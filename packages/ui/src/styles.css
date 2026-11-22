@@ -116,3 +116,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .job { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
 .job + .job { border-top: 1px solid var(--dt-border); }
+
+.agent-card { border-radius: var(--radius); background: var(--dt-accent); font-size: 12.5px; }
+.agent-head { width: 100%; display: flex; gap: 8px; align-items: center; background: none; border: 0; padding: 7px 10px; cursor: pointer; text-align: left; }
+.agent-task { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dt-muted-foreground); }
+.agent-card[data-status="done"] .tool-dot { background: #2da44e; }
+.agent-card[data-status="error"] .tool-dot, .agent-card[data-status="cancelled"] .tool-dot { background: var(--dt-destructive); }
+.agent-card[data-status="running"] .tool-dot { background: var(--dt-primary); animation: pulse 1s infinite; }
+.agent-body { padding: 0 10px 8px; }
+.agent-body pre { margin: 2px 0 8px; padding: 8px 10px; background: var(--dt-muted); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto; font-family: var(--dt-font-mono); }

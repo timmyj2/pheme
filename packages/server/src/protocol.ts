@@ -24,6 +24,7 @@ export type ChatEvent =
   | { type: "approval_request"; id: string; kind: string; title: string; detail: string }
   | { type: "approval_resolved"; id: string; decision: ApprovalDecision }
   | { type: "notice"; text: string; kind: "skill" | "memory" | "info" }
+  | { type: "agent_update"; run: AgentRun }
   | { type: "turn_start" }
   | { type: "idle" }
   | { type: "error"; message: string };
@@ -106,4 +107,28 @@ export interface Job {
   lastRunAt: number | null;
   lastChatId: string | null;
   lastStatus: "ok" | "error" | "skipped" | null;
+}
+
+export interface AgentProfile {
+  name: string;
+  description: string;
+  /** System instructions for this agent. */
+  instructions: string;
+  /** Copilot tool names it may use; empty = all. */
+  tools: string[];
+}
+
+export interface AgentRun {
+  id: string;
+  parentChatId: string;
+  name: string;
+  task: string;
+  /** "session" = a parallel Pheme session started by the agent tool; "copilot" = delegated by the CLI to a custom agent. */
+  source: "session" | "copilot";
+  status: "running" | "done" | "error" | "cancelled";
+  startedAt: number;
+  endedAt: number | null;
+  result: string;
+  /** Hidden chat holding the transcript (session runs only). */
+  childChatId?: string;
 }

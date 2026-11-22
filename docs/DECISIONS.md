@@ -25,3 +25,8 @@ One line each: **decision** — why. The owner reviews these.
 - **Job schedules: interval, daily (local HH:MM), once** — covers the plan without a cron parser.
 - **Jobs run in a normal chat titled "Job: <name>"** — shows in the sidebar and keeps the transcript; job chats never prompt: allow or deny is fixed by `allowActions` at creation (reads always allowed).
 - **Scheduler ticks every 30 s and advances `nextRunAt` before running** — a slow run is never started twice, and any number of missed runs collapse into one on start.
+- **Subagents are both: an `agent` tool and saved profiles** — owner chose "both, parallel sessions first". The `agent` tool starts a separate engine session; saved profiles are also passed to Copilot as `customAgents` (infer on) so the CLI can delegate to them itself.
+- **Sub-agent sessions get only `skill_view`** — no `agent` tool (no recursion), no memory or skill writes; a sub-agent cannot change long-term state.
+- **At most 3 sub-agent sessions run at once** — protects the Free quota and the machine; extra calls wait their turn.
+- **Sub-agent approvals appear as cards in the parent chat; Stop cancels the whole tree** — one place for the user to answer; child sessions are hidden chats kept for the transcript.
+- **Profiles live in `~/.pheme/agents/<name>.md`, archived not deleted; runs in `agent-runs.json` (last 200)** — same conventions as skills. Profile changes apply to new chats, because Copilot gets them at session creation.

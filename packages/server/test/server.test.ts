@@ -87,4 +87,18 @@ describe("server", () => {
     await call("/api/skills/s1", { method: "DELETE" });
     expect(await (await call("/api/skills")).json()).toEqual([]);
   });
+
+  it("agent profile and run endpoints", async () => {
+    const { call, app } = await boot();
+    const put = await call("/api/agent-profiles/critic", { method: "PUT", body: JSON.stringify({ description: "Use when reviewing.", instructions: "Find flaws.", tools: ["view"] }) });
+    expect(put.status).toBe(200);
+    expect((await call("/api/agent-profiles/BAD NAME", { method: "PUT", body: JSON.stringify({ description: "d", instructions: "i" }) })).status).toBe(400);
+    expect((await (await call("/api/agent-profiles")).json())[0]).toMatchObject({ name: "critic", tools: ["view"] });
+    const chat = app.store.create();
+    app.send(chat.id, "agent do a thing");
+    await app.drain();
+    expect((await (await call("/api/agents")).json())[0]).toMatchObject({ status: "done" });
+    await call("/api/agent-profiles/critic", { method: "DELETE" });
+    expect(await (await call("/api/agent-profiles")).json()).toEqual([]);
+  });
 });

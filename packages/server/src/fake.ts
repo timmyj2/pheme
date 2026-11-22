@@ -6,7 +6,11 @@ export type FakeStep =
   | { tool: string; args: Record<string, unknown> }
   /** Pretend the engine ran one of its own built-in tools (needs approval unless kind is "read"). */
   | { builtin: "shell" | "write" | "read"; detail: string }
-  | { delayMs: number };
+  | { delayMs: number }
+  /** Run several tool calls at the same time, like a model that calls a tool twice in one response. */
+  | { parallel: { tool: string; args: Record<string, unknown> }[] }
+  /** Pretend Copilot delegated to one of the custom agents in opts.agents. */
+  | { delegate: string; task: string };
 
 export interface FakeContext {
   prompt: string;
@@ -41,6 +45,12 @@ export const defaultScript: FakeScript = ({ prompt, opts }) => {
     const fact = /remember(?: that)? ([^\n.]+)/i.exec(prompt)?.[1];
     return fact ? [{ tool: "memory", args: { action: "add", store: "user", content: fact.trim() } }, { say: "Saved." }] : [{ say: "Nothing to save." }];
   }
+  const ag = /^agents? (?:(\w[\w-]*): )?(.+)$/i.exec(prompt);
+  if (ag) return [{ tool: "agent", args: { task: ag[2], ...(ag[1] ? { profile: ag[1] } : {}) } }, { say: "Agent finished." }];
+  const par = /^parallel (.+)$/i.exec(prompt);
+  if (par) return [{ parallel: par[1].split("|").map((t) => ({ tool: "agent", args: { task: t.trim() } })) }, { say: "All agents finished." }];
+  const del = /^delegate (\S+) (.+)$/i.exec(prompt);
+  if (del) return [{ delegate: del[1], task: del[2] }, { say: "Delegated." }];
   const steps = /\bsteps (\d+)/i.exec(prompt);
   if (steps) {
     const out: FakeStep[] = [];
@@ -86,23 +96,29 @@ export class FakeEngine implements Engine {
         self.prompts.push({ prompt, opts });
         const steps = await self.script({ prompt, opts });
         let n = 0;
+        const runTool = async (step: { tool: string; args: Record<string, unknown> }) => {
+          const id = `t${++n}-${Math.random().toString(36).slice(2, 7)}`;
+          onEvent({ type: "tool_start", id, name: step.tool, args: step.args });
+          const tool = opts.tools.find((t) => t.name === step.tool);
+          if (!tool) return onEvent({ type: "tool_end", id, name: step.tool, ok: false, result: "unknown tool" });
+          try {
+            const result = await tool.handler(step.args);
+            onEvent({ type: "tool_end", id, name: step.tool, ok: !result.startsWith("Error:"), result });
+          } catch (e) {
+            onEvent({ type: "tool_end", id, name: step.tool, ok: false, result: (e as Error).message });
+          }
+        };
         for (const step of steps) {
           if (signal?.aborted) return;
           if ("delayMs" in step) await sleep(step.delayMs);
           else if ("say" in step) await say(step.say, onEvent, self.streamDelayMs, signal);
-          else if ("tool" in step) {
-            const id = `t${++n}-${Math.random().toString(36).slice(2, 7)}`;
-            onEvent({ type: "tool_start", id, name: step.tool, args: step.args });
-            const tool = opts.tools.find((t) => t.name === step.tool);
-            if (!tool) onEvent({ type: "tool_end", id, name: step.tool, ok: false, result: "unknown tool" });
-            else {
-              try {
-                const result = await tool.handler(step.args);
-                onEvent({ type: "tool_end", id, name: step.tool, ok: !result.startsWith("Error:"), result });
-              } catch (e) {
-                onEvent({ type: "tool_end", id, name: step.tool, ok: false, result: (e as Error).message });
-              }
-            }
+          else if ("tool" in step) await runTool(step);
+          else if ("parallel" in step) await Promise.all(step.parallel.map(runTool));
+          else if ("delegate" in step) {
+            const id = `d${++n}`;
+            const known = opts.agents?.some((x) => x.name === (step as { delegate: string }).delegate);
+            onEvent({ type: "subagent", phase: "start", id, name: step.delegate, task: step.task });
+            onEvent({ type: "subagent", phase: "end", id, name: step.delegate, ok: !!known, result: known ? "" : "unknown agent" });
           } else if ("builtin" in step) {
             const id = `b${++n}-${Math.random().toString(36).slice(2, 7)}`;
             const name = step.builtin === "shell" ? "bash" : step.builtin === "write" ? "edit" : "view";

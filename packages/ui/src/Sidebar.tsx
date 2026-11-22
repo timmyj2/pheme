@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ChatRow } from "./api.ts";
 
-export type View = "chat" | "skills" | "memory" | "jobs" | "settings";
+export type View = "chat" | "skills" | "memory" | "agents" | "jobs" | "settings";
 
 export function Brand() {
   return (
@@ -56,7 +56,7 @@ export function Sidebar(props: {
       </div>
       <button className="link small" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Back to chats" : "Show archived"}</button>
       <nav className="nav">
-        {(["skills", "memory", "jobs", "settings"] as const).map((v) => (
+        {(["skills", "memory", "agents", "jobs", "settings"] as const).map((v) => (
           <button key={v} className={props.view === v ? "active" : ""} onClick={() => props.onView(v)}>{v === "jobs" ? "Scheduled jobs" : v[0].toUpperCase() + v.slice(1)}</button>
         ))}
         <div className="kbd-hint muted small">Ctrl+K for commands</div>

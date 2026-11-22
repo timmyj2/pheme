@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ApprovalDecision, type SeqEvent } from "./api.ts";
+import { AgentCard } from "./AgentCard.tsx";
 import { Markdown } from "./markdown.tsx";
 
 export function useChat(chatId: string, onTurnEnd: () => void) {
@@ -92,9 +93,12 @@ export function Transcript({ chatId, events, streaming, busy }: { chatId: string
   useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [events.length, streaming]);
   const ends = new Map<string, Extract<SeqEvent, { type: "tool_end" }>>();
   const resolved = new Set<string>();
+  const latestRun = new Map<string, Extract<SeqEvent, { type: "agent_update" }>>();
+  const firstSeen = new Set<string>();
   for (const e of events) {
     if (e.type === "tool_end") ends.set(e.id, e);
     if (e.type === "approval_resolved") resolved.add(e.id);
+    if (e.type === "agent_update") latestRun.set(e.run.id, e);
   }
   return (
     <div className="transcript">
@@ -110,6 +114,11 @@ export function Transcript({ chatId, events, streaming, busy }: { chatId: string
               return <ToolRow key={e.seq} start={e} end={ends.get(e.id)} />;
             case "approval_request":
               return !resolved.has(e.id) && busy ? <ApprovalCard key={e.seq} ev={e} onAnswer={(d) => void api.approve(chatId, e.id, d)} /> : null;
+            case "agent_update": {
+              if (firstSeen.has(e.run.id)) return null;
+              firstSeen.add(e.run.id);
+              return <AgentCard key={e.run.id} run={latestRun.get(e.run.id)!.run} />;
+            }
             case "notice":
               return <div key={e.seq} className={`notice ${e.kind}`}>{e.text}</div>;
             case "error":

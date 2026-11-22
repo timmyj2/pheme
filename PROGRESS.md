@@ -20,7 +20,7 @@
 | Step | Status |
 |---|---|
 | Scheduled jobs: scheduler, API, page | ✅ Done (6 tests, checked in a browser) |
-| Subagents + Agents page | ⏳ Next |
+| Subagents: `agent` tool (parallel sessions, max 3 at once) + saved agent profiles passed to Copilot as custom agents + Agents page and inline cards | ✅ Done in fake mode (10 tests, checked in a browser); **not yet tried with real Copilot** |
 
 ## Blockers / needs owner
 
@@ -36,5 +36,6 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 - Repo created with plan, license and notices.
 - Owner chose to pin the CLI at 1.0.112; doctor now treats an empty model list as a warning.
 - Real Copilot check passed; fixed empty tool names on `tool_end` and duplicate approval cards.
+- v2: subagents and Agents page added (both modes).
 - v2: scheduled jobs added (interval/daily/once; run only while open; missed runs collapse into one; `allowActions` fixed at creation).
 - v1 steps 1-9 built; 32 tests, typecheck and lint pass locally on macOS. CI runs on push.

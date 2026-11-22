@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { AgentStore, Semaphore } from "./agents.ts";
 import type { Engine, EngineEvent, EngineSession, PermissionAnswer, PermissionRequest } from "./engine.ts";
 import { JobStore, Scheduler } from "./jobs.ts";
 import { Loops } from "./loops.ts";
 import { MemoryStore } from "./memory.ts";
-import type { ApprovalDecision, ChatMeta, Settings } from "./protocol.ts";
+import type { AgentRun, ApprovalDecision, ChatMeta, Settings } from "./protocol.ts";
 import { SettingsStore } from "./settings.ts";
 import { SkillStore } from "./skills.ts";
 import { ChatStore } from "./store.ts";
-import { memoryTool, skillTools } from "./tools.ts";
+import { agentTool, memoryTool, skillTools } from "./tools.ts";
 
 const PERSONA = `You are Pheme, an assistant running in a local app on the user's computer.
 You keep long-term memory with the memory tool and reusable procedures as skills (skill_view, skill_manage).
@@ -16,6 +17,8 @@ Use memory for durable facts about the user or environment. When a skill in the 
 interface Turn {
   abort: AbortController;
   approvals: Map<string, (d: ApprovalDecision) => void>;
+  /** Abort controllers of sub-agent sessions started during this turn. */
+  children: Set<AbortController>;
   done: Promise<void>;
 }
 
@@ -26,6 +29,8 @@ export class App {
   readonly skills: SkillStore;
   readonly loops: Loops;
   readonly jobs: JobStore;
+  readonly agents: AgentStore;
+  private agentSlots = new Semaphore(3);
   readonly scheduler: Scheduler;
   /** Chats started by scheduled jobs: fixed allow/deny for actions, never asks the user. */
   readonly chatPolicy = new Map<string, "allow" | "deny">();
@@ -44,6 +49,7 @@ export class App {
     this.skills = new SkillStore(dataDir);
     this.loops = new Loops(this);
     this.jobs = new JobStore(dataDir);
+    this.agents = new AgentStore(dataDir);
     this.scheduler = new Scheduler(this);
   }
 
@@ -83,7 +89,7 @@ export class App {
     if (!meta) throw new Error("no such chat");
     if (this.turns.has(chatId)) throw new Error("this chat is still working");
     const abort = new AbortController();
-    const turn: Turn = { abort, approvals: new Map(), done: Promise.resolve() };
+    const turn: Turn = { abort, approvals: new Map(), children: new Set(), done: Promise.resolve() };
     this.turns.set(chatId, turn);
     turn.done = this.runTurn(chatId, meta, text, turn).finally(() => this.turns.delete(chatId));
   }
@@ -92,6 +98,7 @@ export class App {
     const t = this.turns.get(chatId);
     if (!t) return;
     t.abort.abort();
+    for (const c of t.children) c.abort();
     for (const resolve of t.approvals.values()) resolve("deny");
   }
 
@@ -119,7 +126,8 @@ export class App {
         text,
         (e: EngineEvent) => {
           if (e.type === "tool_start") toolSteps++;
-          store.append(chatId, e);
+          if (e.type === "subagent") this.recordCopilotAgent(chatId, e);
+          else store.append(chatId, e);
         },
         turn.abort.signal,
       );
@@ -141,11 +149,87 @@ export class App {
       resume,
       model: this.store.get(chatId)?.model ?? s.model,
       systemMessage: this.buildSystemMessage(),
-      tools: [memoryTool(this.memory), ...skillTools(this.skills)],
+      tools: [memoryTool(this.memory), ...skillTools(this.skills), agentTool((task, profile) => this.runAgent(chatId, task, profile))],
+      agents: this.agents.listProfiles().map((p) => ({ name: p.name, description: p.description, prompt: p.instructions, tools: p.tools.length ? p.tools : undefined })),
       onPermission: (req) => this.askUser(chatId, req, this.turns.get(chatId) ?? turn),
     });
     this.sessions.set(chatId, session);
     return session;
+  }
+
+  private emitRun(run: AgentRun): void {
+    this.agents.upsertRun(run);
+    this.store.append(run.parentChatId, { type: "agent_update", run: { ...run } });
+  }
+
+  /** Copilot delegated to one of the custom agents (subagent.* events). */
+  private recordCopilotAgent(chatId: string, e: Extract<EngineEvent, { type: "subagent" }>): void {
+    const id = `copilot-${e.id}`;
+    const prev = this.agents.listRuns().find((r) => r.id === id);
+    if (e.phase === "start") {
+      this.emitRun({ id, parentChatId: chatId, name: e.name, task: e.task ?? "", source: "copilot", status: "running", startedAt: Date.now(), endedAt: null, result: "" });
+    } else if (prev) {
+      this.emitRun({ ...prev, status: e.ok === false ? "error" : "done", endedAt: Date.now(), result: e.result ?? "" });
+    }
+  }
+
+  /** Run a task in a separate engine session (the `agent` tool). Returns the sub-agent's final answer. */
+  async runAgent(parentChatId: string, task: string, profileName?: string): Promise<string> {
+    const parent = this.turns.get(parentChatId);
+    if (!parent) throw new Error("no active turn to attach the agent to");
+    if (!task.trim()) throw new Error("task is required");
+    const profile = profileName ? this.agents.getProfile(profileName) : undefined;
+    if (profileName && !profile) {
+      const known = this.agents.listProfiles().map((p) => p.name).join(", ") || "none saved";
+      throw new Error(`unknown agent profile "${profileName}" (available: ${known})`);
+    }
+    const run: AgentRun = { id: randomUUID(), parentChatId, name: profile?.name ?? "agent", task: task.slice(0, 2000), source: "session", status: "running", startedAt: Date.now(), endedAt: null, result: "" };
+    this.emitRun(run);
+    const abort = new AbortController();
+    parent.children.add(abort);
+    await this.agentSlots.acquire();
+    let session: EngineSession | undefined;
+    try {
+      if (abort.signal.aborted) throw new Error("cancelled");
+      const child = this.store.create({ hidden: true, title: `Agent: ${run.name}` });
+      run.childChatId = child.id;
+      this.emitRun(run);
+      const persona = `${PERSONA}\n\nYou are a sub-agent started by another Pheme chat to do one task. Do the task, then reply with only the final answer; the parent will read it.${profile ? `\n\n${profile.instructions}` : ""}`;
+      session = await this.engine.createSession({
+        id: child.id,
+        resume: false,
+        model: this.settings.get().model,
+        systemMessage: `${persona}\n\n${this.skills.index()}`,
+        tools: skillTools(this.skills).filter((t) => t.name === "skill_view"),
+        onPermission: (req) => this.askUser(parentChatId, req, parent),
+      });
+      this.store.append(child.id, { type: "user", text: task });
+      let last = "";
+      await session.send(
+        task,
+        (e) => {
+          if (e.type === "message") last = e.text;
+          if (e.type !== "subagent") this.store.append(child.id, e);
+        },
+        abort.signal,
+      );
+      this.store.append(child.id, { type: "idle" });
+      if (abort.signal.aborted) {
+        this.emitRun({ ...run, status: "cancelled", endedAt: Date.now() });
+        return "Cancelled by the user.";
+      }
+      const result = last.slice(0, 8000);
+      this.emitRun({ ...run, status: "done", endedAt: Date.now(), result });
+      return result || "(the sub-agent returned no text)";
+    } catch (e) {
+      const cancelled = abort.signal.aborted;
+      this.emitRun({ ...run, status: cancelled ? "cancelled" : "error", endedAt: Date.now(), result: cancelled ? "" : (e as Error).message });
+      throw e;
+    } finally {
+      this.agentSlots.release();
+      parent.children.delete(abort);
+      await session?.close().catch(() => {});
+    }
   }
 
   private async askUser(chatId: string, req: PermissionRequest, turn: Turn): Promise<PermissionAnswer> {

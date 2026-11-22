@@ -1,6 +1,6 @@
-import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule } from "../../server/src/protocol.ts";
+import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun } from "../../server/src/protocol.ts";
 
-export type { Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
+export type { AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
 export type ChatRow = ChatMeta & { busy?: boolean };
 
 const KEY = "pheme-token";
@@ -52,5 +52,9 @@ export const api = {
   updateJob: (id: string, patch: Partial<Pick<Job, "enabled" | "name" | "prompt">>) => call<Job>(`/jobs/${id}`, "PUT", patch),
   runJob: (id: string) => call<{ ok: boolean }>(`/jobs/${id}/run`, "POST", {}),
   deleteJob: (id: string) => call<{ ok: boolean }>(`/jobs/${id}`, "DELETE"),
+  agentRuns: () => call<AgentRun[]>("/agents"),
+  agentProfiles: () => call<AgentProfile[]>("/agent-profiles"),
+  saveAgentProfile: (p: AgentProfile) => call<AgentProfile>(`/agent-profiles/${encodeURIComponent(p.name)}`, "PUT", p),
+  archiveAgentProfile: (name: string) => call<{ ok: boolean }>(`/agent-profiles/${encodeURIComponent(name)}`, "DELETE"),
   eventsUrl: (id: string, after: number) => `/api/chats/${id}/events?after=${after}&token=${encodeURIComponent(token())}`,
 };

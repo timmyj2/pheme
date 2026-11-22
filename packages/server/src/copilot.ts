@@ -114,6 +114,9 @@ export class CopilotEngine implements Engine {
       onPermissionRequest,
       streaming: true,
     };
+    if (opts.agents?.length) {
+      config.customAgents = opts.agents.map((a) => ({ name: a.name, displayName: a.name, description: a.description, prompt: a.prompt, tools: a.tools ?? null, infer: true }));
+    }
     if (opts.customToolsOnly) config.availableTools = opts.tools.map((t) => t.name);
     const session = opts.resume
       ? await client.resumeSession(opts.id, config as never).catch(() => client.createSession({ ...config, sessionId: opts.id } as never))
@@ -143,6 +146,15 @@ export class CopilotEngine implements Engine {
                 onEvent({ type: "tool_end", id: String(d.toolCallId), name: names.get(String(d.toolCallId)) ?? String(d.toolName ?? ""), ok: d.success !== false, result: String(result?.content ?? err?.message ?? "") });
                 break;
               }
+              case "subagent.started":
+                onEvent({ type: "subagent", phase: "start", id: String(d.toolCallId), name: String(d.agentDisplayName ?? d.agentName), task: String(d.agentDescription ?? "") });
+                break;
+              case "subagent.completed":
+                onEvent({ type: "subagent", phase: "end", id: String(d.toolCallId), name: String(d.agentDisplayName ?? d.agentName), ok: !d.cancelled });
+                break;
+              case "subagent.failed":
+                onEvent({ type: "subagent", phase: "end", id: String(d.toolCallId), name: String(d.agentDisplayName ?? d.agentName), ok: false, result: String(d.error ?? "") });
+                break;
               case "session.error":
                 onEvent({ type: "error", message: String(d.message ?? "Copilot error") });
                 break;

@@ -67,3 +67,26 @@ export function skillTools(skills: SkillStore): ToolDef[] {
     },
   ];
 }
+
+export function agentTool(run: (task: string, profile?: string) => Promise<string>): ToolDef {
+  return {
+    name: "agent",
+    description:
+      "Start a sub-agent in its own separate session to do one self-contained task, and get back its final answer. Call this several times in the same response to work on independent tasks in parallel. Give the task all the context it needs; the sub-agent cannot see this chat. Optional `profile` selects a saved agent (specialised instructions).",
+    parameters: {
+      type: "object",
+      properties: {
+        task: { type: "string", description: "Complete instructions for the sub-agent." },
+        profile: { type: "string", description: "Name of a saved agent profile (optional)." },
+      },
+      required: ["task"],
+    },
+    handler: async (a) => {
+      try {
+        return await run(String(a.task ?? ""), a.profile ? String(a.profile) : undefined);
+      } catch (e) {
+        return `Error: ${(e as Error).message}`;
+      }
+    },
+  };
+}

@@ -21,6 +21,7 @@ export type EngineEvent =
   | { type: "message"; text: string }
   | { type: "tool_start"; id: string; name: string; args: unknown }
   | { type: "tool_end"; id: string; name: string; ok: boolean; result: string }
+  | { type: "subagent"; phase: "start" | "end"; id: string; name: string; task?: string; ok?: boolean; result?: string }
   | { type: "error"; message: string };
 
 export interface SessionOptions {
@@ -35,6 +36,8 @@ export interface SessionOptions {
   onPermission: (req: PermissionRequest) => Promise<PermissionAnswer>;
   /** Restrict the session to the custom tools only (used for hidden review sessions). */
   customToolsOnly?: boolean;
+  /** Custom agent profiles the engine may delegate to (Copilot `customAgents`). */
+  agents?: { name: string; description: string; prompt: string; tools?: string[] }[];
 }
 
 export interface EngineSession {

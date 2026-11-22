@@ -139,6 +139,29 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       }
     }
 
+    // --- agents
+    if (seg[0] === "agents" && m === "GET") return json(res, 200, app.agents.listRuns());
+    if (seg[0] === "agent-profiles") {
+      try {
+        if (seg.length === 1 && m === "GET") return json(res, 200, app.agents.listProfiles());
+        const name = seg[1];
+        if (m === "GET") {
+          const p = app.agents.getProfile(name);
+          return p ? json(res, 200, p) : json(res, 404, { error: "no such agent" });
+        }
+        if (m === "PUT") {
+          const tools = Array.isArray(body.tools) ? body.tools.map(String) : [];
+          return json(res, 200, app.agents.saveProfile({ name, description: String(body.description ?? ""), instructions: String(body.instructions ?? ""), tools }));
+        }
+        if (m === "DELETE") {
+          app.agents.archiveProfile(name);
+          return json(res, 200, { ok: true });
+        }
+      } catch (e) {
+        return json(res, 400, { error: (e as Error).message });
+      }
+    }
+
     // --- memory
     if (seg[0] === "memory") {
       if (m === "GET") return json(res, 200, app.memory.state());

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChatView } from "./Chat.tsx";
+import { AgentsPage } from "./Agents.tsx";
 import { JobsPage } from "./Jobs.tsx";
 import { MemoryPage, SettingsPage, SkillsPage } from "./Pages.tsx";
 import { Palette, type Command } from "./Palette.tsx";
@@ -65,6 +66,7 @@ export function App() {
       { id: "new", label: "New chat", run: () => void newChat() },
       { id: "skills", label: "Go to Skills", run: go("skills") },
       { id: "memory", label: "Go to Memory", run: go("memory") },
+      { id: "agents", label: "Go to Agents", run: go("agents") },
       { id: "jobs", label: "Go to Scheduled jobs", run: go("jobs") },
       { id: "settings", label: "Go to Settings", run: go("settings") },
       { id: "theme", label: "Toggle light/dark theme", run: () => {
@@ -104,6 +106,7 @@ export function App() {
         ))}
         {view === "skills" && <SkillsPage />}
         {view === "memory" && <MemoryPage />}
+        {view === "agents" && <AgentsPage onOpenChat={(id) => { refresh(); setActiveId(id); setView("chat"); }} />}
         {view === "jobs" && <JobsPage onOpenChat={(id) => { refresh(); setActiveId(id); setView("chat"); }} />}
         {view === "settings" && <SettingsPage state={state} onChange={(settings) => setState({ ...state, settings })} />}
       </main>

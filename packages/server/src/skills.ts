@@ -4,7 +4,7 @@ import type { SkillSummary } from "./protocol.ts";
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
-export function parseFrontmatter(text: string): { name?: string; description?: string; body: string } {
+export function parseFrontmatter(text: string): { name?: string; description?: string; tools?: string; body: string } {
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
   if (!m) return { body: text };
   const out: Record<string, string> = {};
@@ -12,7 +12,7 @@ export function parseFrontmatter(text: string): { name?: string; description?: s
     const kv = /^([A-Za-z_-]+):\s*(.*)$/.exec(line);
     if (kv) out[kv[1]] = kv[2].replace(/^["']|["']$/g, "").trim();
   }
-  return { name: out.name, description: out.description, body: m[2] };
+  return { name: out.name, description: out.description, tools: out.tools, body: m[2] };
 }
 
 /** Skills live in Pheme's own folder: <data>/skills/<name>/SKILL.md (+ optional supporting files). */
