@@ -18,7 +18,7 @@
 ## Blockers / needs owner
 
 1. **SDK vs. Copilot CLI version skew: resolved by pinning** (owner chose option a). Both laptops need `npm i -g @github/copilot@1.0.112`; `pheme doctor` explains it if the CLI is newer. Watch for CLI auto-updates.
-2. Real-Copilot test needs the owner's go-ahead (it spends Free-plan quota). The SDK's own runtime already signs in through the `gh` login on this Mac.
+2. ~~Real-Copilot test~~ Done on the Mac (gh login): custom `memory` tool, streaming reply, and a shell approval card all work. Read-only commands such as `echo` are auto-allowed by the CLI itself.
 
 ## End-to-end proof (fake mode)
 
@@ -28,4 +28,5 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 
 - Repo created with plan, license and notices.
 - Owner chose to pin the CLI at 1.0.112; doctor now treats an empty model list as a warning.
+- Real Copilot check passed; fixed empty tool names on `tool_end` and duplicate approval cards.
 - v1 steps 1-9 built; 32 tests, typecheck and lint pass locally on macOS. CI runs on push.

@@ -94,12 +94,17 @@ export class CopilotEngine implements Engine {
         handler: async (args: unknown) => t.handler((args ?? {}) as Record<string, unknown>),
       }),
     );
+    // The CLI can ask more than once for the same tool call; remember what the user already allowed.
+    const allowedCalls = new Set<string>();
     const onPermissionRequest = async (req: { kind: string; [k: string]: unknown }) => {
       const kind = String(req.kind);
       if (kind === "read") return { kind: "approve-once" as const };
+      const callKey = `${String(req.toolCallId ?? "")}|${kind}|${String(req.fullCommandText ?? req.fileName ?? req.url ?? "")}`;
+      if (req.toolCallId && allowedCalls.has(callKey)) return { kind: "approve-once" as const };
       const detail = String(req.fullCommandText ?? req.fileName ?? req.url ?? req.toolName ?? req.toolTitle ?? "");
       const title = kind === "shell" ? "Run shell command" : kind === "write" ? "Edit file" : kind === "url" ? "Fetch URL" : kind === "mcp" ? "Use MCP tool" : `Permission: ${kind}`;
       const answer = await opts.onPermission({ kind, title, detail });
+      if (answer === "allow") allowedCalls.add(callKey);
       return answer === "allow" ? { kind: "approve-once" as const } : { kind: "reject" as const, feedback: "Denied by the user." };
     };
     const config: Record<string, unknown> = {
@@ -116,6 +121,7 @@ export class CopilotEngine implements Engine {
 
     return {
       async send(prompt, onEvent, signal) {
+        const names = new Map<string, string>();
         await new Promise<void>((resolve, reject) => {
           const off = session.on(((raw: unknown) => {
             const ev = raw as { type: string; data?: Record<string, unknown> };
@@ -128,12 +134,13 @@ export class CopilotEngine implements Engine {
                 if (d.content) onEvent({ type: "message", text: String(d.content) });
                 break;
               case "tool.execution_start":
+                names.set(String(d.toolCallId), String(d.toolName));
                 onEvent({ type: "tool_start", id: String(d.toolCallId), name: String(d.toolName), args: d.arguments });
                 break;
               case "tool.execution_complete": {
                 const result = d.result as { content?: string } | undefined;
                 const err = d.error as { message?: string } | undefined;
-                onEvent({ type: "tool_end", id: String(d.toolCallId), name: String(d.toolName ?? ""), ok: d.success !== false, result: String(result?.content ?? err?.message ?? "") });
+                onEvent({ type: "tool_end", id: String(d.toolCallId), name: names.get(String(d.toolCallId)) ?? String(d.toolName ?? ""), ok: d.success !== false, result: String(result?.content ?? err?.message ?? "") });
                 break;
               }
               case "session.error":
