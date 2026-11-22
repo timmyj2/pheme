@@ -1,190 +1,87 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type ApprovalDecision, type SeqEvent } from "./api.ts";
-import { AgentCard } from "./AgentCard.tsx";
-import { Markdown } from "./markdown.tsx";
+import { useEffect, useRef, type RefObject } from "react";
+import { Composer, type ComposerHandle } from "./Composer.tsx";
+import { Transcript, copyText } from "./Transcript.tsx";
+import { useToast } from "./toast.tsx";
+import { useChat } from "./useChat.ts";
 
-export function useChat(chatId: string, onTurnEnd: () => void) {
-  const [events, setEvents] = useState<SeqEvent[]>([]);
-  const [streaming, setStreaming] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const endRef = useRef(onTurnEnd);
-  endRef.current = onTurnEnd;
+interface Props {
+  /** null = a new chat that is created when the first message is sent. */
+  chatId: string | null;
+  offline: boolean;
+  composerRef: RefObject<ComposerHandle | null>;
+  /** Text to send as soon as the chat has loaded (the message that created it). */
+  autoSend?: string;
+  onAutoSent: () => void;
+  onCreate: (text: string) => void;
+  onChanged: () => void;
+  onOpenChat: (id: string) => void;
+  onBusy: (busy: boolean) => void;
+}
 
+export function ChatView({ chatId, offline, composerRef, autoSend, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
+  const toast = useToast();
+  const chat = useChat(chatId, { onChange: onChanged, onError: (m) => toast.error(m) });
+  const sentAuto = useRef(false);
+
+  useEffect(() => { onBusy(chat.busy); }, [chat.busy, onBusy]);
+
+  // The first message of a new chat: the chat is created, the route changes, and the message is sent once it has loaded.
   useEffect(() => {
-    let es: EventSource | undefined;
-    let dead = false;
-    setEvents([]);
-    setStreaming("");
-    setError("");
-    api.chat(chatId).then((c) => {
-      if (dead) return;
-      setEvents(c.events);
-      setBusy(c.busy);
-      const last = c.events.length ? c.events[c.events.length - 1].seq : 0;
-      es = new EventSource(api.eventsUrl(chatId, last));
-      es.onmessage = (m) => {
-        const e = JSON.parse(m.data) as SeqEvent;
-        if (e.type === "delta") return setStreaming((s) => s + e.text);
-        if (e.type === "message") setStreaming("");
-        if (e.type === "turn_start") setBusy(true);
-        if (e.type === "idle") {
-          setBusy(false);
-          setStreaming("");
-          endRef.current();
-        }
-        setEvents((prev) => (prev.some((p) => p.seq === e.seq) ? prev : [...prev, e]));
-      };
-    }).catch((e: Error) => setError(e.message));
-    return () => {
-      dead = true;
-      es?.close();
-    };
-  }, [chatId]);
-
-  const send = useCallback(async (text: string) => {
-    setError("");
-    try {
-      await api.send(chatId, text);
-    } catch (e) {
-      setError((e as Error).message);
+    if (chatId && autoSend && chat.loaded && !sentAuto.current) {
+      sentAuto.current = true;
+      chat.send(autoSend);
+      onAutoSent();
     }
-  }, [chatId]);
+  }, [chatId, autoSend, chat.loaded]);
 
-  return { events, streaming, busy, error, send, stop: () => api.stop(chatId) };
-}
+  const send = (text: string) => (chatId ? chat.send(text) : onCreate(text));
 
-function ToolRow({ start, end }: { start: Extract<SeqEvent, { type: "tool_start" }>; end?: Extract<SeqEvent, { type: "tool_end" }> }) {
-  const [open, setOpen] = useState(false);
-  const a = start.args as Record<string, unknown> | undefined;
-  const summary = a && typeof a === "object" ? String(a.detail ?? a.command ?? a.path ?? a.name ?? a.action ?? a.content ?? "").slice(0, 80) : "";
-  const state = !end ? "running" : end.ok ? "ok" : "failed";
-  return (
-    <div className="tool-row" data-state={state}>
-      <button className="tool-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="tool-dot" />
-        <span className="tool-name">{start.name}</span>
-        <span className="tool-sum">{summary}</span>
-        <span className="tool-state">{state}</span>
-      </button>
-      {open && (
-        <pre className="tool-body">{JSON.stringify(start.args, null, 2)}{end ? `\n\n→ ${end.result}` : ""}</pre>
-      )}
-    </div>
-  );
-}
-
-function ApprovalCard({ ev, onAnswer }: { ev: Extract<SeqEvent, { type: "approval_request" }>; onAnswer: (d: ApprovalDecision) => void }) {
-  return (
-    <div className="approval" role="alertdialog" aria-label={ev.title}>
-      <div className="approval-title">{ev.title}</div>
-      <pre className="approval-detail">{ev.detail}</pre>
-      <div className="approval-actions">
-        <button className="btn primary" onClick={() => onAnswer("once")}>Allow once</button>
-        <button className="btn" onClick={() => onAnswer("chat")}>Allow for this chat</button>
-        <button className="btn danger" onClick={() => onAnswer("deny")}>Deny</button>
-      </div>
-    </div>
-  );
-}
-
-/** Long chats render only the most recent events; older ones load on request. */
-const WINDOW = 400;
-
-export function Transcript({ chatId, events, streaming, busy }: { chatId: string; events: SeqEvent[]; streaming: string; busy: boolean }) {
-  const bottom = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(WINDOW);
-  useEffect(() => { setShown(WINDOW); }, [chatId]);
-  useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [events.length, streaming, chatId]);
-  const ends = new Map<string, Extract<SeqEvent, { type: "tool_end" }>>();
-  const resolved = new Set<string>();
-  const latestRun = new Map<string, Extract<SeqEvent, { type: "agent_update" }>>();
-  const firstSeen = new Set<string>();
-  for (const e of events) {
-    if (e.type === "tool_end") ends.set(e.id, e);
-    if (e.type === "approval_resolved") resolved.add(e.id);
-    if (e.type === "agent_update") latestRun.set(e.run.id, e);
-  }
-  return (
-    <div className="transcript">
-      <div className="transcript-inner">
-        {events.length === 0 && <div className="empty">What can I help with?</div>}
-        {events.length > shown && (
-          <button className="btn load-earlier" onClick={() => setShown((n) => n + WINDOW)}>Show {Math.min(WINDOW, events.length - shown)} earlier of {events.length - shown} hidden events</button>
-        )}
-        {events.slice(-shown).map((e) => {
-          switch (e.type) {
-            case "user":
-              return <div key={e.seq} className="bubble user">{e.text}</div>;
-            case "message":
-              return <div key={e.seq} className="assistant"><Markdown text={e.text} /></div>;
-            case "tool_start":
-              return <ToolRow key={e.seq} start={e} end={ends.get(e.id)} />;
-            case "approval_request":
-              return !resolved.has(e.id) && busy ? <ApprovalCard key={e.seq} ev={e} onAnswer={(d) => void api.approve(chatId, e.id, d)} /> : null;
-            case "agent_update": {
-              if (firstSeen.has(e.run.id)) return null;
-              firstSeen.add(e.run.id);
-              return <AgentCard key={e.run.id} run={latestRun.get(e.run.id)!.run} />;
-            }
-            case "notice":
-              return <div key={e.seq} className={`notice ${e.kind}`}>{e.text}</div>;
-            case "error":
-              return <div key={e.seq} className="notice error">{e.message}</div>;
-            default:
-              return null;
-          }
-        })}
-        {streaming && <div className="assistant streaming"><Markdown text={streaming} /></div>}
-        {busy && !streaming && <div className="thinking" aria-label="Working">●●●</div>}
-        <div ref={bottom} />
-      </div>
-    </div>
-  );
-}
-
-export function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (t: string) => void; onStop: () => void }) {
-  const [text, setText] = useState("");
-  const ta = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => { ta.current?.focus(); }, []);
-  const submit = () => {
-    const t = text.trim();
-    if (!t || busy) return;
-    onSend(t);
-    setText("");
+  const stop = async () => {
+    const held = await chat.stop();
+    if (held.length) composerRef.current?.insert(held.join("\n"));
   };
-  return (
-    <div className="composer">
-      <textarea
-        ref={ta}
-        value={text}
-        rows={2}
-        placeholder="Message Pheme"
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-      />
-      {busy ? (
-        <button className="btn danger" onClick={onStop}>Stop</button>
-      ) : (
-        <button className="btn primary" onClick={submit} disabled={!text.trim()}>Send</button>
-      )}
-    </div>
-  );
-}
 
-export function ChatView({ chatId, title, onTurnEnd }: { chatId: string; title: string; onTurnEnd: () => void }) {
-  const { events, streaming, busy, error, send, stop } = useChat(chatId, onTurnEnd);
+  const copy = async (text: string) => {
+    if (await copyText(text)) toast.info("Copied");
+    else toast.error("Could not copy to the clipboard");
+  };
+
+  if (chat.loadError) {
+    return (
+      <section className="chat">
+        <div className="fatal"><h2>{chat.loadError}</h2><button className="btn" onClick={() => onOpenChat("")}>Start a new chat</button></div>
+      </section>
+    );
+  }
+
   return (
     <section className="chat">
-      <header className="page-head"><h1>{title}</h1></header>
-      <Transcript chatId={chatId} events={events} streaming={streaming} busy={busy} />
-      {error && <div className="notice error banner">{error}</div>}
-      <Composer busy={busy} onSend={(t) => void send(t).then(onTurnEnd)} onStop={() => void stop()} />
+      {chat.live === "reconnecting" && !offline && <div className="banner warn" role="status">Connection lost. Reconnecting…</div>}
+      <Transcript
+        events={chat.events}
+        streaming={chat.streaming}
+        busy={chat.busy}
+        loaded={chat.loaded}
+        pending={chat.pending}
+        onAnswer={chat.answer}
+        onCopy={(t) => void copy(t)}
+        onRetry={(t) => chat.send(t)}
+        onDismissPending={chat.dropPending}
+        onResendPending={(p) => { chat.dropPending(p.id); chat.send(p.text); }}
+        onSuggest={(t) => composerRef.current?.set(t)}
+        onOpenChat={onOpenChat}
+      />
+      <Composer
+        ref={composerRef}
+        chatId={chatId}
+        busy={chat.busy}
+        offline={offline}
+        queue={chat.queue}
+        hasMessages={chat.events.length > 0}
+        onSend={send}
+        onStop={() => void stop()}
+        onRemoveQueued={chat.removeQueued}
+      />
     </section>
   );
 }

@@ -9,6 +9,8 @@ export interface Palette {
   popover: string; primary: string; primaryForeground: string; secondary: string; accent: string; border: string;
   input: string; ring: string; destructive: string; destructiveForeground: string; sidebar: string; sidebarBorder: string;
   userBubble: string; userBubbleBorder: string;
+  /** Derived by adjustPalette (not present on raw palettes): text-safe variants of destructive / primary. */
+  destructiveText?: string; primaryText?: string;
 }
 
 export interface Theme { name: string; label: string; light?: Palette; dark?: Palette }
@@ -18,6 +20,7 @@ const SYSTEM_MONO = '"JetBrains Mono", "Cascadia Code", "Cascadia Mono", "SF Mon
 export const FONTS = { sans: SYSTEM_SANS, mono: SYSTEM_MONO };
 
 import { GENERATED_THEMES } from "./generated.ts";
+import { adjustPalette, parseColor, toHex } from "./contrast.ts";
 
 /** Every theme has a light palette, a dark palette, or both (dark-only themes such as Midnight have just one). */
 export const THEMES: Theme[] = GENERATED_THEMES;
@@ -47,14 +50,32 @@ export function themeValue(name: string, mode: Mode): string {
   return mode === "system" ? name : `${name}-${mode}`;
 }
 
+const adjustedCache = new Map<string, Palette>();
+
+/** Contrast-adjusted palette for a (theme, mode), cached. THEMES itself stays raw. */
+export function adjustedPalette(theme: Theme, dark: boolean, palette: Palette): Palette {
+  const key = `${theme.name}:${dark ? "dark" : "light"}`;
+  let adj = adjustedCache.get(key);
+  if (!adj) { adj = adjustPalette(palette); adjustedCache.set(key, adj); }
+  return adj;
+}
+
+export const BOOT_KEY = "pheme-theme-boot";
+
 export function applyTheme(value: string): void {
   const { theme, mode } = parseTheme(value);
-  const { palette: p, dark } = pickPalette(theme, mode, window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const picked = pickPalette(theme, mode, window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const { dark } = picked;
+  const p = adjustedPalette(theme, dark, picked.palette);
   const root = document.documentElement;
   const set = (k: string, v: string) => root.style.setProperty(`--dt-${k}`, v);
-  (Object.keys(p) as (keyof Palette)[]).forEach((k) => set(k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()), p[k]));
+  (Object.keys(p) as (keyof Palette)[]).forEach((k) => set(k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()), p[k]!));
   root.style.setProperty("--dt-font-sans", FONTS.sans);
   root.style.setProperty("--dt-font-mono", FONTS.mono);
   root.classList.toggle("dark", dark);
   root.style.colorScheme = dark ? "dark" : "light";
+  try {
+    const bg = parseColor(p.background), fg = parseColor(p.foreground, bg ?? undefined);
+    if (bg && fg) localStorage.setItem(BOOT_KEY, JSON.stringify({ bg: toHex(bg), fg: toHex(fg), dark }));
+  } catch { /* localStorage can throw (private mode, quota) */ }
 }

@@ -41,3 +41,5 @@ One line each: **decision** — why. The owner reviews these.
 - **At most 8 engine sessions stay open; a failed turn drops its session; deleting a chat closes it** — real Copilot sessions are processes/streams; they were kept until exit. An evicted chat resumes on its next message.
 - **Long chats render the last 400 events (button loads earlier); sidebar shows 150 chats (search still finds all)** — a 6,000-event chat was 36,000 DOM nodes.
 - **One Pheme per data folder (`pheme.lock` with the pid)** — two instances would both run scheduled jobs and reviews. A stale lock from a crash is replaced. `--port` is validated with a plain message.
+- UI stress round: chat titles now strip markdown (titleFrom); sending your own message always scrolls to bottom; drafts flush on chat switch; offline detection is immediate on a refused connection and polls every 1.2 s while down; mobile drawer closes on Esc and manages focus; PHEME_TOKEN env var fixes the access key for tests.
+- Markdown renderer is react-markdown + remark-gfm + highlight.js (20 languages); bundle grew to ~725 kB JS (accepted).

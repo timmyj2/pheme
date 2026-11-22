@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { AgentCard } from "./AgentCard.tsx";
+import { ConfirmDialog } from "./Dialog.tsx";
 import { api, type AgentProfile, type AgentRun } from "./api.ts";
+import { LoadError } from "./Pages.tsx";
+import { useToast } from "./toast.tsx";
 
 const BLANK: AgentProfile = { name: "", description: "", instructions: "", tools: [] };
 
@@ -9,9 +12,11 @@ export function AgentsPage({ onOpenChat }: { onOpenChat: (id: string) => void })
   const [profiles, setProfiles] = useState<AgentProfile[]>([]);
   const [edit, setEdit] = useState<AgentProfile | null>(null);
   const [tools, setTools] = useState("");
-  const [msg, setMsg] = useState("");
+  const toast = useToast();
+  const [loadError, setLoadError] = useState("");
+  const [confirm, setConfirm] = useState<AgentProfile | null>(null);
   const load = () => {
-    api.agentRuns().then(setRuns).catch(() => {});
+    api.agentRuns().then((r) => { setRuns(r); setLoadError(""); }).catch((e: Error) => setLoadError(e.message));
     api.agentProfiles().then(setProfiles).catch(() => {});
   };
   useEffect(() => { load(); const t = setInterval(() => api.agentRuns().then(setRuns).catch(() => {}), 2000); return () => clearInterval(t); }, []);
@@ -20,9 +25,9 @@ export function AgentsPage({ onOpenChat }: { onOpenChat: (id: string) => void })
     if (!edit) return;
     try {
       await api.saveAgentProfile({ ...edit, tools: tools.split(",").map((t) => t.trim()).filter(Boolean) });
-      setEdit(null); setMsg(""); load();
+      setEdit(null); toast.info("Saved"); load();
     } catch (e) {
-      setMsg((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
   const running = runs.filter((r) => r.status === "running");
@@ -30,24 +35,25 @@ export function AgentsPage({ onOpenChat }: { onOpenChat: (id: string) => void })
   return (
     <section className="page wide">
       <header className="page-head">
-        <h1>Agents</h1>
+        <h2 className="page-title">Agents</h2>
         <p className="muted">Sub-agents work in their own sessions. In a chat, ask Pheme to split work up (for example: "research A and B in parallel"), or save an agent below and Copilot can hand it tasks. Saved agents apply to new chats.</p>
       </header>
       <div className="panel">
-        <h2>Running now ({running.length})</h2>
+        <h3>Running now ({running.length})</h3>
+        {loadError && runs.length === 0 && <LoadError error={loadError} onRetry={load} />}
         {running.length === 0 && <p className="muted small">Nothing running.</p>}
         {running.map((r) => <AgentCard key={r.id} run={r} onOpenChat={onOpenChat} />)}
       </div>
       <div className="panel">
-        <h2>Saved agents</h2>
-        <div className="row"><button className="btn" onClick={() => { setEdit({ ...BLANK }); setTools(""); setMsg(""); }}>New agent</button></div>
+        <h3>Saved agents</h3>
+        <div className="row"><button className="btn" onClick={() => { setEdit({ ...BLANK }); setTools(""); }}>New agent</button></div>
         {profiles.length === 0 && !edit && <p className="muted small">No saved agents yet.</p>}
         {profiles.map((p) => (
           <div key={p.name} className="job">
             <div className="job-main"><strong>{p.name}</strong><div className="muted small">{p.description}</div></div>
             <div className="row">
-              <button className="btn" onClick={() => { setEdit(p); setTools(p.tools.join(", ")); setMsg(""); }}>Edit</button>
-              <button className="btn danger" onClick={() => void api.archiveAgentProfile(p.name).then(load)}>Archive</button>
+              <button className="btn" onClick={() => { setEdit(p); setTools(p.tools.join(", ")); }}>Edit</button>
+              <button className="btn danger" onClick={() => setConfirm(p)}>Archive</button>
             </div>
           </div>
         ))}
@@ -60,16 +66,16 @@ export function AgentsPage({ onOpenChat }: { onOpenChat: (id: string) => void })
             <div className="row">
               <button className="btn primary" onClick={() => void save()}>Save</button>
               <button className="btn" onClick={() => setEdit(null)}>Cancel</button>
-              {msg && <span className="over">{msg}</span>}
             </div>
           </div>
         )}
       </div>
       <div className="panel">
-        <h2>History</h2>
+        <h3>History</h3>
         {runs.filter((r) => r.status !== "running").length === 0 && <p className="muted small">No finished runs yet.</p>}
         {runs.filter((r) => r.status !== "running").slice(0, 50).map((r) => <AgentCard key={r.id} run={r} onOpenChat={onOpenChat} />)}
       </div>
+      {confirm && <ConfirmDialog title={`Archive "${confirm.name}"?`} body="The agent moves to the archive folder and Pheme stops offering it. Nothing is deleted." confirmLabel="Archive" danger onConfirm={() => { api.archiveAgentProfile(confirm.name).then(load).catch((e: Error) => toast.error(e.message)); }} onClose={() => setConfirm(null)} />}
     </section>
   );
 }

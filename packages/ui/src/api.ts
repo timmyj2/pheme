@@ -18,14 +18,26 @@ export function initToken(): string {
 }
 export const token = () => sessionStorage.getItem(KEY) ?? "";
 
+/** An API failure. status 0 means the server could not be reached at all. */
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
 async function call<T>(path: string, method = "GET", body?: unknown): Promise<T> {
-  const r = await fetch("/api" + path, {
-    method,
-    headers: { "x-pheme-token": token(), "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let r: Response;
+  try {
+    r = await fetch("/api" + path, {
+      method,
+      headers: { "x-pheme-token": token(), "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, "Can't reach Pheme. Is it still running?");
+  }
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${r.status}`);
+  if (!r.ok) throw new ApiError(r.status, (data as { error?: string }).error ?? `HTTP ${r.status}`);
   return data as T;
 }
 

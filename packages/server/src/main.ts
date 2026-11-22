@@ -53,7 +53,10 @@ async function main() {
   const app = new App(dir, engine);
   const wantPort = parsePort(arg(args, "--port"), 7676);
   const assets = loadAssets();
-  const opts = { app, fake, version: VERSION, assets };
+  // PHEME_TOKEN lets tests (and people who want a stable bookmark) fix the access key. It must look like a real key.
+  const envToken = process.env.PHEME_TOKEN;
+  const token = envToken && /^[A-Za-z0-9_-]{24,}$/.test(envToken) ? envToken : undefined;
+  const opts = { app, fake, version: VERSION, assets, token };
   let server;
   try {
     server = await startServer({ ...opts, port: wantPort });

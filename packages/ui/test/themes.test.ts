@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { adjustPalette } from "../src/themes/contrast.ts";
 import { THEMES, parseTheme, pickPalette, themeValue } from "../src/themes/presets.ts";
 
 describe("themes", () => {
@@ -8,7 +9,11 @@ describe("themes", () => {
   });
   it("every palette has every token", () => {
     const keys = Object.keys(THEMES[0].dark!).sort();
-    for (const t of THEMES) for (const p of [t.light, t.dark]) if (p) expect(Object.keys(p).sort()).toEqual(keys);
+    expect(keys).not.toContain("destructiveText");
+    for (const t of THEMES) for (const p of [t.light, t.dark]) if (p) {
+      expect(Object.keys(p).sort()).toEqual(keys); // raw palettes: no derived tokens
+      expect(Object.keys(adjustPalette(p)).sort()).toEqual([...keys, "destructiveText", "primaryText"].sort());
+    }
   });
   it("no theme carries upstream branding", () => {
     expect(JSON.stringify(THEMES).toLowerCase()).not.toMatch(/nous|hermes/);

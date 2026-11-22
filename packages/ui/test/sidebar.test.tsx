@@ -1,0 +1,119 @@
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createRef } from "react";
+import { describe, expect, it, vi } from "vitest";
+import { ROW_LIMIT, Sidebar, groupChats } from "../src/Sidebar.tsx";
+import type { ChatRow } from "../src/api.ts";
+
+const DAY = 86_400_000;
+const NOW = new Date(2026, 10, 22, 15, 0, 0).getTime();
+const chat = (id: string, title: string, ago: number, extra: Partial<ChatRow> = {}): ChatRow => ({ id, title, pinned: false, archived: false, createdAt: 0, updatedAt: NOW - ago, userMessages: 1, lastMemoryReviewAt: 0, ...extra });
+
+describe("groupChats", () => {
+  it("buckets by recency with pinned first and drops empty groups", () => {
+    const g = groupChats([chat("a", "a", 60_000), chat("b", "b", DAY), chat("c", "c", 3 * DAY), chat("d", "d", 30 * DAY), chat("e", "e", 5 * DAY, { pinned: true })], NOW);
+    expect(g.map((x) => [x.label, x.chats.map((c) => c.id)])).toEqual([["Pinned", ["e"]], ["Today", ["a"]], ["Yesterday", ["b"]], ["Previous 7 days", ["c"]], ["Older", ["d"]]]);
+    expect(groupChats([], NOW)).toEqual([]);
+    expect(groupChats([chat("a", "a", 1)], NOW).map((x) => x.label)).toEqual(["Today"]);
+  });
+});
+
+function setup(chats: ChatRow[], over: Partial<React.ComponentProps<typeof Sidebar>> = {}) {
+  const props = {
+    chats, activeId: null, view: "chat" as const, unread: new Set<string>(), searchRef: createRef<HTMLInputElement>(),
+    onNew: vi.fn(), onOpen: vi.fn(), onView: vi.fn(), onRename: vi.fn(), onPin: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn(), ...over,
+  };
+  render(<Sidebar {...props} />);
+  return props;
+}
+
+describe("Sidebar", () => {
+  it("opens a chat, starts a new one and navigates pages", async () => {
+    const user = userEvent.setup();
+    const p = setup([chat("a", "Alpha", 1000)]);
+    await user.click(screen.getByText("Alpha"));
+    expect(p.onOpen).toHaveBeenCalledWith("a");
+    await user.click(screen.getByText("New chat"));
+    expect(p.onNew).toHaveBeenCalled();
+    await user.click(screen.getByText("Settings"));
+    expect(p.onView).toHaveBeenCalledWith("settings");
+  });
+  it("searches case-insensitively and says when nothing matches", async () => {
+    const user = userEvent.setup();
+    setup([chat("a", "Quarterly REPORT", 1), chat("b", "Other", 2)]);
+    await user.type(screen.getByLabelText("Search chats"), "report");
+    expect(screen.getByText("Quarterly REPORT")).toBeInTheDocument();
+    expect(screen.queryByText("Other")).toBeNull();
+    await user.clear(screen.getByLabelText("Search chats"));
+    await user.type(screen.getByLabelText("Search chats"), "zzz");
+    expect(screen.getByText("No chats match.")).toBeInTheDocument();
+  });
+  it("renames inline: double-click, Enter saves, Escape cancels, blank is ignored", async () => {
+    const user = userEvent.setup();
+    const p = setup([chat("a", "Alpha", 1)]);
+    await user.dblClick(screen.getByText("Alpha"));
+    const input = screen.getByLabelText("Chat title");
+    await user.clear(input);
+    await user.type(input, "Beta{Enter}");
+    expect(p.onRename).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }), "Beta");
+    await user.dblClick(screen.getByText("Alpha"));
+    await user.type(screen.getByLabelText("Chat title"), "zzz{Escape}");
+    expect(p.onRename).toHaveBeenCalledTimes(1);
+    await user.dblClick(screen.getByText("Alpha"));
+    await user.clear(screen.getByLabelText("Chat title"));
+    await user.keyboard("{Enter}");
+    expect(p.onRename).toHaveBeenCalledTimes(1);
+  });
+  it("the ⋯ menu and right-click offer rename, pin, archive and delete", async () => {
+    const user = userEvent.setup();
+    const p = setup([chat("a", "Alpha", 1)]);
+    await user.click(screen.getByLabelText("Actions for Alpha"));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((x) => x.textContent)).toEqual(["Rename", "Pin", "Archive", "Delete…"]);
+    await user.click(within(menu).getByText("Pin"));
+    expect(p.onPin).toHaveBeenCalled();
+    await user.pointer({ keys: "[MouseRight]", target: screen.getByText("Alpha") });
+    await user.click(within(screen.getByRole("menu")).getByText("Delete…"));
+    expect(p.onDelete).toHaveBeenCalled();
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+  it("keyboard: arrows move between chats, F2 renames, Delete asks to delete, Escape closes a menu", async () => {
+    const user = userEvent.setup();
+    const p = setup([chat("a", "Alpha", 1), chat("b", "Beta", 2)]);
+    screen.getByText("Alpha").closest("button")!.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByText("Beta").closest("button")).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(screen.getByText("Alpha").closest("button")).toHaveFocus();
+    await user.keyboard("{Delete}");
+    expect(p.onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+    await user.keyboard("{F2}");
+    expect(screen.getByLabelText("Chat title")).toHaveFocus();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByLabelText("Actions for Alpha"));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+  it("shows busy and unread markers and marks the open chat", () => {
+    setup([chat("a", "Alpha", 1, { busy: true } as never), chat("b", "Beta", 2), chat("c", "Gamma", 3)], { unread: new Set(["b"]), activeId: "c" });
+    expect(screen.getByLabelText("working")).toBeInTheDocument();
+    expect(screen.getByLabelText("new activity")).toBeInTheDocument();
+    expect(screen.getByText("Gamma").closest("button")).toHaveAttribute("aria-current", "page");
+  });
+  it("renders only the first page of a huge list, with a way to see more", async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: ROW_LIMIT * 2 + 10 }, (_, i) => chat(`c${i}`, `Chat ${i}`, i));
+    setup(many);
+    expect(document.querySelectorAll(".chat-item")).toHaveLength(ROW_LIMIT);
+    await user.click(screen.getByText(/Show \d+ more/));
+    expect(document.querySelectorAll(".chat-item")).toHaveLength(ROW_LIMIT * 2);
+  });
+  it("archived chats live behind a toggle", async () => {
+    const user = userEvent.setup();
+    setup([chat("a", "Alpha", 1), chat("z", "Zeta", 2, { archived: true })]);
+    expect(screen.queryByText("Zeta")).toBeNull();
+    await user.click(screen.getByText("Show archived"));
+    expect(screen.getByText("Zeta")).toBeInTheDocument();
+    expect(screen.queryByText("Alpha")).toBeNull();
+  });
+});

@@ -1,119 +1,186 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "./Dialog.tsx";
 import { THEMES, parseTheme, themeValue, type Mode } from "./themes/presets.ts";
-import { api, type CuratorState, type BootstrapState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
+import { api, type BootstrapState, type CuratorState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
+import { useToast } from "./toast.tsx";
 
-function Head({ title, sub }: { title: string; sub?: string }) {
+export function Head({ title, sub }: { title: string; sub?: string }) {
   return (
     <header className="page-head">
-      <h1>{title}</h1>
+      <h2 className="page-title">{title}</h2>
       {sub && <p className="muted">{sub}</p>}
     </header>
   );
 }
 
+/** Load something once and on demand; a failed load shows a message with a retry instead of an empty page. */
+export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = []) {
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState("");
+  const reload = useCallback(async () => {
+    try {
+      setData(await fn());
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+     
+  }, deps);
+  useEffect(() => { void reload(); }, [reload]);
+  return { data, setData, error, reload };
+}
+
+export function LoadError({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return <div className="panel" role="alert"><p className="over">Could not load this page: {error}</p><div className="row"><button className="btn" onClick={onRetry}>Try again</button></div></div>;
+}
+
 function MemoryList({ label, store, entries, limit, onSaved }: { label: string; store: "memory" | "user"; entries: string[]; limit: number; onSaved: (m: MemoryState) => void }) {
-  const [text, setText] = useState(entries.join("\n§\n"));
-  const [msg, setMsg] = useState("");
-  useEffect(() => { setText(entries.join("\n§\n")); }, [entries]);
+  const toast = useToast();
+  const joined = entries.join("\n§\n");
+  const [text, setText] = useState(joined);
+  const [base, setBase] = useState(joined);
+  const dirty = text !== base;
+  // Follow outside changes (the agent writes memory too) unless the user is mid-edit.
+  useEffect(() => {
+    if (!dirty) { setText(joined); setBase(joined); }
+     
+  }, [joined]);
   const parsed = text.split("§").map((s) => s.trim()).filter(Boolean);
   const used = parsed.join("\n§\n").length;
+  const changedElsewhere = dirty && joined !== base;
   const save = async () => {
     try {
       onSaved(await api.saveMemory(store, parsed));
-      setMsg("Saved");
+      toast.info("Saved");
     } catch (e) {
-      setMsg((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
   return (
     <section className="panel">
-      <h2>{label}</h2>
+      <h3>{label}</h3>
       <p className="muted small">Separate entries with a line containing only §.</p>
-      <textarea className="area" rows={10} value={text} onChange={(e) => { setText(e.target.value); setMsg(""); }} aria-label={label} />
+      <textarea className="area" rows={10} value={text} onChange={(e) => setText(e.target.value)} aria-label={label} />
       <div className="row">
-        <span className={used > limit ? "over" : "muted"}>{used} / {limit} characters</span>
-        <button className="btn primary" disabled={used > limit} onClick={() => void save()}>Save</button>
-        {msg && <span className="muted">{msg}</span>}
+        <span className={used > limit ? "over" : "muted"}>{used.toLocaleString()} / {limit.toLocaleString()} characters</span>
+        <button className="btn primary" disabled={used > limit || !dirty} onClick={() => void save()}>Save</button>
+        {dirty && <span className="muted small">Unsaved changes</span>}
+        {changedElsewhere && <span className="over small">This changed elsewhere. Saving replaces it.</span>}
       </div>
     </section>
   );
 }
 
 export function MemoryPage() {
-  const [m, setM] = useState<MemoryState | null>(null);
-  useEffect(() => { api.memory().then(setM); }, []);
-  if (!m) return <section className="page"><Head title="Memory" /></section>;
+  const { data: m, setData, error, reload } = useLoad(api.memory);
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === "visible") void reload(); }, 5000);
+    return () => clearInterval(t);
+  }, [reload]);
   return (
     <section className="page">
       <Head title="Memory" sub="Facts Pheme loads into every new chat. The agent can edit these too." />
-      <MemoryList label="User profile" store="user" entries={m.user} limit={m.userLimit} onSaved={setM} />
-      <MemoryList label="Environment and conventions" store="memory" entries={m.memory} limit={m.memoryLimit} onSaved={setM} />
+      {error && !m && <LoadError error={error} onRetry={() => void reload()} />}
+      {m && (
+        <>
+          <MemoryList label="User profile" store="user" entries={m.user} limit={m.userLimit} onSaved={setData} />
+          <MemoryList label="Environment and conventions" store="memory" entries={m.memory} limit={m.memoryLimit} onSaved={setData} />
+        </>
+      )}
     </section>
   );
 }
 
-export function SkillsPage({ initial }: { initial?: string | null }) {
-  const [list, setList] = useState<SkillSummary[]>([]);
-  const [open, setOpen] = useState<string | null>(null);
-  const [content, setContent] = useState("");
-  const [files, setFiles] = useState<string[]>([]);
-  const [msg, setMsg] = useState("");
+const NEW_SKILL = "---\nname: my-skill\ndescription: Use when ...\n---\n\n## Procedure\n1. \n";
+
+export function SkillsPage({ name, onOpen }: { name: string | null; onOpen: (name: string | null) => void }) {
+  const toast = useToast();
+  const { data: list, error, reload: reloadList } = useLoad<SkillSummary[]>(api.skills);
   const [curator, setCurator] = useState<CuratorState | null>(null);
-  const load = () => { api.skills().then(setList); api.curator().then(setCurator).catch(() => {}); };
-  useEffect(() => { load(); if (initial) void view(initial); }, []);
-  const view = async (name: string) => {
-    const s = await api.skill(name);
-    setOpen(name);
-    setContent(s.content);
-    setFiles(s.files);
-    setMsg("");
+  const [isNew, setIsNew] = useState(false);
+  const [content, setContent] = useState("");
+  const [saved, setSaved] = useState("");
+  const [files, setFiles] = useState<string[]>([]);
+  const [loadingSkill, setLoadingSkill] = useState(false);
+  const [guard, setGuard] = useState<null | (() => void)>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const dirty = (isNew || !!name) && content !== saved;
+  const nameRef = useRef(name);
+  nameRef.current = name;
+
+  const loadCurator = useCallback(() => { api.curator().then(setCurator).catch(() => {}); }, []);
+  useEffect(() => { loadCurator(); }, [loadCurator]);
+
+  // Open the skill named in the URL.
+  useEffect(() => {
+    if (!name) { if (!isNew) { setContent(""); setSaved(""); setFiles([]); } return; }
+    setIsNew(false);
+    setLoadingSkill(true);
+    api.skill(name).then((s) => {
+      if (nameRef.current !== name) return;
+      setContent(s.content); setSaved(s.content); setFiles(s.files);
+    }).catch((e: Error) => { toast.error(`Could not open "${name}": ${e.message}`); onOpen(null); }).finally(() => setLoadingSkill(false));
+     
+  }, [name]);
+
+  // Never lose edits silently: switching away with unsaved changes asks first.
+  const guarded = (go: () => void) => (dirty ? setGuard(() => go) : go());
+  useEffect(() => {
+    if (!dirty) return;
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [dirty]);
+
+  const save = async () => {
+    const target = isNew ? /^name:\s*(\S+)/m.exec(content)?.[1] ?? "" : name ?? "";
+    if (!target) { toast.error("Add a name: line to the front matter first."); return; }
+    try {
+      await api.saveSkill(target, content);
+      setSaved(content);
+      setIsNew(false);
+      toast.info(`Saved "${target}"`);
+      await reloadList();
+      if (target !== name) onOpen(target);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
-  const NEW = "---\nname: my-skill\ndescription: Use when ...\n---\n\n## Procedure\n1. \n";
+
   return (
     <section className="page wide">
       <Head title="Skills" sub="Reusable procedures. Pheme writes these after long tasks; you can edit them." />
       <div className="panel">
-        <h2>Skill curator</h2>
+        <h3>Skill curator</h3>
         <p className="muted small">Every few days Pheme merges overlapping skills and archives ones that have not been used for a long time. Nothing is ever deleted; archived skills stay in the skills/.archive folder.</p>
         <div className="row">
-          <button className="btn" disabled={curator?.running} onClick={() => { void api.runCurator().then(() => setTimeout(load, 1500)); }}>{curator?.running ? "Running…" : "Run curator now"}</button>
+          <button className="btn" disabled={curator?.running} onClick={() => { void api.runCurator().then(() => setTimeout(() => { loadCurator(); void reloadList(); }, 1500)).catch((e: Error) => toast.error(e.message)); }}>{curator?.running ? "Running…" : "Run curator now"}</button>
           <span className="muted small">{curator?.lastRunAt ? `Last run ${new Date(curator.lastRunAt).toLocaleString()}` : "Has not run yet"}</span>
         </div>
         {curator && curator.report.length > 0 && <ul className="small">{curator.report.map((l, i) => <li key={i}>{l}</li>)}</ul>}
       </div>
+      {error && !list && <LoadError error={error} onRetry={() => void reloadList()} />}
       <div className="split">
         <div className="panel list">
-          <button className="btn" onClick={() => { setOpen("(new)"); setContent(NEW); setFiles([]); setMsg(""); }}>New skill</button>
+          <button className="btn" onClick={() => guarded(() => { setIsNew(true); setContent(NEW_SKILL); setSaved(""); setFiles([]); onOpen(null); })}>New skill</button>
           <ul>
-            {list.map((s) => (
-              <li key={s.name} className={open === s.name ? "active" : ""}>
-                <button onClick={() => void view(s.name)}><strong>{s.name}</strong><span className="muted small">{s.description}</span></button>
+            {(list ?? []).map((s) => (
+              <li key={s.name} className={name === s.name && !isNew ? "active" : ""}>
+                <button aria-current={name === s.name && !isNew ? "true" : undefined} onClick={() => guarded(() => { setIsNew(false); onOpen(s.name); })}><strong>{s.name}</strong><span className="muted small">{s.description}</span></button>
               </li>
             ))}
           </ul>
-          {list.length === 0 && <p className="muted small">No skills yet.</p>}
+          {list && list.length === 0 && <p className="muted small">No skills yet.</p>}
         </div>
         <div className="panel grow">
-          {open ? (
+          {name || isNew ? (
             <>
-              <textarea className="area tall" value={content} onChange={(e) => setContent(e.target.value)} aria-label="Skill content" />
+              <textarea className="area tall" value={content} disabled={loadingSkill} onChange={(e) => setContent(e.target.value)} aria-label="Skill content" spellCheck={false} />
               {files.length > 1 && <p className="muted small">Files: {files.join(", ")}</p>}
               <div className="row">
-                <button className="btn primary" onClick={async () => {
-                  const name = open === "(new)" ? /^name:\s*(\S+)/m.exec(content)?.[1] ?? "" : open;
-                  try {
-                    await api.saveSkill(name, content);
-                    setMsg("Saved");
-                    await load();
-                    setOpen(name);
-                  } catch (e) {
-                    setMsg((e as Error).message);
-                  }
-                }}>Save</button>
-                {open !== "(new)" && (
-                  <button className="btn danger" onClick={async () => { await api.archiveSkill(open); setOpen(null); await load(); }}>Archive</button>
-                )}
-                {msg && <span className="muted">{msg}</span>}
+                <button className="btn primary" disabled={!dirty} onClick={() => void save()}>Save</button>
+                {!isNew && <button className="btn danger" onClick={() => setConfirmArchive(true)}>Archive</button>}
+                {dirty && <span className="muted small">Unsaved changes</span>}
               </div>
             </>
           ) : (
@@ -121,63 +188,111 @@ export function SkillsPage({ initial }: { initial?: string | null }) {
           )}
         </div>
       </div>
+      {guard && <ConfirmDialog title="Discard unsaved changes?" body="You have edits to this skill that are not saved." confirmLabel="Discard" danger onConfirm={() => { const g = guard; setGuard(null); g(); setSaved(content); }} onClose={() => setGuard(null)} />}
+      {confirmArchive && name && (
+        <ConfirmDialog
+          title={`Archive "${name}"?`}
+          body="The skill moves to the archive folder and Pheme stops using it. Nothing is deleted."
+          confirmLabel="Archive"
+          danger
+          onConfirm={() => { api.archiveSkill(name).then(() => { toast.info(`Archived "${name}"`); onOpen(null); void reloadList(); }).catch((e: Error) => toast.error(e.message)); }}
+          onClose={() => setConfirmArchive(false)}
+        />
+      )}
     </section>
   );
 }
 
-export function SettingsPage({ state, onChange }: { state: BootstrapState; onChange: (s: Settings) => void }) {
-  const [models, setModels] = useState<ModelOption[]>([]);
-  useEffect(() => { api.models().then(setModels); }, []);
-  const s = state.settings;
-  const set = async (patch: Partial<Settings>) => onChange(await api.settings(patch));
-  const num = (k: keyof Settings, label: string) => (
+/** Limits the server enforces; the field explains them instead of silently snapping back. */
+export const SETTING_RANGES: Partial<Record<keyof Settings, [number, number]>> = {
+  skillReviewMinToolSteps: [1, 1000],
+  memoryReviewEveryUserMessages: [1, 1000],
+  memoryLimit: [100, 100000],
+  userLimit: [100, 100000],
+  curatorEveryDays: [1, 3650],
+  curatorStaleDays: [1, 3650],
+};
+
+export function NumberField({ label, value, range, onCommit }: { label: string; value: number; range: [number, number]; onCommit: (n: number) => Promise<void> | void }) {
+  const [text, setText] = useState(String(value));
+  const [err, setErr] = useState("");
+  useEffect(() => { setText(String(value)); setErr(""); }, [value]);
+  const commit = async () => {
+    const n = Number(text);
+    if (text.trim() === "" || !Number.isInteger(n) || n < range[0] || n > range[1]) {
+      setErr(`Enter a whole number from ${range[0].toLocaleString()} to ${range[1].toLocaleString()}.`);
+      return;
+    }
+    setErr("");
+    if (n !== value) await onCommit(n);
+  };
+  return (
     <label className="field">{label}
-      <input type="number" min={1} value={s[k] as number} onChange={(e) => void set({ [k]: Math.max(1, Number(e.target.value) || 1) })} />
+      <input
+        inputMode="numeric"
+        value={text}
+        aria-invalid={!!err}
+        onChange={(e) => { setText(e.target.value); setErr(""); }}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => { if (e.key === "Enter") void commit(); else if (e.key === "Escape") { setText(String(value)); setErr(""); } }}
+      />
+      {err && <span className="over small" role="alert">{err}</span>}
     </label>
   );
+}
+
+export function SettingsPage({ state, onChange }: { state: BootstrapState; onChange: (s: Settings) => void }) {
+  const toast = useToast();
+  const { data: models } = useLoad<ModelOption[]>(api.models);
+  const s = state.settings;
+  const set = async (patch: Partial<Settings>) => {
+    try {
+      onChange(await api.settings(patch));
+    } catch (e) {
+      toast.error(`Could not save: ${(e as Error).message}`);
+    }
+  };
+  const num = (k: keyof Settings, label: string) => <NumberField label={label} value={s[k] as number} range={SETTING_RANGES[k]!} onCommit={(n) => set({ [k]: n })} />;
+  const cur = parseTheme(s.theme);
+  const theme = cur.theme;
+  const modes: Mode[] = ["system", ...(theme.light ? ["light" as const] : []), ...(theme.dark ? ["dark" as const] : [])];
+  const list = models ?? [];
   return (
     <section className="page">
       <Head title="Settings" sub={`Pheme ${state.version} · engine: ${state.engine}${state.fake ? " (fake mode)" : ""}`} />
       <div className="panel">
-        <h2>Model</h2>
+        <h3>Model</h3>
         <label className="field">Chat model
           <select value={s.model} onChange={(e) => void set({ model: e.target.value })}>
-            {[{ id: "auto", name: "Auto" }, ...models.filter((m) => m.id !== "auto")].map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            {[{ id: "auto", name: "Auto" }, ...list.filter((m) => m.id !== "auto")].map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </label>
         <label className="field">Background review model
           <select value={s.reviewModel} onChange={(e) => void set({ reviewModel: e.target.value })}>
             <option value="">Cheapest available</option>
-            {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            {list.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </label>
         <p className="muted small">Usage so far: {state.usage.turns} chat turns, {state.usage.reviews} background reviews, {state.usage.toolSteps} tool steps.</p>
       </div>
       <div className="panel">
-        <h2>Appearance</h2>
-        {(() => {
-          const cur = parseTheme(s.theme);
-          const theme = cur.theme;
-          const modes: Mode[] = ["system", ...(theme.light ? ["light" as const] : []), ...(theme.dark ? ["dark" as const] : [])];
-          return (
-            <div className="row">
-              <label className="field">Theme
-                <select value={theme.name} onChange={(e) => void set({ theme: themeValue(e.target.value, cur.mode) })}>
-                  {THEMES.map((t) => <option key={t.name} value={t.name}>{t.label}</option>)}
-                </select>
-              </label>
-              <label className="field">Mode
-                <select value={modes.includes(cur.mode) ? cur.mode : "system"} onChange={(e) => void set({ theme: themeValue(theme.name, e.target.value as Mode) })}>
-                  {modes.map((m) => <option key={m} value={m}>{m === "system" ? "Match system" : m[0].toUpperCase() + m.slice(1)}</option>)}
-                </select>
-              </label>
-            </div>
-          );
-        })()}
-        {(!parseTheme(s.theme).theme.light || !parseTheme(s.theme).theme.dark) && <p className="muted small">This theme has only one {parseTheme(s.theme).theme.dark ? "dark" : "light"} palette.</p>}
+        <h3>Appearance</h3>
+        <div className="row">
+          <label className="field">Theme
+            <select value={theme.name} onChange={(e) => void set({ theme: themeValue(e.target.value, cur.mode) })}>
+              {THEMES.map((t) => <option key={t.name} value={t.name}>{t.label}</option>)}
+            </select>
+          </label>
+          <label className="field">Mode
+            <select value={modes.includes(cur.mode) ? cur.mode : "system"} onChange={(e) => void set({ theme: themeValue(theme.name, e.target.value as Mode) })}>
+              {modes.map((m) => <option key={m} value={m}>{m === "system" ? "Match system" : m[0].toUpperCase() + m.slice(1)}</option>)}
+            </select>
+          </label>
+        </div>
+        {(!theme.light || !theme.dark) && <p className="muted small">This theme has only one {theme.dark ? "dark" : "light"} palette.</p>}
       </div>
       <div className="panel">
-        <h2>Permissions</h2>
+        <h3>Permissions</h3>
         <label className="check">
           <input type="checkbox" checked={s.autoApproveAll} onChange={(e) => void set({ autoApproveAll: e.target.checked })} />
           Auto-approve all (shell commands and file edits run without asking)
@@ -185,7 +300,7 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
         {s.autoApproveAll && <p className="over small">Pheme will run commands and edit files without showing an approval card.</p>}
       </div>
       <div className="panel">
-        <h2>Learning loops</h2>
+        <h3>Learning loops</h3>
         <label className="check">
           <input type="checkbox" checked={s.loopsEnabled} onChange={(e) => void set({ loopsEnabled: e.target.checked })} />
           Review chats in the background to improve skills and memory (uses extra Copilot requests)

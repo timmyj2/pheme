@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { ConfirmDialog } from "./Dialog.tsx";
 import { api, type Job, type JobSchedule } from "./api.ts";
+import { LoadError } from "./Pages.tsx";
+import { useToast } from "./toast.tsx";
 
 const describe = (s: JobSchedule) =>
   s.kind === "interval" ? `every ${s.everyMinutes} min` : s.kind === "daily" ? `daily at ${s.time}` : `once, ${new Date(s.at).toLocaleString()}`;
@@ -13,29 +16,33 @@ export function JobsPage({ onOpenChat }: { onOpenChat: (id: string) => void }) {
   const [time, setTime] = useState("09:00");
   const [at, setAt] = useState("");
   const [allow, setAllow] = useState(false);
-  const [msg, setMsg] = useState("");
-  const load = () => { api.jobs().then(setJobs).catch(() => {}); };
+  const toast = useToast();
+  const [loadError, setLoadError] = useState("");
+  const [confirm, setConfirm] = useState<Job | null>(null);
+  const load = () => { api.jobs().then((j) => { setJobs(j); setLoadError(""); }).catch((e: Error) => setLoadError(e.message)); };
   useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, []);
 
   const create = async () => {
     try {
+      if (kind === "once" && !at) { toast.error("Pick a date and time."); return; }
       const schedule: JobSchedule = kind === "interval" ? { kind, everyMinutes: minutes } : kind === "daily" ? { kind, time } : { kind, at: new Date(at).getTime() };
       await api.createJob({ name, prompt, schedule, allowActions: allow });
-      setName(""); setPrompt(""); setAllow(false); setMsg("");
+      setName(""); setPrompt(""); setAllow(false);
+      toast.info("Job created");
       load();
     } catch (e) {
-      setMsg((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
   return (
     <section className="page wide">
       <header className="page-head">
-        <h1>Scheduled jobs</h1>
+        <h2 className="page-title">Scheduled jobs</h2>
         <p className="muted">Jobs run only while Pheme is open. A job missed while Pheme was closed runs once when it starts.</p>
       </header>
       <div className="panel">
-        <h2>New job</h2>
+        <h3>New job</h3>
         <label className="field">Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="field">What should it do?<textarea className="area" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} /></label>
         <div className="row">
@@ -54,11 +61,11 @@ export function JobsPage({ onOpenChat }: { onOpenChat: (id: string) => void }) {
         </label>
         <div className="row">
           <button className="btn primary" disabled={!name.trim() || !prompt.trim()} onClick={() => void create()}>Create job</button>
-          {msg && <span className="over">{msg}</span>}
         </div>
       </div>
       <div className="panel">
-        <h2>Jobs</h2>
+        <h3>Jobs</h3>
+        {loadError && jobs.length === 0 && <LoadError error={loadError} onRetry={load} />}
         {jobs.length === 0 && <p className="muted small">No jobs yet.</p>}
         {jobs.map((j) => (
           <div key={j.id} className="job">
@@ -70,14 +77,15 @@ export function JobsPage({ onOpenChat }: { onOpenChat: (id: string) => void }) {
               </div>
             </div>
             <div className="row">
-              <button className="btn" onClick={() => void api.runJob(j.id).then(() => setTimeout(load, 600))}>Run now</button>
+              <button className="btn" onClick={() => void api.runJob(j.id).then(() => { toast.info(`Started "${j.name}"`); setTimeout(load, 600); }).catch((e: Error) => toast.error(e.message))}>Run now</button>
               {j.lastChatId && <button className="btn" onClick={() => onOpenChat(j.lastChatId!)}>Open last run</button>}
-              <button className="btn" onClick={() => void api.updateJob(j.id, { enabled: !j.enabled }).then(load)}>{j.enabled ? "Pause" : "Resume"}</button>
-              <button className="btn danger" onClick={() => void api.deleteJob(j.id).then(load)}>Delete</button>
+              <button className="btn" onClick={() => void api.updateJob(j.id, { enabled: !j.enabled }).then(load).catch((e: Error) => toast.error(e.message))}>{j.enabled ? "Pause" : "Resume"}</button>
+              <button className="btn danger" onClick={() => setConfirm(j)}>Delete</button>
             </div>
           </div>
         ))}
       </div>
+      {confirm && <ConfirmDialog title={`Delete "${confirm.name}"?`} body="The job stops running. Its past chats stay in your chat list." confirmLabel="Delete" danger onConfirm={() => { api.deleteJob(confirm.id).then(load).catch((e: Error) => toast.error(e.message)); }} onClose={() => setConfirm(null)} />}
     </section>
   );
 }

@@ -26,6 +26,24 @@ interface Turn {
 /** Cached engine sessions kept open at once; idle ones beyond this are closed and resumed on demand. */
 const MAX_OPEN_SESSIONS = 8;
 
+/** A short chat title from the first message: first real line, markdown marks removed, cut on a word. */
+export function titleFrom(text: string): string {
+  const strip = (line: string) =>
+    line
+      .trim()
+      .replace(/^(#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, "")
+      .replace(/^```\w*\s*/, "")
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/[*_`~]+/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  const plain = text.split(/\r?\n/).map(strip).find((l) => /[\p{L}\p{N}]/u.test(l));
+  if (!plain) return "New chat";
+  if (plain.length <= 60) return plain;
+  const cut = plain.slice(0, 60);
+  return cut.slice(0, Math.max(30, cut.lastIndexOf(" "))).trimEnd() + "…";
+}
+
 export class App {
   readonly store: ChatStore;
   readonly settings: SettingsStore;
@@ -149,7 +167,7 @@ export class App {
     store.append(chatId, { type: "user", text });
     store.update(chatId, {
       userMessages: meta.userMessages + 1,
-      ...(meta.title === "New chat" ? { title: text.replace(/\s+/g, " ").slice(0, 60) } : {}),
+      ...(meta.title === "New chat" ? { title: titleFrom(text) } : {}),
     });
     store.append(chatId, { type: "turn_start" });
     this.settings.bumpUsage({ turns: 1 });

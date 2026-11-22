@@ -56,3 +56,6 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 - v2: subagents and Agents page added (both modes). Real Copilot: two parallel `agent` calls returned alpha/beta; a saved `poet` profile was delegated to by the CLI and shown as a Copilot-agent card.
 - v2: scheduled jobs added (interval/daily/once; run only while open; missed runs collapse into one; `allowActions` fixed at creation).
 - v1 steps 1-9 built; 32 tests, typecheck and lint pass locally on macOS. CI runs on push.
+
+## UI stress round (2026-11-22)
+Hermes-style UI pass: markdown, 11 themes with contrast checks, queue-while-busy, history, drafts, reconnect, drawer. 346 tests, stress 20/20, smoke ok.

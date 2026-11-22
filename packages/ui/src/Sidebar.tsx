@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Menu, type MenuItem } from "./Menu.tsx";
 import type { ChatRow } from "./api.ts";
-
-export type View = "chat" | "skills" | "memory" | "agents" | "jobs" | "settings";
+import type { View } from "./router.ts";
+import { ALT } from "./shortcuts.ts";
 
 /** Rows rendered before "Show more": keeps the sidebar fast with thousands of chats. */
-const ROW_LIMIT = 150;
+export const ROW_LIMIT = 150;
 
 export function Brand() {
   return (
@@ -15,57 +16,173 @@ export function Brand() {
   );
 }
 
+export interface Group {
+  label: string;
+  chats: ChatRow[];
+}
+
+const startOfDay = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+
+/** Pinned first, then by recency: Today, Yesterday, Previous 7 days, Older. Empty groups are dropped. */
+export function groupChats(chats: ChatRow[], now = Date.now()): Group[] {
+  const today = startOfDay(now);
+  const day = 86_400_000;
+  const buckets: Group[] = [
+    { label: "Pinned", chats: [] },
+    { label: "Today", chats: [] },
+    { label: "Yesterday", chats: [] },
+    { label: "Previous 7 days", chats: [] },
+    { label: "Older", chats: [] },
+  ];
+  for (const c of chats) {
+    if (c.pinned) buckets[0].chats.push(c);
+    else if (c.updatedAt >= today) buckets[1].chats.push(c);
+    else if (c.updatedAt >= today - day) buckets[2].chats.push(c);
+    else if (c.updatedAt >= today - 7 * day) buckets[3].chats.push(c);
+    else buckets[4].chats.push(c);
+  }
+  return buckets.filter((b) => b.chats.length);
+}
+
+function Item({ c, active, unread, onOpen, onRename, onPin, onArchive, onDelete }: {
+  c: ChatRow; active: boolean; unread: boolean;
+  onOpen: () => void; onRename: (t: string) => void; onPin: () => void; onArchive: () => void; onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(c.title);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (editing) { input.current?.focus(); input.current?.select(); } }, [editing]);
+
+  const items: MenuItem[] = [
+    { label: "Rename", run: () => { setDraft(c.title); setEditing(true); } },
+    { label: c.pinned ? "Unpin" : "Pin", run: onPin },
+    { label: c.archived ? "Unarchive" : "Archive", run: onArchive },
+    { label: "Delete…", run: onDelete, danger: true },
+  ];
+  const commit = () => {
+    setEditing(false);
+    const t = draft.trim();
+    if (t && t !== c.title) onRename(t);
+  };
+
+  return (
+    <li className={`chat-item${active ? " active" : ""}`} data-chat-id={c.id} onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
+      {editing ? (
+        <input
+          ref={input}
+          className="rename"
+          value={draft}
+          maxLength={120}
+          aria-label="Chat title"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            else if (e.key === "Escape") { e.stopPropagation(); setEditing(false); }
+          }}
+        />
+      ) : (
+        <button
+          className="chat-row"
+          onClick={onOpen}
+          onDoubleClick={() => { setDraft(c.title); setEditing(true); }}
+          aria-current={active ? "page" : undefined}
+          title={c.title}
+          onKeyDown={(e) => {
+            const row = e.currentTarget.closest("li");
+            if (e.key === "ArrowDown") { e.preventDefault(); (row?.nextElementSibling?.querySelector(".chat-row") as HTMLElement | null)?.focus(); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); (row?.previousElementSibling?.querySelector(".chat-row") as HTMLElement | null)?.focus(); }
+            else if (e.key === "F2") { e.preventDefault(); setDraft(c.title); setEditing(true); }
+            else if (e.key === "Delete") { e.preventDefault(); onDelete(); }
+          }}
+        >
+          {c.busy ? <span className="spin" role="img" aria-label="working" /> : unread ? <span className="dot" role="img" aria-label="new activity" /> : null}
+          <span className="chat-title">{c.title}</span>
+        </button>
+      )}
+      {!editing && (
+        <button className="icon-btn row-more" aria-label={`Actions for ${c.title}`} aria-haspopup="menu" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4 }); }}>⋯</button>
+      )}
+      {menu && <Menu x={menu.x} y={menu.y} items={items} onClose={() => setMenu(null)} />}
+    </li>
+  );
+}
+
 export function Sidebar(props: {
   chats: ChatRow[];
   activeId: string | null;
   view: View;
+  unread: Set<string>;
+  searchRef: RefObject<HTMLInputElement | null>;
   onNew: () => void;
   onOpen: (id: string) => void;
   onView: (v: View) => void;
+  onRename: (c: ChatRow, title: string) => void;
   onPin: (c: ChatRow) => void;
   onArchive: (c: ChatRow) => void;
+  onDelete: (c: ChatRow) => void;
 }) {
   const [q, setQ] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [limit, setLimit] = useState(ROW_LIMIT);
-  const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return props.chats.filter((c) => (showArchived ? c.archived : !c.archived) && (!needle || c.title.toLowerCase().includes(needle)));
-  }, [props.chats, q, showArchived]);
-  const pinned = rows.filter((c) => c.pinned);
-  const restAll = rows.filter((c) => !c.pinned);
-  const rest = restAll.slice(0, limit);
-  const row = (c: ChatRow) => (
-    <li key={c.id} className={c.id === props.activeId && props.view === "chat" ? "active" : ""}>
-      <button className="chat-row" onClick={() => props.onOpen(c.id)} title={c.title}>
-        {c.busy && <span className="spin" aria-label="working" />}
-        <span className="chat-title">{c.title}</span>
-      </button>
-      <span className="row-actions">
-        <button aria-label={c.pinned ? "Unpin" : "Pin"} title={c.pinned ? "Unpin" : "Pin"} onClick={() => props.onPin(c)}>{c.pinned ? "★" : "☆"}</button>
-        <button aria-label={c.archived ? "Unarchive" : "Archive"} title={c.archived ? "Unarchive" : "Archive"} onClick={() => props.onArchive(c)}>{c.archived ? "↩" : "▣"}</button>
-      </span>
-    </li>
+  const needle = q.trim().toLowerCase();
+
+  const rows = useMemo(
+    () => props.chats.filter((c) => (showArchived ? c.archived : !c.archived) && (!needle || c.title.toLowerCase().includes(needle))),
+    [props.chats, showArchived, needle],
   );
+  const groups = useMemo(() => (needle ? [{ label: `Results (${rows.length})`, chats: rows }] : groupChats(rows)), [rows, needle]);
+  useEffect(() => setLimit(ROW_LIMIT), [needle, showArchived]);
+
+  let budget = limit;
+  const shownGroups = groups.map((g) => { const chats = g.chats.slice(0, Math.max(0, budget)); budget -= chats.length; return { ...g, chats }; }).filter((g) => g.chats.length);
+  const hiddenCount = rows.length - shownGroups.reduce((n, g) => n + g.chats.length, 0);
+
+  const navLabel: Record<string, string> = { skills: "Skills", memory: "Memory", agents: "Agents", jobs: "Scheduled jobs", settings: "Settings" };
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Sidebar">
       <Brand />
-      <button className="btn primary new-chat" onClick={props.onNew}>New chat</button>
-      <input className="search" type="search" placeholder="Search chats" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search chats" />
-      <div className="chat-list">
-        {pinned.length > 0 && <div className="group-label">Pinned</div>}
-        <ul>{pinned.map(row)}</ul>
-        <div className="group-label">{showArchived ? "Archived" : "Chats"}</div>
-        <ul>{rest.map(row)}</ul>
-        {restAll.length > rest.length && <button className="link small" onClick={() => setLimit((n) => n + ROW_LIMIT)}>Show {Math.min(ROW_LIMIT, restAll.length - rest.length)} more ({restAll.length - rest.length} hidden; search finds them all)</button>}
-        {rows.length === 0 && <div className="muted small">No chats</div>}
-      </div>
-      <button className="link small" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Back to chats" : "Show archived"}</button>
-      <nav className="nav">
-        {(["skills", "memory", "agents", "jobs", "settings"] as const).map((v) => (
-          <button key={v} className={props.view === v ? "active" : ""} onClick={() => props.onView(v)}>{v === "jobs" ? "Scheduled jobs" : v[0].toUpperCase() + v.slice(1)}</button>
+      <button className="btn primary new-chat" onClick={props.onNew} title={`New chat (${ALT}+N)`}>New chat</button>
+      <input
+        ref={props.searchRef}
+        className="search"
+        type="search"
+        placeholder="Search chats"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Escape") { setQ(""); (e.target as HTMLInputElement).blur(); } else if (e.key === "ArrowDown") { e.preventDefault(); (document.querySelector(".chat-list .chat-row") as HTMLElement | null)?.focus(); } }}
+        aria-label="Search chats"
+      />
+      <nav className="chat-list" aria-label="Chats">
+        {shownGroups.map((g) => (
+          <section key={g.label}>
+            <h2 className="group-label">{g.label}</h2>
+            <ul>
+              {g.chats.map((c) => (
+                <Item
+                  key={c.id}
+                  c={c}
+                  active={c.id === props.activeId && props.view === "chat"}
+                  unread={props.unread.has(c.id)}
+                  onOpen={() => props.onOpen(c.id)}
+                  onRename={(t) => props.onRename(c, t)}
+                  onPin={() => props.onPin(c)}
+                  onArchive={() => props.onArchive(c)}
+                  onDelete={() => props.onDelete(c)}
+                />
+              ))}
+            </ul>
+          </section>
         ))}
-        <div className="kbd-hint muted small">Ctrl+K for commands</div>
+        {hiddenCount > 0 && <button className="link small" onClick={() => setLimit((n) => n + ROW_LIMIT)}>Show {Math.min(ROW_LIMIT, hiddenCount)} more ({hiddenCount} hidden; search finds them all)</button>}
+        {rows.length === 0 && <div className="muted small empty-list">{needle ? "No chats match." : showArchived ? "No archived chats." : "No chats yet."}</div>}
+      </nav>
+      <button className="link small" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Back to chats" : "Show archived"}</button>
+      <nav className="nav" aria-label="Pages">
+        {(["skills", "memory", "agents", "jobs", "settings"] as const).map((v) => (
+          <button key={v} className={props.view === v ? "active" : ""} aria-current={props.view === v ? "page" : undefined} onClick={() => props.onView(v)}>{navLabel[v]}</button>
+        ))}
       </nav>
     </aside>
   );
