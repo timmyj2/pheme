@@ -45,6 +45,7 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 - Repo created with plan, license and notices.
 - Owner chose to pin the CLI at 1.0.112; doctor now treats an empty model list as a warning.
 - Real Copilot check passed; fixed empty tool names on `tool_end` and duplicate approval cards.
+- README updated for v2/v3; v0.1.0 released.
 - Real Copilot check of learning loops and curator: skill review wrote a good class-level skill from a 10-step transcript; memory review saved two user facts; curator merged two overlapping skills into one, archived both extras and left the unrelated one alone.
 - v3: themes, Ctrl+K, curator added (55 tests).
 - v2: subagents and Agents page added (both modes). Real Copilot: two parallel `agent` calls returned alpha/beta; a saved `poet` profile was delegated to by the CLI and shown as a Copilot-agent card.

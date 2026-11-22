@@ -8,3 +8,4 @@ coverage/
 Thumbs.db
 # App data must never live in the repo
 .pheme/
+release/
