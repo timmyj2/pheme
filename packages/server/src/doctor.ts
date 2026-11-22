@@ -6,6 +6,8 @@ export interface Check {
   name: string;
   ok: boolean;
   detail: string;
+  /** A failed check that does not block use: shown as WARN and not counted as a failure. */
+  warn?: boolean;
 }
 
 const MIN_NODE = [22, 12];
@@ -41,7 +43,7 @@ export async function runDoctor(dataDir: string, log: (line: string) => void = c
   const checks: Check[] = [];
   const add = (c: Check) => {
     checks.push(c);
-    log(`${c.ok ? "PASS" : "FAIL"}  ${c.name}: ${c.detail}`);
+    log(`${c.ok ? "PASS" : c.warn ? "WARN" : "FAIL"}  ${c.name}: ${c.detail}`);
   };
   add(nodeCheck());
   add(dataDirCheck(dataDir));
@@ -59,7 +61,8 @@ export async function runDoctor(dataDir: string, log: (line: string) => void = c
       add({ name: "Copilot sign-in", ok: !!auth.isAuthenticated, detail: auth.isAuthenticated ? `signed in${auth.login ? " as " + auth.login : ""}` : `not signed in. Run: copilot, then /login. ${auth.statusMessage ?? ""}`.trim() });
       if (auth.isAuthenticated) {
         const models = await engine.listModels();
-        add({ name: "Models allowed", ok: models.length > 1, detail: models.map((m) => m.id).join(", ") || "none" });
+        const real = models.filter((m) => m.id !== "auto");
+        add({ name: "Models allowed", ok: real.length > 0, warn: true, detail: real.length ? real.map((m) => m.id).join(", ") : "Copilot listed no models for this account; Pheme will use Auto" });
       }
     } catch (e) {
       add({ name: "Copilot sign-in", ok: false, detail: (e as Error).message });
@@ -67,7 +70,7 @@ export async function runDoctor(dataDir: string, log: (line: string) => void = c
       await engine.close();
     }
   }
-  const failed = checks.filter((c) => !c.ok).length;
+  const failed = checks.filter((c) => !c.ok && !c.warn).length;
   log(failed ? `\n${failed} check(s) failed.` : "\nAll checks passed.");
   return failed === 0;
 }

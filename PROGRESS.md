@@ -17,7 +17,7 @@
 
 ## Blockers / needs owner
 
-1. **SDK vs. Copilot CLI version skew.** `@github/copilot-sdk` 1.0.34 (latest) speaks protocol 3; the installed CLI 1.0.114 (latest) speaks protocol 4, so the SDK refuses to connect. Options: (a) pin the CLI on both laptops (`npm i -g @github/copilot@1.0.112`) — works now, breaks again if the CLI auto-updates before a new SDK ships; (b) build the ACP engine from the plan's fallback (`copilot --acp --stdio`, protocol 1, answered fine on 1.0.114) — more robust, but needs a small MCP server for memory/skill tools and a prompt preamble in place of the system message. Not changed without the owner's call.
+1. **SDK vs. Copilot CLI version skew: resolved by pinning** (owner chose option a). Both laptops need `npm i -g @github/copilot@1.0.112`; `pheme doctor` explains it if the CLI is newer. Watch for CLI auto-updates.
 2. Real-Copilot test needs the owner's go-ahead (it spends Free-plan quota). The SDK's own runtime already signs in through the `gh` login on this Mac.
 
 ## End-to-end proof (fake mode)
@@ -27,4 +27,5 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 ## Log
 
 - Repo created with plan, license and notices.
+- Owner chose to pin the CLI at 1.0.112; doctor now treats an empty model list as a warning.
 - v1 steps 1-9 built; 32 tests, typecheck and lint pass locally on macOS. CI runs on push.
