@@ -7,20 +7,34 @@ chat with a session list, skills and memory that improve themselves, sub-agents,
 - Ships as one ready-to-run file: `pheme.mjs` plus `start-pheme.cmd`. No `npm install` where it runs.
 - Works on Windows and macOS. All data lives in `~/.pheme` (`%USERPROFILE%\.pheme` on Windows), never in the repo.
 
-## Quick start
+## On your work computer (Windows): step by step
 
-You need **Node 22.12+** and **GitHub Copilot CLI 1.0.112**, signed in:
+**One-time setup**
 
-```
-npm i -g @github/copilot@1.0.112
-copilot          # then type /login
-```
+1. **Check Node.** Press the Windows key, type `cmd`, press Enter. In the black window type `node -v` and press Enter. You need `v22.12` or higher. If it says something older or "not recognized", ask IT for a newer Node.
+2. **Install Copilot CLI (the exact version).** In the same window type:
+   ```
+   npm i -g @github/copilot@1.0.112
+   ```
+3. **Sign in to Copilot.** Type `copilot` and press Enter. When it starts, type `/login` and follow the steps in your browser. Then close it (press Ctrl+C twice).
+4. **Download Pheme.** Open https://github.com/timmyj2/pheme/releases/latest, scroll to **Assets**, and click `pheme-v0.1.0.zip`.
+5. **Unzip it.** Right-click the zip, choose **Extract All**, and pick a folder you'll remember, for example `C:\Users\<you>\pheme`. If Windows blocks the files, right-click the zip first, choose **Properties**, tick **Unblock**, click OK, then extract.
+6. **Check everything works.** Open the unzipped `pheme-v0.1.0` folder, click its address bar, type `cmd` and press Enter. Then type `start-pheme.cmd doctor` and press Enter. Every line should say `PASS` (a `WARN` about models is fine). If a line says `FAIL`, it tells you what to fix.
 
-The version matters: the Copilot SDK built into Pheme speaks one protocol version, and a newer CLI is refused. `doctor` tells you if that happens.
+**Every day**
 
-1. Download `pheme-v0.1.0.zip` from the [Releases](https://github.com/timmyj2/pheme/releases) page (or take `dist/` from a CI run or `npm run build`) and unzip it into one folder.
-2. Double-click `start-pheme.cmd`, or run `node pheme.mjs`. Your browser opens on a link that contains a one-time token.
-3. If anything is off, run `start-pheme.cmd doctor` (or `node pheme.mjs doctor`). It checks Node, Copilot CLI, sign-in, network to GitHub, the data folder and the models you may use.
+1. Double-click `start-pheme.cmd`. A black window opens and your browser opens Pheme.
+2. Leave the black window open while you use Pheme. Closing it (or pressing Ctrl+C in it) stops Pheme.
+3. If the browser doesn't open, copy the `Open: http://127.0.0.1:...` link from the black window into your browser. Use that exact link, because it contains a one-time key that changes each time you start Pheme.
+
+**Good to know**
+
+- Pheme asks before it runs a command or edits a file. Click **Allow once**, **Allow for this chat** or **Deny**.
+- Your chats, skills and memory are saved in `C:\Users\<you>\.pheme`. Nothing is sent anywhere except to Copilot.
+- To update, download the newer zip and unzip it over the old folder. Your data stays where it is.
+- If Pheme says your Copilot CLI is "newer than this build understands", run step 2 again.
+
+**On your Mac or any other machine**, the steps are the same except you start it with `node pheme.mjs` instead of `start-pheme.cmd`.
 
 Try it without Copilot: `node pheme.mjs --fake` (a scripted fake engine; type `steps 10`, `run ls`, `remember I like tea`, `parallel a|b|c`).
 
