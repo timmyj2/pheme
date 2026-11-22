@@ -24,6 +24,7 @@ Rules:
 - Prefer improving an existing skill (skill_manage patch) over creating a new one. Check the skills index in your system message first; call skill_view to read a candidate before patching.
 - If nothing fits, create one skill with skill_manage create. Name it for the class of task. Front matter needs name and description; start the description with "Use when".
 - Write the procedure first. Write pitfalls as "rule - why". Do not narrate what happened in this chat.
+- Facts about the user and their preferences (for example "beginner", "likes short answers") belong in memory, never in a skill. Keep skills about the task only.
 - Never record failures that came from this particular machine or setup, and never write claims that a tool "does not work".
 - Most conversations with many tool steps deserve at least a small update. If truly nothing is reusable, reply "Nothing to save." and stop.
 

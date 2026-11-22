@@ -28,7 +28,7 @@
 |---|---|
 | All themes (11, Nous-branded ones renamed) with theme + mode pickers | ✅ Done (checked in a browser) |
 | Ctrl+K completeness (pages, chat actions, settings toggles, every theme, every skill, every chat) | ✅ Done |
-| Skill curator (merge overlaps, archive unused, never delete; scheduled + run-now) | ✅ Done in fake mode (4 tests); **not yet tried with real Copilot** |
+| Skill curator (merge overlaps, archive unused, never delete; scheduled + run-now) | ✅ Done (4 tests, and verified with real Copilot) |
 | Icon | ✅ Done in v1 |
 
 ## Blockers / needs owner
@@ -45,6 +45,7 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 - Repo created with plan, license and notices.
 - Owner chose to pin the CLI at 1.0.112; doctor now treats an empty model list as a warning.
 - Real Copilot check passed; fixed empty tool names on `tool_end` and duplicate approval cards.
+- Real Copilot check of learning loops and curator: skill review wrote a good class-level skill from a 10-step transcript; memory review saved two user facts; curator merged two overlapping skills into one, archived both extras and left the unrelated one alone.
 - v3: themes, Ctrl+K, curator added (55 tests).
 - v2: subagents and Agents page added (both modes). Real Copilot: two parallel `agent` calls returned alpha/beta; a saved `poet` profile was delegated to by the CLI and shown as a Copilot-agent card.
 - v2: scheduled jobs added (interval/daily/once; run only while open; missed runs collapse into one; `allowActions` fixed at creation).
