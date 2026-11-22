@@ -139,6 +139,15 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       }
     }
 
+    // --- curator
+    if (seg[0] === "curator") {
+      if (m === "GET") return json(res, 200, app.curator.state());
+      if (m === "POST" && seg[1] === "run") {
+        app.background(app.curator.run());
+        return json(res, 202, { ok: true });
+      }
+    }
+
     // --- agents
     if (seg[0] === "agents" && m === "GET") return json(res, 200, app.agents.listRuns());
     if (seg[0] === "agent-profiles") {

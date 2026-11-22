@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, type BootstrapState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
+import { THEMES, parseTheme, themeValue, type Mode } from "./themes/presets.ts";
+import { api, type CuratorState, type BootstrapState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
 
 function Head({ title, sub }: { title: string; sub?: string }) {
   return (
@@ -51,14 +52,15 @@ export function MemoryPage() {
   );
 }
 
-export function SkillsPage() {
+export function SkillsPage({ initial }: { initial?: string | null }) {
   const [list, setList] = useState<SkillSummary[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
-  const load = () => api.skills().then(setList);
-  useEffect(() => { load(); }, []);
+  const [curator, setCurator] = useState<CuratorState | null>(null);
+  const load = () => { api.skills().then(setList); api.curator().then(setCurator).catch(() => {}); };
+  useEffect(() => { load(); if (initial) void view(initial); }, []);
   const view = async (name: string) => {
     const s = await api.skill(name);
     setOpen(name);
@@ -70,6 +72,15 @@ export function SkillsPage() {
   return (
     <section className="page wide">
       <Head title="Skills" sub="Reusable procedures. Pheme writes these after long tasks; you can edit them." />
+      <div className="panel">
+        <h2>Skill curator</h2>
+        <p className="muted small">Every few days Pheme merges overlapping skills and archives ones that have not been used for a long time. Nothing is ever deleted; archived skills stay in the skills/.archive folder.</p>
+        <div className="row">
+          <button className="btn" disabled={curator?.running} onClick={() => { void api.runCurator().then(() => setTimeout(load, 1500)); }}>{curator?.running ? "Running…" : "Run curator now"}</button>
+          <span className="muted small">{curator?.lastRunAt ? `Last run ${new Date(curator.lastRunAt).toLocaleString()}` : "Has not run yet"}</span>
+        </div>
+        {curator && curator.report.length > 0 && <ul className="small">{curator.report.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+      </div>
       <div className="split">
         <div className="panel list">
           <button className="btn" onClick={() => { setOpen("(new)"); setContent(NEW); setFiles([]); setMsg(""); }}>New skill</button>
@@ -114,10 +125,6 @@ export function SkillsPage() {
   );
 }
 
-const THEME_CHOICES = [
-  ["pheme-dark", "Pheme dark"], ["pheme-light", "Pheme light"], ["github-dark", "GitHub dark"], ["github-light", "GitHub light"], ["system", "Match system"],
-];
-
 export function SettingsPage({ state, onChange }: { state: BootstrapState; onChange: (s: Settings) => void }) {
   const [models, setModels] = useState<ModelOption[]>([]);
   useEffect(() => { api.models().then(setModels); }, []);
@@ -148,11 +155,26 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
       </div>
       <div className="panel">
         <h2>Appearance</h2>
-        <label className="field">Theme
-          <select value={s.theme} onChange={(e) => void set({ theme: e.target.value })}>
-            {THEME_CHOICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </label>
+        {(() => {
+          const cur = parseTheme(s.theme);
+          const theme = cur.theme;
+          const modes: Mode[] = ["system", ...(theme.light ? ["light" as const] : []), ...(theme.dark ? ["dark" as const] : [])];
+          return (
+            <div className="row">
+              <label className="field">Theme
+                <select value={theme.name} onChange={(e) => void set({ theme: themeValue(e.target.value, cur.mode) })}>
+                  {THEMES.map((t) => <option key={t.name} value={t.name}>{t.label}</option>)}
+                </select>
+              </label>
+              <label className="field">Mode
+                <select value={modes.includes(cur.mode) ? cur.mode : "system"} onChange={(e) => void set({ theme: themeValue(theme.name, e.target.value as Mode) })}>
+                  {modes.map((m) => <option key={m} value={m}>{m === "system" ? "Match system" : m[0].toUpperCase() + m.slice(1)}</option>)}
+                </select>
+              </label>
+            </div>
+          );
+        })()}
+        {(!parseTheme(s.theme).theme.light || !parseTheme(s.theme).theme.dark) && <p className="muted small">This theme has only one {parseTheme(s.theme).theme.dark ? "dark" : "light"} palette.</p>}
       </div>
       <div className="panel">
         <h2>Permissions</h2>
@@ -170,6 +192,12 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
         </label>
         {num("skillReviewMinToolSteps", "Skill review after a turn with at least this many tool steps")}
         {num("memoryReviewEveryUserMessages", "Memory review every this many user messages")}
+        <label className="check">
+          <input type="checkbox" checked={s.curatorEnabled} onChange={(e) => void set({ curatorEnabled: e.target.checked })} />
+          Skill curator: periodically merge overlapping skills and archive unused ones
+        </label>
+        {num("curatorEveryDays", "Curator runs every this many days")}
+        {num("curatorStaleDays", "Archive skills unused for this many days")}
         {num("memoryLimit", "Memory limit (characters)")}
         {num("userLimit", "User profile limit (characters)")}
       </div>

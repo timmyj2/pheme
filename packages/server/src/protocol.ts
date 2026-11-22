@@ -40,6 +40,10 @@ export interface Settings {
   theme: string;
   autoApproveAll: boolean;
   loopsEnabled: boolean;
+  curatorEnabled: boolean;
+  curatorEveryDays: number;
+  /** Archive skills not used for this many days. */
+  curatorStaleDays: number;
   skillReviewMinToolSteps: number;
   memoryReviewEveryUserMessages: number;
   memoryLimit: number;
@@ -52,6 +56,9 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
   autoApproveAll: false,
   loopsEnabled: true,
+  curatorEnabled: true,
+  curatorEveryDays: 7,
+  curatorStaleDays: 90,
   skillReviewMinToolSteps: 10,
   memoryReviewEveryUserMessages: 10,
   memoryLimit: 2200,
@@ -131,4 +138,11 @@ export interface AgentRun {
   result: string;
   /** Hidden chat holding the transcript (session runs only). */
   childChatId?: string;
+}
+
+export interface CuratorState {
+  lastRunAt: number | null;
+  running: boolean;
+  /** Plain-language lines describing what the last run did. */
+  report: string[];
 }

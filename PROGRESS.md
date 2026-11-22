@@ -22,6 +22,15 @@
 | Scheduled jobs: scheduler, API, page | ✅ Done (6 tests, checked in a browser) |
 | Subagents: `agent` tool (parallel sessions, max 3 at once) + saved agent profiles passed to Copilot as custom agents + Agents page and inline cards | ✅ Done (10 tests, checked in a browser, and verified with real Copilot) |
 
+## v3
+
+| Step | Status |
+|---|---|
+| All themes (11, Nous-branded ones renamed) with theme + mode pickers | ✅ Done (checked in a browser) |
+| Ctrl+K completeness (pages, chat actions, settings toggles, every theme, every skill, every chat) | ✅ Done |
+| Skill curator (merge overlaps, archive unused, never delete; scheduled + run-now) | ✅ Done in fake mode (4 tests); **not yet tried with real Copilot** |
+| Icon | ✅ Done in v1 |
+
 ## Blockers / needs owner
 
 1. **SDK vs. Copilot CLI version skew: resolved by pinning** (owner chose option a). Both laptops need `npm i -g @github/copilot@1.0.112`; `pheme doctor` explains it if the CLI is newer. Watch for CLI auto-updates.
@@ -36,6 +45,7 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 - Repo created with plan, license and notices.
 - Owner chose to pin the CLI at 1.0.112; doctor now treats an empty model list as a warning.
 - Real Copilot check passed; fixed empty tool names on `tool_end` and duplicate approval cards.
+- v3: themes, Ctrl+K, curator added (55 tests).
 - v2: subagents and Agents page added (both modes). Real Copilot: two parallel `agent` calls returned alpha/beta; a saved `poet` profile was delegated to by the CLI and shown as a Copilot-agent card.
 - v2: scheduled jobs added (interval/daily/once; run only while open; missed runs collapse into one; `allowActions` fixed at creation).
 - v1 steps 1-9 built; 32 tests, typecheck and lint pass locally on macOS. CI runs on push.

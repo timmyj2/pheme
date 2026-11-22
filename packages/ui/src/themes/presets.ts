@@ -11,44 +11,45 @@ export interface Palette {
   userBubble: string; userBubbleBorder: string;
 }
 
-export interface Theme { name: string; label: string; light: Palette; dark: Palette }
+export interface Theme { name: string; label: string; light?: Palette; dark?: Palette }
 
 const SYSTEM_SANS = '"Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"';
 const SYSTEM_MONO = '"JetBrains Mono", "Cascadia Code", "Cascadia Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace';
 export const FONTS = { sans: SYSTEM_SANS, mono: SYSTEM_MONO };
 
-const neutralLight = { background: "#ffffff", foreground: "#1f2328", card: "#f6f8fa", cardForeground: "#1f2328", muted: "#f6f6f6", mutedForeground: "#656d76", popover: "#ffffff", border: "#d0d7de", input: "#ffffff", destructive: "#cf222e", destructiveForeground: "#ffffff", sidebar: "#f6f8fa", sidebarBorder: "#d0d7de", primaryForeground: "#ffffff" };
-const neutralDark = { background: "#0d1117", foreground: "#e6edf3", card: "#010409", cardForeground: "#e6edf3", muted: "#1a1e24", mutedForeground: "#7d8590", popover: "#161b22", border: "#30363d", input: "#0d1117", destructive: "#f85149", destructiveForeground: "#ffffff", sidebar: "#010409", sidebarBorder: "#30363d" };
+import { GENERATED_THEMES } from "./generated.ts";
 
-export const THEMES: Theme[] = [
-  {
-    name: "pheme", label: "Pheme",
-    light: { ...neutralLight, primary: "#0053fd", secondary: "#deeaff", accent: "#e3edff", ring: "#0053fd", userBubble: "#dae7fd", userBubbleBorder: "#d0d7de" },
-    dark: { ...neutralDark, primary: "#4a84fe", primaryForeground: "#161616", secondary: "#1d2e4f", accent: "#17243a", ring: "#4a84fe", userBubble: "#07162c", userBubbleBorder: "#30363d" },
-  },
-  {
-    name: "github", label: "GitHub",
-    light: { ...neutralLight, primary: "#196d31", secondary: "#dfebe2", accent: "#e3ede6", ring: "#196d31", userBubble: "#dbe7e2", userBubbleBorder: "#d0d7de" },
-    dark: { ...neutralDark, primary: "#4f9e5e", primaryForeground: "#ffffff", secondary: "#1f382b", accent: "#192a24", ring: "#4f9e5e", userBubble: "#0f2018", userBubbleBorder: "#30363d" },
-  },
-];
+/** Every theme has a light palette, a dark palette, or both (dark-only themes such as Midnight have just one). */
+export const THEMES: Theme[] = GENERATED_THEMES;
 
 export type Mode = "light" | "dark" | "system";
 
-/** Settings.theme is "<name>-<mode>", "<name>" (system mode), or just a mode. */
+/** Settings.theme is "<name>-<mode>", "<name>" (system mode), or just a mode ("dark", "light", "system"). */
 export function parseTheme(value: string): { theme: Theme; mode: Mode } {
+  if (value === "dark" || value === "light" || value === "system") return { theme: THEMES[0], mode: value };
   const parts = value.split("-");
   const last = parts[parts.length - 1];
-  const mode: Mode = last === "light" || last === "dark" ? last : "system";
-  const name = last === "light" || last === "dark" ? parts.slice(0, -1).join("-") : value;
+  const hasMode = last === "light" || last === "dark";
+  const name = hasMode ? parts.slice(0, -1).join("-") : value;
   const theme = THEMES.find((t) => t.name === name) ?? THEMES[0];
-  return { theme, mode: value === "dark" || value === "light" || value === "system" ? (value as Mode) : mode };
+  return { theme, mode: hasMode ? (last as Mode) : "system" };
+}
+
+/** Which palette to paint: the requested mode if the theme has it, otherwise the one it has. */
+export function pickPalette(theme: Theme, mode: Mode, systemDark: boolean): { palette: Palette; dark: boolean } {
+  const wantDark = mode === "dark" || (mode === "system" && systemDark);
+  if (wantDark && theme.dark) return { palette: theme.dark, dark: true };
+  if (!wantDark && theme.light) return { palette: theme.light, dark: false };
+  return theme.dark ? { palette: theme.dark, dark: true } : { palette: theme.light!, dark: false };
+}
+
+export function themeValue(name: string, mode: Mode): string {
+  return mode === "system" ? name : `${name}-${mode}`;
 }
 
 export function applyTheme(value: string): void {
   const { theme, mode } = parseTheme(value);
-  const dark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const p = dark ? theme.dark : theme.light;
+  const { palette: p, dark } = pickPalette(theme, mode, window.matchMedia("(prefers-color-scheme: dark)").matches);
   const root = document.documentElement;
   const set = (k: string, v: string) => root.style.setProperty(`--dt-${k}`, v);
   (Object.keys(p) as (keyof Palette)[]).forEach((k) => set(k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()), p[k]));

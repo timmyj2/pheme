@@ -41,6 +41,16 @@ export const defaultScript: FakeScript = ({ prompt, opts }) => {
       { say: "Saved." },
     ];
   }
+  if (prompt.includes("[pheme:curator]")) {
+    // Merge the first two skills: fold the second one's name into the first, then archive the second.
+    const names = [...opts.systemMessage.matchAll(/^- ([a-z0-9_-]+):/gm)].map((m) => m[1]);
+    if (names.length < 2) return [{ say: "No changes." }];
+    return [
+      { tool: "skill_manage", args: { action: "patch", name: names[0], old_string: "## Procedure", new_string: `## Procedure\n(also covers: ${names[1]})` } },
+      { tool: "skill_manage", args: { action: "delete", name: names[1] } },
+      { say: "Merged." },
+    ];
+  }
   if (prompt.includes("[pheme:memory-review]")) {
     const fact = /remember(?: that)? ([^\n.]+)/i.exec(prompt)?.[1];
     return fact ? [{ tool: "memory", args: { action: "add", store: "user", content: fact.trim() } }, { say: "Saved." }] : [{ say: "Nothing to save." }];

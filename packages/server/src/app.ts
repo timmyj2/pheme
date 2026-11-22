@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AgentStore, Semaphore } from "./agents.ts";
 import type { Engine, EngineEvent, EngineSession, PermissionAnswer, PermissionRequest } from "./engine.ts";
+import { Curator } from "./curator.ts";
 import { JobStore, Scheduler } from "./jobs.ts";
 import { Loops } from "./loops.ts";
 import { MemoryStore } from "./memory.ts";
@@ -30,6 +31,7 @@ export class App {
   readonly loops: Loops;
   readonly jobs: JobStore;
   readonly agents: AgentStore;
+  readonly curator: Curator;
   private agentSlots = new Semaphore(3);
   readonly scheduler: Scheduler;
   /** Chats started by scheduled jobs: fixed allow/deny for actions, never asks the user. */
@@ -50,6 +52,7 @@ export class App {
     this.loops = new Loops(this);
     this.jobs = new JobStore(dataDir);
     this.agents = new AgentStore(dataDir);
+    this.curator = new Curator(this);
     this.scheduler = new Scheduler(this);
   }
 

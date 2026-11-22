@@ -1,6 +1,6 @@
-import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun } from "../../server/src/protocol.ts";
+import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun, CuratorState } from "../../server/src/protocol.ts";
 
-export type { AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
+export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
 export type ChatRow = ChatMeta & { busy?: boolean };
 
 const KEY = "pheme-token";
@@ -56,5 +56,7 @@ export const api = {
   agentProfiles: () => call<AgentProfile[]>("/agent-profiles"),
   saveAgentProfile: (p: AgentProfile) => call<AgentProfile>(`/agent-profiles/${encodeURIComponent(p.name)}`, "PUT", p),
   archiveAgentProfile: (name: string) => call<{ ok: boolean }>(`/agent-profiles/${encodeURIComponent(name)}`, "DELETE"),
+  curator: () => call<CuratorState>("/curator"),
+  runCurator: () => call<{ ok: boolean }>("/curator/run", "POST", {}),
   eventsUrl: (id: string, after: number) => `/api/chats/${id}/events?after=${after}&token=${encodeURIComponent(token())}`,
 };

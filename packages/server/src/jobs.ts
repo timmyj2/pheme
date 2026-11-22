@@ -100,6 +100,7 @@ export class Scheduler {
   /** Run every enabled job whose time has come, once each. */
   tick(): void {
     const now = this.now();
+    this.app.curator.maybeRun(now);
     for (const j of this.app.jobs.list()) {
       if (j.enabled && j.nextRunAt !== null && j.nextRunAt <= now) this.app.background(this.run(j.id));
     }

@@ -42,6 +42,7 @@ export function skillTools(skills: SkillStore): ToolDef[] {
       handler: wrap((a) => {
         if (!a.name) return skills.index();
         const text = skills.view(String(a.name), a.file_path ? String(a.file_path) : undefined);
+        if (!a.file_path) skills.recordView(String(a.name));
         const extra = a.file_path ? "" : skills.files(String(a.name)).filter((f) => f !== "SKILL.md");
         return Array.isArray(extra) && extra.length ? `${text}\n\n[supporting files: ${extra.join(", ")}]` : text;
       }),

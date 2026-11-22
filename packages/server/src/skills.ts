@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SkillSummary } from "./protocol.ts";
+import { readJson, writeJson } from "./settings.ts";
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -18,8 +19,27 @@ export function parseFrontmatter(text: string): { name?: string; description?: s
 /** Skills live in Pheme's own folder: <data>/skills/<name>/SKILL.md (+ optional supporting files). */
 export class SkillStore {
   private dir: string;
+  private usageFile: string;
   constructor(dataDir: string) {
     this.dir = path.join(dataDir, "skills");
+    this.usageFile = path.join(dataDir, "skill-usage.json");
+  }
+
+  /** Record that the agent loaded a skill (used by the curator to find unused ones). */
+  recordView(name: string, now = Date.now()): void {
+    const u = readJson<Record<string, { views: number; lastViewedAt: number }>>(this.usageFile, {});
+    u[name] = { views: (u[name]?.views ?? 0) + 1, lastViewedAt: now };
+    writeJson(this.usageFile, u);
+  }
+
+  /** Skills with no use for `days` days. A skill counts from its last view, else from its last edit. */
+  stale(days: number, now = Date.now()): string[] {
+    const u = readJson<Record<string, { lastViewedAt: number }>>(this.usageFile, {});
+    const cutoff = now - days * 86_400_000;
+    return this.list().filter((sk) => {
+      const edited = fs.statSync(path.join(this.dir, sk.name, "SKILL.md")).mtimeMs;
+      return Math.max(edited, u[sk.name]?.lastViewedAt ?? 0) < cutoff;
+    }).map((sk) => sk.name);
   }
   private skillDir(name: string) {
     if (!NAME_RE.test(name)) throw new Error("skill name must be lowercase letters, digits, - or _ (max 64)");
