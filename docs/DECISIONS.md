@@ -30,3 +30,4 @@ One line each: **decision** — why. The owner reviews these.
 - **At most 3 sub-agent sessions run at once** — protects the Free quota and the machine; extra calls wait their turn.
 - **Sub-agent approvals appear as cards in the parent chat; Stop cancels the whole tree** — one place for the user to answer; child sessions are hidden chats kept for the transcript.
 - **Profiles live in `~/.pheme/agents/<name>.md`, archived not deleted; runs in `agent-runs.json` (last 200)** — same conventions as skills. Profile changes apply to new chats, because Copilot gets them at session creation.
+- **Real-Copilot check of subagents (2 chats)** — the model calls `agent` twice in one response and both run in parallel; a saved profile is delegated to through Copilot's own `task` tool and its `subagent.*` events become a card. The model sometimes adds a `name` argument to `agent`; it is ignored.
