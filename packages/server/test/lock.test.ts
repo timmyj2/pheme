@@ -8,8 +8,8 @@ describe("single instance lock", () => {
   it("blocks a second live instance, allows after release, and replaces a stale lock", () => {
     const d = tmpDir();
     const release = acquireLock(d, process.pid);
-    // pid 1 (init/launchd) is always alive, so pretend it is the other instance
-    fs.writeFileSync(path.join(d, "pheme.lock"), "1");
+    // our parent process is alive on every OS, so pretend it is the other instance
+    fs.writeFileSync(path.join(d, "pheme.lock"), String(process.ppid));
     expect(() => acquireLock(d, process.pid)).toThrow(/already running/);
     fs.writeFileSync(path.join(d, "pheme.lock"), "2147483000"); // no such process
     const again = acquireLock(d, process.pid);
