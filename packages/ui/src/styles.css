@@ -113,3 +113,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .palette li.sel { background: var(--dt-accent); }
 
 @media (max-width: 720px) { .sidebar { width: 200px; } .split { flex-direction: column; } .split .list { width: auto; } }
+
+.job { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
+.job + .job { border-top: 1px solid var(--dt-border); }

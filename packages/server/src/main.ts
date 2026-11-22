@@ -59,6 +59,7 @@ async function main() {
     server = await startServer({ ...opts, port: 0 });
   }
   console.log(`Pheme is running${fake ? " (fake engine)" : ""}.\nOpen: ${server.url}\nData folder: ${dir}\nPress Ctrl+C to stop.`);
+  app.scheduler.start();
   if (!args.includes("--no-open")) openBrowser(server.url);
   const stop = async () => {
     await app.shutdown().catch(() => {});

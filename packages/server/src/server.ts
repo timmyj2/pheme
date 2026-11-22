@@ -118,6 +118,27 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (seg[2] === "events" && m === "GET") return sse(req, res, id, Number(url.searchParams.get("after") ?? 0));
     }
 
+    // --- scheduled jobs
+    if (seg[0] === "jobs") {
+      try {
+        if (seg.length === 1 && m === "GET") return json(res, 200, app.jobs.list());
+        if (seg.length === 1 && m === "POST") return json(res, 201, app.jobs.create(body as never));
+        const job = app.jobs.get(seg[1]);
+        if (!job) return json(res, 404, { error: "no such job" });
+        if (seg[2] === "run" && m === "POST") {
+          app.background(app.scheduler.run(job.id));
+          return json(res, 202, { ok: true });
+        }
+        if (m === "PUT") return json(res, 200, app.jobs.update(job.id, body as never));
+        if (m === "DELETE") {
+          app.jobs.remove(job.id);
+          return json(res, 200, { ok: true });
+        }
+      } catch (e) {
+        return json(res, 400, { error: (e as Error).message });
+      }
+    }
+
     // --- memory
     if (seg[0] === "memory") {
       if (m === "GET") return json(res, 200, app.memory.state());

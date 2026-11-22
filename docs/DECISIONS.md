@@ -22,3 +22,6 @@ One line each: **decision** — why. The owner reviews these.
 - **UI is new code in Hermes's design vocabulary, not a file copy** — Hermes's CSS and components are tied to Tailwind, assistant-ui and its own state layer. Copied: the `--dt-*` token names, the Nous/GitHub palettes (renamed Pheme/GitHub), system font stacks and the shadow/stroke approach. Mirror of source layout (`src/themes/presets.ts`, `src/styles.css`) kept. Agents and Scheduled jobs pages are v2 and not in the nav yet.
 - **CI uses `npm install`, not `npm ci`** — the Copilot SDK's per-platform optional packages make a lockfile written on macOS unreliable on Windows with `npm ci`.
 - **Real-Copilot check done (3 short chats)** — custom tool, memory write and approval card verified; `tool_end` name now taken from the start event by id; repeated permission asks for one tool call are approved silently after the first Allow.
+- **Job schedules: interval, daily (local HH:MM), once** — covers the plan without a cron parser.
+- **Jobs run in a normal chat titled "Job: <name>"** — shows in the sidebar and keeps the transcript; job chats never prompt: allow or deny is fixed by `allowActions` at creation (reads always allowed).
+- **Scheduler ticks every 30 s and advances `nextRunAt` before running** — a slow run is never started twice, and any number of missed runs collapse into one on start.

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Engine, EngineEvent, EngineSession, PermissionAnswer, PermissionRequest } from "./engine.ts";
+import { JobStore, Scheduler } from "./jobs.ts";
 import { Loops } from "./loops.ts";
 import { MemoryStore } from "./memory.ts";
 import type { ApprovalDecision, ChatMeta, Settings } from "./protocol.ts";
@@ -24,6 +25,10 @@ export class App {
   readonly memory: MemoryStore;
   readonly skills: SkillStore;
   readonly loops: Loops;
+  readonly jobs: JobStore;
+  readonly scheduler: Scheduler;
+  /** Chats started by scheduled jobs: fixed allow/deny for actions, never asks the user. */
+  readonly chatPolicy = new Map<string, "allow" | "deny">();
   private turns = new Map<string, Turn>();
   private sessions = new Map<string, EngineSession>();
   private chatAllow = new Map<string, Set<string>>();
@@ -38,6 +43,8 @@ export class App {
     });
     this.skills = new SkillStore(dataDir);
     this.loops = new Loops(this);
+    this.jobs = new JobStore(dataDir);
+    this.scheduler = new Scheduler(this);
   }
 
   /** Track a background job so tests and shutdown can wait for it. */
@@ -51,6 +58,11 @@ export class App {
     while (this.pending.size || this.turns.size) {
       await Promise.all([...this.pending, ...[...this.turns.values()].map((t) => t.done)]);
     }
+  }
+
+  /** Resolves when the chat's current turn (if any) has finished. */
+  async waitIdle(chatId: string): Promise<void> {
+    await this.turns.get(chatId)?.done;
   }
 
   isBusy(chatId: string): boolean {
@@ -137,8 +149,10 @@ export class App {
   }
 
   private async askUser(chatId: string, req: PermissionRequest, turn: Turn): Promise<PermissionAnswer> {
-    if (this.settings.get().autoApproveAll) return "allow";
     if (req.kind === "read") return "allow";
+    const policy = this.chatPolicy.get(chatId);
+    if (policy) return policy;
+    if (this.settings.get().autoApproveAll) return "allow";
     if (this.chatAllow.get(chatId)?.has(req.kind)) return "allow";
     if (turn.abort.signal.aborted) return "deny";
     const id = randomUUID();
@@ -155,6 +169,7 @@ export class App {
   }
 
   async shutdown(): Promise<void> {
+    this.scheduler.stop();
     for (const id of this.turns.keys()) this.stop(id);
     await this.drain();
     for (const s of this.sessions.values()) await s.close().catch(() => {});

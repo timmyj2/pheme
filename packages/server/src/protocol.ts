@@ -87,3 +87,23 @@ export interface ModelOption {
   id: string;
   name: string;
 }
+
+export type JobSchedule =
+  | { kind: "interval"; everyMinutes: number }
+  | { kind: "daily"; time: string } // local "HH:MM"
+  | { kind: "once"; at: number };
+
+export interface Job {
+  id: string;
+  name: string;
+  prompt: string;
+  schedule: JobSchedule;
+  /** Fixed at creation: may the job run shell commands and edit files? */
+  allowActions: boolean;
+  enabled: boolean;
+  createdAt: number;
+  nextRunAt: number | null;
+  lastRunAt: number | null;
+  lastChatId: string | null;
+  lastStatus: "ok" | "error" | "skipped" | null;
+}
