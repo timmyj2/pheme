@@ -1,0 +1,28 @@
+{
+  "name": "pheme",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "typecheck": "tsc -p packages/server && tsc -p packages/ui",
+    "lint": "eslint packages scripts",
+    "test": "vitest run",
+    "build:ui": "npm run build -w @pheme/ui",
+    "build": "node scripts/build.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "dev:fake": "node --experimental-strip-types packages/server/src/main.ts --fake"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@github/copilot-sdk": "^1.0.34",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.0.0"
+  }
+}
