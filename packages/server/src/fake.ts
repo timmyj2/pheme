@@ -122,7 +122,7 @@ export class FakeEngine implements Engine {
         };
         for (const step of steps) {
           if (signal?.aborted) return;
-          if ("delayMs" in step) await sleep(step.delayMs);
+          if ("delayMs" in step) await sleep(step.delayMs, signal);
           else if ("say" in step) await say(step.say, onEvent, self.streamDelayMs, signal);
           else if ("tool" in step) await runTool(step);
           else if ("parallel" in step) await Promise.all(step.parallel.map(runTool));
@@ -155,7 +155,15 @@ export class FakeEngine implements Engine {
   async close() {}
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Wait `ms`, or less if the turn is aborted. */
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(t);
+      resolve();
+    });
+  });
 
 async function say(text: string, onEvent: (e: EngineEvent) => void, delay: number, signal?: AbortSignal) {
   for (const w of text.match(/\S+\s*/g) ?? []) {

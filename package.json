@@ -4,8 +4,12 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "workspaces": ["packages/*"],
-  "engines": { "node": ">=22.12.0" },
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "typecheck": "tsc -p packages/server && tsc -p packages/ui",
     "lint": "eslint packages scripts",
@@ -19,9 +23,13 @@
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@github/copilot-sdk": "^1.0.34",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.13",
     "@types/node": "^22.0.0",
     "esbuild": "^0.25.0",
     "eslint": "^9.0.0",
+    "jsdom": "^31.0.1",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^3.0.0"
