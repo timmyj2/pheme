@@ -1,0 +1,228 @@
+import http from "node:http";
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import type { AddressInfo } from "node:net";
+import type { App } from "./app.ts";
+import type { ApprovalDecision, BootstrapState, Settings } from "./protocol.ts";
+import type { MemoryStoreName } from "./memory.ts";
+
+export interface Asset {
+  type: string;
+  /** base64 */
+  data: string;
+}
+export type Assets = Record<string, Asset>;
+
+export interface ServerOptions {
+  app: App;
+  fake: boolean;
+  version: string;
+  assets?: Assets;
+  port?: number;
+  token?: string;
+}
+
+export interface RunningServer {
+  url: string;
+  port: number;
+  token: string;
+  close(): Promise<void>;
+}
+
+const MAX_BODY = 1_000_000;
+
+export async function startServer(opts: ServerOptions): Promise<RunningServer> {
+  const { app } = opts;
+  const token = opts.token ?? randomBytes(24).toString("base64url");
+  const tokenBuf = Buffer.from(token);
+
+  const server = http.createServer((req, res) => {
+    handle(req, res).catch((e) => {
+      if (!res.headersSent) json(res, 500, { error: (e as Error).message });
+      else res.end();
+    });
+  });
+
+  const hostOk = (req: http.IncomingMessage) => /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(req.headers.host ?? "");
+
+  async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
+    // Guard against DNS rebinding: only accept loopback Host headers.
+    if (!hostOk(req)) return json(res, 403, { error: "bad host" });
+    const url = new URL(req.url ?? "/", "http://127.0.0.1");
+    const p = url.pathname;
+    if (!p.startsWith("/api/")) return serveStatic(res, p);
+
+    const given = String(req.headers["x-pheme-token"] ?? url.searchParams.get("token") ?? "");
+    const g = Buffer.from(given);
+    if (g.length !== tokenBuf.length || !timingSafeEqual(g, tokenBuf)) return json(res, 401, { error: "bad token" });
+    const origin = req.headers.origin;
+    if (origin && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) return json(res, 403, { error: "bad origin" });
+
+    const m = req.method ?? "GET";
+    const seg = p.slice(5).split("/").filter(Boolean).map(decodeURIComponent);
+    const body = m === "POST" || m === "PUT" || m === "PATCH" ? await readBody(req) : {};
+
+    // --- bootstrap, settings, models
+    if (seg[0] === "state" && m === "GET") {
+      const s: BootstrapState = { engine: app.engine.name, fake: opts.fake, settings: app.settings.get(), usage: app.settings.usage(), version: opts.version };
+      return json(res, 200, s);
+    }
+    if (seg[0] === "settings") {
+      if (m === "PUT") return json(res, 200, app.settings.update(body as Partial<Settings>));
+      return json(res, 200, app.settings.get());
+    }
+    if (seg[0] === "models" && m === "GET") return json(res, 200, await app.engine.listModels().catch(() => []));
+
+    // --- chats
+    if (seg[0] === "chats") {
+      if (seg.length === 1) {
+        if (m === "GET") return json(res, 200, app.store.list().map((c) => ({ ...c, busy: app.isBusy(c.id) })));
+        if (m === "POST") return json(res, 201, app.store.create({ model: typeof body.model === "string" ? body.model : undefined }));
+      }
+      const id = seg[1];
+      const meta = app.store.get(id);
+      if (!meta) return json(res, 404, { error: "no such chat" });
+      if (seg.length === 2) {
+        if (m === "GET") return json(res, 200, { meta, busy: app.isBusy(id), events: app.store.events(id), pendingApprovals: app.pendingApprovals(id) });
+        if (m === "PATCH") {
+          const patch: Record<string, unknown> = {};
+          if (typeof body.title === "string") patch.title = body.title.slice(0, 120);
+          if (typeof body.pinned === "boolean") patch.pinned = body.pinned;
+          if (typeof body.archived === "boolean") patch.archived = body.archived;
+          return json(res, 200, app.store.update(id, patch));
+        }
+        if (m === "DELETE") {
+          app.stop(id);
+          app.store.remove(id);
+          return json(res, 200, { ok: true });
+        }
+      }
+      if (seg[2] === "messages" && m === "POST") {
+        const text = typeof body.text === "string" ? body.text.trim() : "";
+        if (!text) return json(res, 400, { error: "empty message" });
+        try {
+          app.send(id, text);
+        } catch (e) {
+          return json(res, 409, { error: (e as Error).message });
+        }
+        return json(res, 202, { ok: true });
+      }
+      if (seg[2] === "stop" && m === "POST") {
+        app.stop(id);
+        return json(res, 200, { ok: true });
+      }
+      if (seg[2] === "approvals" && seg[3] && m === "POST") {
+        const d = body.decision as ApprovalDecision;
+        if (d !== "once" && d !== "chat" && d !== "deny") return json(res, 400, { error: "bad decision" });
+        return json(res, app.resolveApproval(id, seg[3], d) ? 200 : 404, { ok: true });
+      }
+      if (seg[2] === "events" && m === "GET") return sse(req, res, id, Number(url.searchParams.get("after") ?? 0));
+    }
+
+    // --- memory
+    if (seg[0] === "memory") {
+      if (m === "GET") return json(res, 200, app.memory.state());
+      if (m === "PUT") {
+        const store = body.store as MemoryStoreName;
+        if ((store !== "memory" && store !== "user") || !Array.isArray(body.entries)) return json(res, 400, { error: "bad request" });
+        try {
+          app.memory.write(store, body.entries.map(String));
+        } catch (e) {
+          return json(res, 400, { error: (e as Error).message });
+        }
+        return json(res, 200, app.memory.state());
+      }
+    }
+
+    // --- skills
+    if (seg[0] === "skills") {
+      if (seg.length === 1 && m === "GET") return json(res, 200, app.skills.list());
+      const name = seg[1];
+      try {
+        if (m === "GET") return json(res, 200, { name, content: app.skills.view(name), files: app.skills.files(name) });
+        if (m === "PUT") {
+          const exists = app.skills.list().some((s) => s.name === name);
+          app.skills.manage({ action: exists ? "edit" : "create", name, content: String(body.content ?? "") });
+          return json(res, 200, { ok: true });
+        }
+        if (m === "DELETE") {
+          app.skills.manage({ action: "delete", name });
+          return json(res, 200, { ok: true });
+        }
+      } catch (e) {
+        return json(res, 400, { error: (e as Error).message });
+      }
+    }
+    return json(res, 404, { error: "not found" });
+  }
+
+  function sse(req: http.IncomingMessage, res: http.ServerResponse, id: string, after: number) {
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+    res.write(": connected\n\n"); // flush headers so clients see the stream open
+    let last = after;
+    const send = (e: { seq: number }) => {
+      if (e.seq <= last) return; // already replayed
+      last = e.seq;
+      res.write(`data: ${JSON.stringify(e)}\n\n`);
+    };
+    const off = app.store.subscribe(id, send);
+    for (const e of app.store.events(id, after)) send(e);
+    const ka = setInterval(() => res.write(": keepalive\n\n"), 15000);
+    req.on("close", () => {
+      clearInterval(ka);
+      off();
+    });
+  }
+
+  function serveStatic(res: http.ServerResponse, p: string) {
+    const assets = opts.assets ?? {};
+    const key = p === "/" ? "/index.html" : p;
+    const a = assets[key] ?? (key.includes(".") ? undefined : assets["/index.html"]);
+    if (!a) return json(res, 404, { error: "UI not built. Run npm run build." });
+    res.writeHead(200, { "content-type": a.type, "cache-control": "no-store", "x-content-type-options": "nosniff" });
+    res.end(Buffer.from(a.data, "base64"));
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(opts.port ?? 0, "127.0.0.1", resolve);
+  });
+  const port = (server.address() as AddressInfo).port;
+  return {
+    url: `http://127.0.0.1:${port}/?token=${token}`,
+    port,
+    token,
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.closeAllConnections();
+        server.close(() => resolve());
+      }),
+  };
+}
+
+function json(res: http.ServerResponse, status: number, body: unknown) {
+  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+  res.end(JSON.stringify(body));
+}
+
+function readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size > MAX_BODY) {
+        reject(new Error("body too large"));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on("end", () => {
+      try {
+        const t = Buffer.concat(chunks).toString("utf8");
+        resolve(t ? (JSON.parse(t) as Record<string, unknown>) : {});
+      } catch {
+        reject(new Error("bad json"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
