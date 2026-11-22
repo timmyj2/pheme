@@ -2,9 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_SETTINGS, type Settings, type Usage } from "./protocol.ts";
 
+/** Read a JSON file; a missing, corrupt or wrong-shaped file (e.g. `7` where an object is expected) gives the fallback. */
 function readJson<T>(file: string, fallback: T): T {
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as unknown;
+    if (fallback !== undefined && (parsed === null || typeof parsed !== typeof fallback || Array.isArray(parsed) !== Array.isArray(fallback))) return fallback;
+    return parsed as T;
   } catch {
     return fallback;
   }
@@ -18,6 +21,24 @@ function writeJson(file: string, value: unknown): void {
 }
 
 export { readJson, writeJson };
+
+const INT_RANGES: Partial<Record<keyof Settings, [number, number]>> = {
+  skillReviewMinToolSteps: [1, 1000],
+  memoryReviewEveryUserMessages: [1, 1000],
+  memoryLimit: [100, 100_000],
+  userLimit: [100, 100_000],
+  curatorEveryDays: [1, 3650],
+  curatorStaleDays: [1, 3650],
+};
+
+/** Accept only values of the right type and sane size; anything else is ignored. */
+export function validSetting(key: keyof Settings, v: unknown): boolean {
+  if (typeof v !== typeof DEFAULT_SETTINGS[key]) return false;
+  const range = INT_RANGES[key];
+  if (range) return Number.isInteger(v) && (v as number) >= range[0] && (v as number) <= range[1];
+  if (typeof v === "string") return v.length <= 200;
+  return true;
+}
 
 export class SettingsStore {
   private file: string;
@@ -33,7 +54,7 @@ export class SettingsStore {
     const next: Settings = { ...this.get() };
     for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
       const v = patch[key];
-      if (v !== undefined && typeof v === typeof DEFAULT_SETTINGS[key]) (next as unknown as Record<string, unknown>)[key] = v;
+      if (v !== undefined && validSetting(key, v)) (next as unknown as Record<string, unknown>)[key] = v;
     }
     writeJson(this.file, next);
     return next;

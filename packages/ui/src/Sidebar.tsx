@@ -3,6 +3,9 @@ import type { ChatRow } from "./api.ts";
 
 export type View = "chat" | "skills" | "memory" | "agents" | "jobs" | "settings";
 
+/** Rows rendered before "Show more": keeps the sidebar fast with thousands of chats. */
+const ROW_LIMIT = 150;
+
 export function Brand() {
   return (
     <div className="brand">
@@ -24,12 +27,14 @@ export function Sidebar(props: {
 }) {
   const [q, setQ] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [limit, setLimit] = useState(ROW_LIMIT);
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return props.chats.filter((c) => (showArchived ? c.archived : !c.archived) && (!needle || c.title.toLowerCase().includes(needle)));
   }, [props.chats, q, showArchived]);
   const pinned = rows.filter((c) => c.pinned);
-  const rest = rows.filter((c) => !c.pinned);
+  const restAll = rows.filter((c) => !c.pinned);
+  const rest = restAll.slice(0, limit);
   const row = (c: ChatRow) => (
     <li key={c.id} className={c.id === props.activeId && props.view === "chat" ? "active" : ""}>
       <button className="chat-row" onClick={() => props.onOpen(c.id)} title={c.title}>
@@ -52,6 +57,7 @@ export function Sidebar(props: {
         <ul>{pinned.map(row)}</ul>
         <div className="group-label">{showArchived ? "Archived" : "Chats"}</div>
         <ul>{rest.map(row)}</ul>
+        {restAll.length > rest.length && <button className="link small" onClick={() => setLimit((n) => n + ROW_LIMIT)}>Show {Math.min(ROW_LIMIT, restAll.length - rest.length)} more ({restAll.length - rest.length} hidden; search finds them all)</button>}
         {rows.length === 0 && <div className="muted small">No chats</div>}
       </div>
       <button className="link small" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Back to chats" : "Show archived"}</button>

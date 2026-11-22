@@ -25,6 +25,7 @@ export class MemoryStore {
   }
   write(store: MemoryStoreName, entries: string[]): void {
     const clean = entries.map((e) => e.trim()).filter(Boolean);
+    if (clean.some((e) => e.includes("§"))) throw new Error("entries cannot contain the § character (it separates entries)");
     const total = clean.join(SEP).length;
     if (total > this.limit(store)) throw new Error(`over the ${this.limit(store)}-char limit (${total})`);
     fs.mkdirSync(this.dir, { recursive: true });

@@ -84,6 +84,18 @@ export class CopilotEngine implements Engine {
   }
 
   async createSession(opts: SessionOptions): Promise<EngineSession> {
+    try {
+      return await this.createSessionInner(opts);
+    } catch (e) {
+      // If the CLI process died, the cached client is useless; drop it so the next try starts a new one.
+      const old = this.client;
+      this.client = undefined;
+      void old?.stop().catch(() => {});
+      throw e;
+    }
+  }
+
+  private async createSessionInner(opts: SessionOptions): Promise<EngineSession> {
     const { client, sdk } = await this.ensure();
     const tools = opts.tools.map((t) =>
       sdk.defineTool(t.name, {

@@ -31,6 +31,10 @@
 | Skill curator (merge overlaps, archive unused, never delete; scheduled + run-now) | ✅ Done (4 tests, and verified with real Copilot) |
 | Icon | ✅ Done in v1 |
 
+## Stress test (macOS, fake engine)
+
+`npm run stress` (also in CI) runs 20 probes against the built file: 40 concurrent chats, 60 SSE clients, malformed/oversized/odd input, delete-while-busy, approval races, rapid stop/send, 5,000-event transcripts, hostile skill/job/memory input, auth bypass attempts, corrupt data files, restarts. First run: 12/20 passed. All bugs found were fixed; now 20/20. Also checked by hand: 2,000 chats in the list (70 ms), a 6,000-event chat in the browser, port fallback, Ctrl+C with a pending approval.
+
 ## Blockers / needs owner
 
 1. **SDK vs. Copilot CLI version skew: resolved by pinning** (owner chose option a). Both laptops need `npm i -g @github/copilot@1.0.112`; `pheme doctor` explains it if the CLI is newer. Watch for CLI auto-updates.
@@ -45,6 +49,7 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 - Repo created with plan, license and notices.
 - Owner chose to pin the CLI at 1.0.112; doctor now treats an empty model list as a warning.
 - Real Copilot check passed; fixed empty tool names on `tool_end` and duplicate approval cards.
+- Stress test round 1: fixed 12 bugs (see DECISIONS.md).
 - README updated for v2/v3; v0.1.0 released.
 - Real Copilot check of learning loops and curator: skill review wrote a good class-level skill from a 10-step transcript; memory review saved two user facts; curator merged two overlapping skills into one, archived both extras and left the unrelated one alone.
 - v3: themes, Ctrl+K, curator added (55 tests).

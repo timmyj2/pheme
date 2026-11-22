@@ -13,6 +13,7 @@
     "build:ui": "npm run build -w @pheme/ui",
     "build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke.mjs",
+    "stress": "node scripts/stress.mjs",
     "dev:fake": "node --experimental-strip-types packages/server/src/main.ts --fake"
   },
   "devDependencies": {

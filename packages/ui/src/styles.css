@@ -125,3 +125,5 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .agent-card[data-status="running"] .tool-dot { background: var(--dt-primary); animation: pulse 1s infinite; }
 .agent-body { padding: 0 10px 8px; }
 .agent-body pre { margin: 2px 0 8px; padding: 8px 10px; background: var(--dt-muted); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto; font-family: var(--dt-font-mono); }
+
+.load-earlier { align-self: center; }

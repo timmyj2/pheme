@@ -8,6 +8,8 @@ import { readJson, writeJson } from "./settings.ts";
 export class ChatStore {
   private dir: string;
   private seqs = new Map<string, number>();
+  /** Chats deleted in this process: late events from a still-running turn must not recreate their files. */
+  private removed = new Set<string>();
   private listeners = new Map<string, Set<(e: SeqEvent) => void>>();
 
   constructor(dataDir: string) {
@@ -41,6 +43,7 @@ export class ChatStore {
   }
 
   get(id: string): ChatMeta | undefined {
+    if (!ID_RE.test(id)) return undefined;
     const f = this.metaFile(id);
     if (!fs.existsSync(f)) return undefined;
     return readJson<ChatMeta | undefined>(f, undefined);
@@ -65,6 +68,8 @@ export class ChatStore {
   }
 
   remove(id: string): void {
+    this.removed.add(id);
+    this.listeners.delete(id);
     fs.rmSync(this.metaFile(id), { force: true });
     fs.rmSync(this.logFile(id), { force: true });
     this.seqs.delete(id);
@@ -96,9 +101,32 @@ export class ChatStore {
     seq += 1;
     this.seqs.set(id, seq);
     const full = { ...event, seq, ts: Date.now() } as SeqEvent;
-    if (event.type !== "delta") fs.appendFileSync(this.logFile(id), JSON.stringify(full) + "\n");
+    if (this.removed.has(id)) return full;
+    if (event.type !== "delta") {
+      this.repairTail(id);
+      fs.appendFileSync(this.logFile(id), JSON.stringify(full) + "\n");
+    }
     for (const l of this.listeners.get(id) ?? []) l(full);
     return full;
+  }
+
+  private repaired = new Set<string>();
+  /** A crash can leave a half-written last line; make sure the next event starts on its own line. */
+  private repairTail(id: string): void {
+    if (this.repaired.has(id)) return;
+    this.repaired.add(id);
+    const f = this.logFile(id);
+    if (!fs.existsSync(f)) return;
+    const fd = fs.openSync(f, "r");
+    try {
+      const size = fs.fstatSync(fd).size;
+      if (!size) return;
+      const last = Buffer.alloc(1);
+      fs.readSync(fd, last, 0, 1, size - 1);
+      if (last[0] !== 0x0a) fs.appendFileSync(f, "\n");
+    } finally {
+      fs.closeSync(fd);
+    }
   }
 
   subscribe(id: string, fn: (e: SeqEvent) => void): () => void {
@@ -109,7 +137,9 @@ export class ChatStore {
   }
 }
 
+const ID_RE = /^[A-Za-z0-9-]{1,64}$/;
+
 function safeId(id: string): string {
-  if (!/^[A-Za-z0-9-]+$/.test(id)) throw new Error("bad id");
+  if (!ID_RE.test(id)) throw new Error("bad id");
   return id;
 }

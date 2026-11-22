@@ -23,6 +23,9 @@ interface Turn {
   done: Promise<void>;
 }
 
+/** Cached engine sessions kept open at once; idle ones beyond this are closed and resumed on demand. */
+const MAX_OPEN_SESSIONS = 8;
+
 export class App {
   readonly store: ChatStore;
   readonly settings: SettingsStore;
@@ -74,6 +77,34 @@ export class App {
     await this.turns.get(chatId)?.done;
   }
 
+  openSessionCount(): number {
+    return this.sessions.size;
+  }
+
+  /** Close one chat's engine session so the next message creates a fresh (resumed) one. */
+  private async dropSession(chatId: string): Promise<void> {
+    const s = this.sessions.get(chatId);
+    this.sessions.delete(chatId);
+    await s?.close().catch(() => {});
+  }
+
+  /** Keep the number of open engine sessions bounded: close the least recently used idle ones. */
+  private async evictIdleSessions(): Promise<void> {
+    for (const id of [...this.sessions.keys()]) {
+      if (this.sessions.size <= MAX_OPEN_SESSIONS) return;
+      if (!this.turns.has(id)) await this.dropSession(id);
+    }
+  }
+
+  /** Delete a chat for good: stop its turn, close its session, forget its permissions. */
+  async removeChat(chatId: string): Promise<void> {
+    this.stop(chatId);
+    this.store.remove(chatId);
+    this.chatAllow.delete(chatId);
+    this.chatPolicy.delete(chatId);
+    await this.dropSession(chatId);
+  }
+
   isBusy(chatId: string): boolean {
     return this.turns.has(chatId);
   }
@@ -89,7 +120,7 @@ export class App {
   /** Start a turn. Returns once the turn is accepted; events arrive through the store. */
   send(chatId: string, text: string): void {
     const meta = this.store.get(chatId);
-    if (!meta) throw new Error("no such chat");
+    if (!meta || meta.hidden) throw new Error("no such chat");
     if (this.turns.has(chatId)) throw new Error("this chat is still working");
     const abort = new AbortController();
     const turn: Turn = { abort, approvals: new Map(), children: new Set(), done: Promise.resolve() };
@@ -136,16 +167,23 @@ export class App {
       );
     } catch (e) {
       store.append(chatId, { type: "error", message: (e as Error).message });
+      // The session may be broken (for example the CLI process died); start fresh next time.
+      await this.dropSession(chatId);
     } finally {
       this.settings.bumpUsage({ toolSteps });
       store.append(chatId, { type: "idle" });
     }
+    await this.evictIdleSessions();
     this.loops.afterTurn(chatId, toolSteps);
   }
 
   private async sessionFor(chatId: string, resume: boolean, turn: Turn): Promise<EngineSession> {
     const existing = this.sessions.get(chatId);
-    if (existing) return existing;
+    if (existing) {
+      this.sessions.delete(chatId); // re-insert: most recently used goes last
+      this.sessions.set(chatId, existing);
+      return existing;
+    }
     const s: Settings = this.settings.get();
     const session = await this.engine.createSession({
       id: chatId,

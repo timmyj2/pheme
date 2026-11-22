@@ -86,6 +86,8 @@ export class FakeEngine implements Engine {
   readonly name = "fake";
   /** Every session ever created, for assertions. */
   readonly sessions: SessionOptions[] = [];
+  /** Ids of sessions that were closed. */
+  readonly closed: string[] = [];
   /** Every prompt sent, with the session options it was sent to. */
   readonly prompts: { prompt: string; opts: SessionOptions }[] = [];
   constructor(private script: FakeScript = defaultScript, private streamDelayMs = 0) {}
@@ -145,7 +147,9 @@ export class FakeEngine implements Engine {
           }
         }
       },
-      async close() {},
+      async close() {
+        self.closed.push(opts.id);
+      },
     };
   }
   async close() {}

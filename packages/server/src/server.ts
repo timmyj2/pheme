@@ -30,6 +30,12 @@ export interface RunningServer {
 
 const MAX_BODY = 1_000_000;
 
+class HttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
 export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const { app } = opts;
   const token = opts.token ?? randomBytes(24).toString("base64url");
@@ -37,7 +43,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   const server = http.createServer((req, res) => {
     handle(req, res).catch((e) => {
-      if (!res.headersSent) json(res, 500, { error: (e as Error).message });
+      if (!res.headersSent) json(res, e instanceof HttpError ? e.status : 500, { error: (e as Error).message });
       else res.end();
     });
   });
@@ -91,8 +97,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
           return json(res, 200, app.store.update(id, patch));
         }
         if (m === "DELETE") {
-          app.stop(id);
-          app.store.remove(id);
+          await app.removeChat(id);
           return json(res, 200, { ok: true });
         }
       }
@@ -264,16 +269,18 @@ function readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
     req.on("data", (c: Buffer) => {
       size += c.length;
       if (size > MAX_BODY) {
-        reject(new Error("body too large"));
-        req.destroy();
-      } else chunks.push(c);
+        reject(new HttpError(413, "body too large"));
+        chunks.length = 0;
+      } else if (size <= MAX_BODY) chunks.push(c);
     });
     req.on("end", () => {
       try {
         const t = Buffer.concat(chunks).toString("utf8");
-        resolve(t ? (JSON.parse(t) as Record<string, unknown>) : {});
+        const v = t ? (JSON.parse(t) as unknown) : {};
+        if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("not an object");
+        resolve(v as Record<string, unknown>);
       } catch {
-        reject(new Error("bad json"));
+        reject(new HttpError(400, "bad json"));
       }
     });
     req.on("error", reject);

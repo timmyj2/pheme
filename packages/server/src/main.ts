@@ -4,6 +4,7 @@ import { loadAssets } from "./assets.ts";
 import { CopilotEngine } from "./copilot.ts";
 import { runDoctor } from "./doctor.ts";
 import { FakeEngine } from "./fake.ts";
+import { acquireLock, parsePort } from "./lock.ts";
 import { dataDir } from "./paths.ts";
 import { startServer } from "./server.ts";
 
@@ -45,10 +46,12 @@ async function main() {
     const ok = await runDoctor(dir);
     process.exit(ok ? 0 : 1);
   }
+  const releaseLock = acquireLock(dir);
+  process.on("exit", releaseLock);
   const fake = args.includes("--fake");
   const engine = fake ? new FakeEngine(undefined, 25) : new CopilotEngine();
   const app = new App(dir, engine);
-  const wantPort = Number(arg(args, "--port") ?? 7676);
+  const wantPort = parsePort(arg(args, "--port"), 7676);
   const assets = loadAssets();
   const opts = { app, fake, version: VERSION, assets };
   let server;

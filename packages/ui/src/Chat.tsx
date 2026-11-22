@@ -88,9 +88,14 @@ function ApprovalCard({ ev, onAnswer }: { ev: Extract<SeqEvent, { type: "approva
   );
 }
 
+/** Long chats render only the most recent events; older ones load on request. */
+const WINDOW = 400;
+
 export function Transcript({ chatId, events, streaming, busy }: { chatId: string; events: SeqEvent[]; streaming: string; busy: boolean }) {
   const bottom = useRef<HTMLDivElement>(null);
-  useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [events.length, streaming]);
+  const [shown, setShown] = useState(WINDOW);
+  useEffect(() => { setShown(WINDOW); }, [chatId]);
+  useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [events.length, streaming, chatId]);
   const ends = new Map<string, Extract<SeqEvent, { type: "tool_end" }>>();
   const resolved = new Set<string>();
   const latestRun = new Map<string, Extract<SeqEvent, { type: "agent_update" }>>();
@@ -104,7 +109,10 @@ export function Transcript({ chatId, events, streaming, busy }: { chatId: string
     <div className="transcript">
       <div className="transcript-inner">
         {events.length === 0 && <div className="empty">What can I help with?</div>}
-        {events.map((e) => {
+        {events.length > shown && (
+          <button className="btn load-earlier" onClick={() => setShown((n) => n + WINDOW)}>Show {Math.min(WINDOW, events.length - shown)} earlier of {events.length - shown} hidden events</button>
+        )}
+        {events.slice(-shown).map((e) => {
           switch (e.type) {
             case "user":
               return <div key={e.seq} className="bubble user">{e.text}</div>;
