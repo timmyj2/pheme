@@ -91,6 +91,8 @@ export interface GitStatus {
   hasCommits?: boolean;
   /** On main/master or a detached HEAD: a commit here needs a new branch first. */
   protectedBranch?: boolean;
+  /** Subject line of the most recent commit (used to pre-fill a pull request title). */
+  lastSubject?: string;
   files: ChangedFile[];
   /** True when more files changed than we list. */
   moreFiles?: number;
@@ -193,8 +195,9 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
     }
   }
   for (const f of parsed.files) if (looksSecret(f.path)) f.risky = true;
+  const lastSubject = parsed.hasCommits === false ? undefined : (await runGit(root, ["log", "-1", "--format=%s"])).stdout.trim().slice(0, 256) || undefined;
   const protectedBranch = parsed.detached === true || (!!parsed.branch && PROTECTED.has(parsed.branch));
-  return { repo: true, root, ...parsed, protectedBranch, files: parsed.files, ...(moreFiles ? { moreFiles } : {}) };
+  return { repo: true, root, ...parsed, protectedBranch, lastSubject, files: parsed.files, ...(moreFiles ? { moreFiles } : {}) };
 }
 
 export interface FileDiff {
@@ -352,4 +355,179 @@ export async function gitUndo(cwd: string, sha: string): Promise<{ undone: strin
   const r = await runGit(root, ["reset", "--soft", "HEAD~1"]);
   if (!r.ok) throw new HttpError(500, r.stderr || "Could not undo the commit.");
   return { undone: head.slice(0, 7) };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Push and pull requests
+// ---------------------------------------------------------------------------------------------------------------------
+
+const GH_TIMEOUT_MS = 45_000;
+const PUSH_TIMEOUT_MS = 90_000;
+
+/** Run the GitHub CLI with a fixed argument list. Never prompts. */
+export function runGh(cwd: string, args: string[], opts: { input?: string; timeoutMs?: number } = {}): Promise<GitResult> {
+  return new Promise((resolve) => {
+    const child = execFile(
+      "gh",
+      args,
+      { cwd, timeout: opts.timeoutMs ?? GH_TIMEOUT_MS, maxBuffer: MAX_OUTPUT, windowsHide: true, encoding: "utf8", env: { ...process.env, GH_PROMPT_DISABLED: "1", NO_COLOR: "1", GH_NO_UPDATE_NOTIFIER: "1", GH_SPINNER_DISABLED: "1" } },
+      (err, stdout, stderr) => {
+        const e = err as (NodeJS.ErrnoException & { killed?: boolean }) | null;
+        if (e && e.code === "ENOENT") return resolve({ ok: false, stdout: "", stderr: "gh is not installed", truncated: false });
+        if (e && e.killed) return resolve({ ok: false, stdout: String(stdout ?? ""), stderr: "GitHub took too long to answer.", truncated: false });
+        resolve({ ok: !e, stdout: String(stdout ?? ""), stderr: String(stderr ?? "").trim(), truncated: false });
+      },
+    );
+    if (opts.input !== undefined) child.stdin?.end(opts.input);
+  });
+}
+
+/** Parse a GitHub remote URL (https, ssh or scp-style) into owner and repo. Returns null for other hosts. Exported for tests. */
+export function parseGithubRemote(url: string): { host: string; owner: string; repo: string } | null {
+  const u = url.trim();
+  const m = /^(?:https?:\/\/(?:[^@/]+@)?|ssh:\/\/(?:[^@/]+@)?|git@)([^/:]+)[/:](?:\d+\/)?([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u);
+  if (!m) return null;
+  return { host: m[1].toLowerCase(), owner: m[2], repo: m[3] };
+}
+
+/** Link that opens GitHub's "create pull request" page for a branch; used when the GitHub CLI is not available. */
+export function compareUrl(remoteUrl: string, base: string, branch: string): string | null {
+  const r = parseGithubRemote(remoteUrl);
+  if (!r) return null;
+  const enc = (x: string) => x.split("/").map(encodeURIComponent).join("/");
+  return `https://${r.host}/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}/compare/${enc(base)}...${enc(branch)}?expand=1`;
+}
+
+export interface PrInfo {
+  number: number;
+  url: string;
+  title: string;
+  state: string;
+  draft: boolean;
+  /** "passing" | "failing" | "pending" | "none" */
+  checks: "passing" | "failing" | "pending" | "none";
+}
+
+export interface RemoteInfo {
+  /** Name of the remote we push to (origin when it exists). */
+  remote?: string;
+  url?: string;
+  github: boolean;
+  ghInstalled: boolean;
+  ghSignedIn: boolean;
+  branch?: string;
+  upstream?: string;
+  ahead: number;
+  behind: number;
+  defaultBase?: string;
+  pr?: PrInfo;
+  compareUrl?: string;
+  /** Plain-language reason push or PR is not possible right now. */
+  problem?: string;
+}
+
+function summariseChecks(rollup: unknown): PrInfo["checks"] {
+  if (!Array.isArray(rollup) || rollup.length === 0) return "none";
+  let pending = false;
+  for (const c of rollup as { status?: string; conclusion?: string; state?: string }[]) {
+    const concl = (c.conclusion ?? c.state ?? "").toUpperCase();
+    if (["FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"].includes(concl)) return "failing";
+    if ((c.status && c.status.toUpperCase() !== "COMPLETED") || concl === "PENDING" || concl === "") pending = true;
+  }
+  return pending ? "pending" : "passing";
+}
+
+export async function gitRemoteInfo(cwd: string): Promise<RemoteInfo> {
+  const st = await gitStatus(cwd);
+  const info: RemoteInfo = { github: false, ghInstalled: false, ghSignedIn: false, ahead: st.ahead ?? 0, behind: st.behind ?? 0, branch: st.branch, upstream: st.upstream };
+  if (!st.repo || !st.root) return { ...info, problem: st.problem ?? "This folder is not a Git repository." };
+  const remotes = (await runGit(st.root, ["remote"])).stdout.split("\n").map((x) => x.trim()).filter(Boolean);
+  if (!remotes.length) return { ...info, problem: "This repository has no remote yet. Add one with:  git remote add origin <url>" };
+  info.remote = remotes.includes("origin") ? "origin" : remotes[0];
+  info.url = (await runGit(st.root, ["remote", "get-url", info.remote])).stdout.trim();
+  info.github = !!parseGithubRemote(info.url) && parseGithubRemote(info.url)!.host.includes("github");
+  const ver = await runGh(st.root, ["--version"]);
+  info.ghInstalled = ver.ok;
+  if (info.ghInstalled && info.github) {
+    const host = parseGithubRemote(info.url)!.host;
+    info.ghSignedIn = (await runGh(st.root, ["auth", "status", "--hostname", host])).ok;
+    if (info.ghSignedIn) {
+      const def = await runGh(st.root, ["repo", "view", "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name"]);
+      if (def.ok && def.stdout.trim()) info.defaultBase = def.stdout.trim();
+      if (st.branch && !st.protectedBranch) {
+        const pr = await runGh(st.root, ["pr", "list", "--head", st.branch, "--state", "open", "--json", "number,url,title,state,isDraft,statusCheckRollup", "--limit", "1"]);
+        if (pr.ok) {
+          try {
+            const [first] = JSON.parse(pr.stdout || "[]") as { number: number; url: string; title: string; state: string; isDraft: boolean; statusCheckRollup: unknown }[];
+            if (first) info.pr = { number: first.number, url: first.url, title: first.title, state: first.state, draft: first.isDraft, checks: summariseChecks(first.statusCheckRollup) };
+          } catch { /* unreadable answer: show no PR */ }
+        }
+      }
+    }
+  }
+  const base = info.defaultBase ?? (await runGit(st.root, ["symbolic-ref", "--short", "-q", `refs/remotes/${info.remote}/HEAD`])).stdout.trim().replace(`${info.remote}/`, "") ?? "main";
+  info.defaultBase = base || "main";
+  if (st.branch && info.url) info.compareUrl = compareUrl(info.url, info.defaultBase, st.branch) ?? undefined;
+  if (st.detached) info.problem = "HEAD is detached. Switch to a branch first.";
+  else if (st.protectedBranch) info.problem = `You are on ${st.branch}. Commit to a new branch, then push that.`;
+  return info;
+}
+
+/** Push the current branch to its remote with an upstream. Never forces; refuses main/master/trunk and a detached HEAD. */
+export async function gitPush(cwd: string): Promise<{ branch: string; remote: string; output: string }> {
+  const st = await gitStatus(cwd);
+  if (!st.repo || !st.root) throw new HttpError(400, st.problem ?? "This folder is not a Git repository.");
+  if (st.detached || !st.branch) throw new HttpError(409, "HEAD is detached. Switch to a branch first.");
+  if (st.protectedBranch) throw new HttpError(409, `Pheme will not push ${st.branch} directly. Commit to a new branch and push that.`);
+  if (!st.hasCommits) throw new HttpError(409, "There is nothing to push yet. Make a commit first.");
+  const remotes = (await runGit(st.root, ["remote"])).stdout.split("\n").map((x) => x.trim()).filter(Boolean);
+  if (!remotes.length) throw new HttpError(409, "This repository has no remote. Add one with:  git remote add origin <url>");
+  const remote = remotes.includes("origin") ? "origin" : remotes[0];
+  if (!(await validBranchName(st.root, st.branch))) throw new HttpError(400, "That branch name cannot be pushed.");
+  // No --force of any kind. `--` is not valid before refspecs here, so the branch name was checked above (it cannot start with "-").
+  const r = await runGit(st.root, ["push", "--set-upstream", remote, `refs/heads/${st.branch}:refs/heads/${st.branch}`], { timeoutMs: PUSH_TIMEOUT_MS });
+  if (!r.ok) {
+    const why = r.stderr || r.stdout;
+    if (/non-fast-forward|fetch first|rejected/i.test(why)) throw new HttpError(409, "GitHub already has different commits on this branch. Pull or rebase in a terminal, then push again. Pheme never force-pushes.");
+    if (/could not read Username|Authentication failed|Permission denied|403|terminal prompts disabled|invalid credentials/i.test(why)) throw new HttpError(409, "Git could not sign in to GitHub. Run `gh auth login` (or sign in with your usual Git credentials) in a terminal, then try again.");
+    if (/Could not resolve host|unable to access|Connection (timed out|refused)|Network is unreachable/i.test(why)) throw new HttpError(409, "Could not reach GitHub. Check your internet connection and try again.");
+    if (/repository not found|does not exist|does not appear to be a git repository|correct access rights/i.test(why)) throw new HttpError(409, "GitHub says that repository does not exist or you do not have access to it.");
+    throw new HttpError(409, why.split("\n").slice(-3).join(" ").slice(0, 400) || "git push failed.");
+  }
+  return { branch: st.branch, remote, output: (r.stderr || r.stdout).slice(0, 2000) };
+}
+
+export interface PrRequest { title: string; body?: string; base?: string; draft?: boolean }
+
+/** Open a pull request for the current branch with the GitHub CLI. The branch must already be pushed. */
+export async function gitCreatePr(cwd: string, req: PrRequest): Promise<{ url: string; number?: number }> {
+  const title = typeof req.title === "string" ? req.title.trim() : "";
+  if (!title) throw new HttpError(400, "Write a title for the pull request.");
+  if (title.length > 256) throw new HttpError(400, "That title is too long (256 characters at most).");
+  const body = typeof req.body === "string" ? req.body : "";
+  if (body.length > 60_000) throw new HttpError(400, "That description is too long.");
+  const info = await gitRemoteInfo(cwd);
+  if (info.problem) throw new HttpError(409, info.problem);
+  if (!info.github) throw new HttpError(409, "Pull requests need a GitHub remote.");
+  if (!info.ghInstalled) throw new HttpError(409, "The GitHub CLI (gh) is not installed." + (info.compareUrl ? " Open the link to create the pull request in your browser." : ""));
+  if (!info.ghSignedIn) throw new HttpError(409, "The GitHub CLI is not signed in. Run `gh auth login` in a terminal, then try again.");
+  if (info.pr) throw new HttpError(409, `A pull request is already open for this branch: ${info.pr.url}`);
+  if (!info.upstream) throw new HttpError(409, "Push the branch first, then open the pull request.");
+  if (info.ahead > 0) throw new HttpError(409, `${info.ahead} commit${info.ahead === 1 ? " is" : "s are"} not pushed yet. Push first so the pull request includes them.`);
+  const base = (req.base ?? "").trim() || info.defaultBase || "main";
+  if (!(await validBranchName(cwd, base))) throw new HttpError(400, `"${base}" is not a valid branch name.`);
+  if (base === info.branch) throw new HttpError(400, "The base branch cannot be the same as this branch.");
+  const args = ["pr", "create", "--title", title, "--body-file", "-", "--base", base, "--head", info.branch!];
+  if (req.draft) args.push("--draft");
+  const r = await runGh(cwd, args, { input: body, timeoutMs: 60_000 });
+  if (!r.ok) {
+    const why = r.stderr || r.stdout;
+    if (/already exists/i.test(why)) throw new HttpError(409, why.split("\n")[0]);
+    if (/No commits between|no commits/i.test(why)) throw new HttpError(409, `This branch has no commits that ${base} does not already have, so there is nothing to propose.`);
+    throw new HttpError(409, why.split("\n").slice(0, 3).join(" ").slice(0, 400) || "Could not create the pull request.");
+  }
+  const url = r.stdout.trim().split("\n").filter((l) => /^https?:\/\//.test(l)).pop() ?? "";
+  if (!url) throw new HttpError(500, "The pull request may have been created, but GitHub did not return its address. Check GitHub.");
+  const num = /\/pull\/(\d+)/.exec(url)?.[1];
+  return { url, number: num ? Number(num) : undefined };
 }

@@ -174,3 +174,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .commit-done { display: flex; align-items: center; gap: 8px; justify-content: space-between; font-size: 12px; padding: 6px 8px; border-radius: 6px; background: var(--dt-muted); }
 .field.small { font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
 .field.small input { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--dt-border); background: var(--dt-background); color: var(--dt-foreground); font-family: var(--dt-font-mono); }
+
+.ship-box { border-top: 1px solid var(--dt-border); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ship-box h3 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--dt-muted-foreground); font-weight: 600; }
+.pr-card { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--dt-border); border-radius: 8px; font-size: 13px; }
+.pr-card a { color: var(--dt-primary-text); text-decoration: none; font-weight: 500; }
+.pr-card a:hover { text-decoration: underline; }
+.checks { font-size: 12px; color: var(--dt-muted-foreground); }
+.checks.passing { color: var(--dt-success-text, #3fb950); } .checks.failing { color: var(--dt-destructive-text); }
+.pr-form input, .pr-form textarea { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--dt-border); background: var(--dt-background); color: var(--dt-foreground); font: inherit; font-size: 13px; }
+.changes-panel { overflow-y: auto; }
+
+.ship-box .approval { display: flex; flex-direction: column; gap: 6px; }

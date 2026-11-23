@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CommitBox } from "./CommitBox.tsx";
+import { ShipBox } from "./ShipBox.tsx";
 import { api, type ChangedFile, type FileDiff, type GitStatus } from "./api.ts";
 
 const LABEL: Record<string, string> = { modified: "M", added: "A", deleted: "D", renamed: "R", copied: "C", untracked: "U", conflicted: "!", typechange: "T" };
@@ -103,6 +104,7 @@ export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClos
         {!!status?.moreFiles && <p className="muted small">…and {status.moreFiles} more files not shown. Commit them from a terminal, or in smaller groups.</p>}
       </div>
       {status?.repo && !status.problem && <CommitBox key={chatId} chatId={chatId} status={status} busy={busy} onDone={onRefresh} />}
+      {status?.repo && !status.problem && status.hasCommits && !status.protectedBranch && <ShipBox key={`ship-${chatId}`} chatId={chatId} status={status} busy={busy} suggestedTitle={status.lastSubject || status.branch || ""} onDone={onRefresh} />}
     </aside>
   );
 }

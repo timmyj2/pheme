@@ -1,4 +1,4 @@
-import { gitCommit, gitDiff, gitStatus, gitUndo } from "./git.ts";
+import { gitCommit, gitCreatePr, gitDiff, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
 import { HttpError } from "./http-error.ts";
 import http from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -118,6 +118,17 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         const file = url.searchParams.get("path");
         if (!file) throw new HttpError(400, "path is required.");
         return json(res, 200, await gitDiff(dir, file));
+      }
+      if (seg[2] === "git" && seg.length === 4 && seg[3] === "remote" && m === "GET") {
+        if (!meta.projectDir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        return json(res, 200, await gitRemoteInfo(meta.projectDir));
+      }
+      if (seg[2] === "git" && m === "POST" && seg.length === 4 && (seg[3] === "push" || seg[3] === "pr")) {
+        const dir = meta.projectDir;
+        if (!dir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        if (app.isBusy(id)) throw new HttpError(409, "A reply is running. Wait for it to finish (or stop it) first.");
+        if (seg[3] === "push") return json(res, 200, await gitPush(dir));
+        return json(res, 200, await gitCreatePr(dir, { title: body.title as string, body: typeof body.body === "string" ? body.body : "", base: typeof body.base === "string" ? body.base : undefined, draft: body.draft === true }));
       }
       if (seg[2] === "git" && m === "POST" && seg.length === 4 && (seg[3] === "commit" || seg[3] === "undo")) {
         const dir = meta.projectDir;

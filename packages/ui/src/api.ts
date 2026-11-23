@@ -1,6 +1,6 @@
 import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun, CuratorState } from "../../server/src/protocol.ts";
 
-export type { GitStatus, ChangedFile, FileDiff } from "../../server/src/git.ts";
+export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo } from "../../server/src/git.ts";
 export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
 export type ChatRow = ChatMeta & { busy?: boolean };
 
@@ -54,6 +54,9 @@ export const api = {
   gitDiff: (id: string, path: string) => call<import("../../server/src/git.ts").FileDiff>(`/chats/${id}/git/diff?path=${encodeURIComponent(path)}`),
   gitCommit: (id: string, body: { message: string; paths: string[]; branch?: string; allowRisky?: string[] }) => call<{ sha: string; short: string; branch: string; summary: string; files: number }>(`/chats/${id}/git/commit`, "POST", body),
   gitUndo: (id: string, sha: string) => call<{ undone: string }>(`/chats/${id}/git/undo`, "POST", { sha }),
+  gitRemote: (id: string) => call<import("../../server/src/git.ts").RemoteInfo>(`/chats/${id}/git/remote`),
+  gitPush: (id: string) => call<{ branch: string; remote: string; output: string }>(`/chats/${id}/git/push`, "POST", {}),
+  gitPr: (id: string, body: { title: string; body?: string; base?: string; draft?: boolean }) => call<{ url: string; number?: number }>(`/chats/${id}/git/pr`, "POST", body),
   deleteChat: (id: string) => call<{ ok: boolean }>(`/chats/${id}`, "DELETE"),
   send: (id: string, text: string) => call<{ ok: boolean }>(`/chats/${id}/messages`, "POST", { text }),
   stop: (id: string) => call<{ ok: boolean }>(`/chats/${id}/stop`, "POST", {}),
