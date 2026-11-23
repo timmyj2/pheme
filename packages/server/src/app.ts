@@ -148,6 +148,11 @@ export class App {
     return updated;
   }
 
+  /** Number of chats with a reply in progress. */
+  busyCount(): number {
+    return this.turns.size;
+  }
+
   isBusy(chatId: string): boolean {
     return this.turns.has(chatId);
   }

@@ -1,5 +1,6 @@
 import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun, CuratorState } from "../../server/src/protocol.ts";
 
+export type { BackupPreview } from "../../server/src/backup.ts";
 export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo } from "../../server/src/git.ts";
 export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
 export type ChatRow = ChatMeta & { busy?: boolean; /** A tool is waiting for the user's approval. */ waiting?: boolean };
@@ -60,7 +61,35 @@ async function exportChat(id: string): Promise<{ blob: Blob; name: string }> {
   return { blob: await r.blob(), name };
 }
 
+/** Send a file as the raw request body (used for restore). */
+async function postFile<T>(path: string, file: File): Promise<T> {
+  let r: Response;
+  try {
+    r = await fetch("/api" + path, { method: "POST", headers: { "x-pheme-token": token(), "content-type": "application/octet-stream" }, body: file });
+  } catch {
+    throw new ApiError(0, "Can't reach Pheme. Is it still running?");
+  }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new ApiError(r.status, (data as { error?: string }).error ?? (r.status === 413 ? "That file is too large." : `HTTP ${r.status}`));
+  return data as T;
+}
+
+async function downloadBackup(): Promise<{ blob: Blob; name: string }> {
+  let r: Response;
+  try {
+    r = await fetch("/api/backup", { headers: { "x-pheme-token": token() } });
+  } catch {
+    throw new ApiError(0, "Can't reach Pheme. Is it still running?");
+  }
+  if (!r.ok) throw new ApiError(r.status, ((await r.json().catch(() => ({}))) as { error?: string }).error ?? `HTTP ${r.status}`);
+  const name = /filename="([^"]+)"/.exec(r.headers.get("content-disposition") ?? "")?.[1] ?? "pheme.pheme-backup";
+  return { blob: await r.blob(), name };
+}
+
 export const api = {
+  downloadBackup,
+  previewRestore: (file: File) => postFile<import("../../server/src/backup.ts").BackupPreview>("/restore/preview", file),
+  restore: (file: File, overwrite: boolean) => postFile<{ written: number; skipped: number; safetyBackup?: string }>(`/restore${overwrite ? "?overwrite=1" : ""}`, file),
   exportChat,
   search: (q: string) => call<{ hits: SearchHit[]; partial: boolean }>(`/search?q=${encodeURIComponent(q)}`),
   state: () => call<BootstrapState>("/state"),

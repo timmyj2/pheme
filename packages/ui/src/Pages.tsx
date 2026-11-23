@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BackupSetting } from "./BackupSetting.tsx";
 import { NotificationSetting } from "./NotificationSetting.tsx";
 import { useUnsaved } from "./unsaved.ts";
 import { ConfirmDialog } from "./Dialog.tsx";
@@ -296,6 +297,7 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
         {(!theme.light || !theme.dark) && <p className="muted small">This theme has only one {theme.dark ? "dark" : "light"} palette.</p>}
       </div>
       <NotificationSetting />
+      <BackupSetting />
       <div className="panel">
         <h3>Permissions</h3>
         <label className="check">

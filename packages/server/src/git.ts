@@ -163,6 +163,8 @@ export function parseNumstat(out: string): Map<string, { a: number; d: number; b
 }
 
 export async function gitStatus(cwd: string): Promise<GitStatus> {
+  // A folder that was deleted or moved (or came from a restored backup made elsewhere) must not look like "git is missing".
+  if (!fs.existsSync(cwd)) return { repo: false, files: [], problem: `This folder no longer exists: ${cwd}. Choose a folder again.` };
   const top = await runGit(cwd, ["rev-parse", "--show-toplevel"]);
   if (!top.ok) {
     const missing = /not installed/.test(top.stderr);
@@ -217,6 +219,7 @@ export function safeRepoPath(p: string): string {
 /** Unified diff of one file against HEAD (staged and unstaged together). Untracked files are shown as all-added. */
 export async function gitDiff(cwd: string, file: string): Promise<FileDiff> {
   const f = safeRepoPath(file);
+  if (!fs.existsSync(cwd)) throw new HttpError(400, `This folder no longer exists: ${cwd}`);
   const root = (await runGit(cwd, ["rev-parse", "--show-toplevel"])).stdout.trim();
   if (!root) throw new HttpError(400, "This folder is not a Git repository.");
   const tracked = await runGit(root, ["ls-files", "--error-unmatch", "--", f]);
