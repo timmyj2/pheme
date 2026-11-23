@@ -104,7 +104,9 @@ describe("gitStatus / gitDiff on a real repository", () => {
     expect(s).toMatchObject({ repo: true, hasCommits: false });
     expect(s.files[0]).toMatchObject({ path: "first.txt", staged: "added", additions: 1 });
     fs.mkdirSync(path.join(d, "deep"));
-    expect((await gitStatus(path.join(d, "deep"))).root).toBe(d);
+    const root = (await gitStatus(path.join(d, "deep"))).root!;
+    // Git prints the root with forward slashes (and long names on Windows); compare the real location.
+    expect(fs.realpathSync.native(root).toLowerCase()).toBe(fs.realpathSync.native(d).toLowerCase());
   });
 
   it("shows a unified diff, an all-added diff for untracked files, and flags binary files", async () => {

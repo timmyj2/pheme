@@ -100,11 +100,13 @@ describe("gitCommit", () => {
 
   it("works with unusual file names (spaces, glob characters, leading dashes)", async () => {
     const d = repo();
-    for (const n of ["with space.txt", "star*.txt", "-dash.txt", "[br].txt", "sub dir/in side.txt"]) w(d, n, "x\n");
+    // "*" and a few other characters are not legal in Windows file names, so use them only elsewhere.
+    const names = ["with space.txt", "-dash.txt", "[br].txt", "sub dir/in side.txt", ...(process.platform === "win32" ? [] : ["star*.txt", "q?.txt"])];
+    for (const n of names) w(d, n, "x\n");
     const st = await gitStatus(d);
     await gitCommit(d, { message: "odd names", paths: st.files.map((f) => f.path) });
     expect(git(d, "status", "--porcelain")).toBe("");
-    expect(lastFiles(d)).toHaveLength(5);
+    expect(lastFiles(d)).toHaveLength(names.length);
   });
 
   it("refuses to commit on main: asks for a branch, validates it, then creates it", async () => {
