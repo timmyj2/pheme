@@ -144,7 +144,8 @@ test.describe("Pheme in a real browser", () => {
     await page.getByRole("button", { name: "Undo" }).click();
     await expect(page.locator(".commit-done")).toHaveCount(0);
     expect(git("rev-list", "--count", "HEAD")).toBe("1");
-    fs.rmSync(repo, { recursive: true, force: true });
+    // Windows keeps a folder locked while Pheme is still watching it; the temp folder is not important enough to fail the test.
+    try { fs.rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* left for the OS temp cleanup */ }
   });
 
   test("backup downloads a file that previews as a valid backup", async ({ page }) => {
