@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useUnsaved } from "./unsaved.ts";
 import { ConfirmDialog } from "./Dialog.tsx";
 import { THEMES, parseTheme, themeValue, type Mode } from "./themes/presets.ts";
 import { api, type BootstrapState, type CuratorState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
@@ -40,6 +41,7 @@ function MemoryList({ label, store, entries, limit, onSaved }: { label: string; 
   const [text, setText] = useState(joined);
   const [base, setBase] = useState(joined);
   const dirty = text !== base;
+  useUnsaved(dirty);
   // Follow outside changes (the agent writes memory too) unless the user is mid-edit.
   useEffect(() => {
     if (!dirty) { setText(joined); setBase(joined); }
@@ -105,6 +107,7 @@ export function SkillsPage({ name, onOpen }: { name: string | null; onOpen: (nam
   const [guard, setGuard] = useState<null | (() => void)>(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const dirty = (isNew || !!name) && content !== saved;
+  useUnsaved(dirty);
   const nameRef = useRef(name);
   nameRef.current = name;
 

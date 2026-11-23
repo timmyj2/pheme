@@ -15,6 +15,13 @@ describe("schedules", () => {
     expect(() => validateSchedule({ kind: "interval", everyMinutes: 0 })).toThrow();
     expect(() => validateSchedule({ kind: "daily", time: "25:00" })).toThrow();
     expect(() => validateSchedule({ kind: "weekly" })).toThrow();
+    expect(() => validateSchedule({ kind: "interval", everyMinutes: 1.5 })).toThrow(/whole number/);
+    expect(() => validateSchedule({ kind: "interval", everyMinutes: -5 })).toThrow();
+    expect(() => validateSchedule({ kind: "interval", everyMinutes: 99_999_999 })).toThrow(/525,600/);
+    expect(() => validateSchedule({ kind: "interval", everyMinutes: NaN })).toThrow();
+    expect(() => validateSchedule({ kind: "once", at: -1 })).toThrow();
+    expect(() => validateSchedule({ kind: "once", at: 1e300 })).toThrow();
+    expect(validateSchedule({ kind: "interval", everyMinutes: 525_600 })).toEqual({ kind: "interval", everyMinutes: 525_600 });
   });
 });
 

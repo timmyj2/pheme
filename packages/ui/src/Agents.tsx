@@ -4,6 +4,7 @@ import { ConfirmDialog } from "./Dialog.tsx";
 import { api, type AgentProfile, type AgentRun } from "./api.ts";
 import { LoadError } from "./Pages.tsx";
 import { useToast } from "./toast.tsx";
+import { useUnsaved } from "./unsaved.ts";
 
 const BLANK: AgentProfile = { name: "", description: "", instructions: "", tools: [] };
 
@@ -30,6 +31,12 @@ export function AgentsPage({ onOpenChat }: { onOpenChat: (id: string) => void })
       toast.error((e as Error).message);
     }
   };
+  // The edit form counts as unsaved once it differs from what was opened.
+  const [baseline, setBaseline] = useState("");
+  const [existing, setExisting] = useState(false); // editing a saved agent (its name is fixed) vs creating a new one
+  const snap = (p: AgentProfile | null, t: string) => JSON.stringify(p && [p.name, p.description, p.instructions, t.trim()]);
+  useUnsaved(!!edit && snap(edit, tools) !== baseline);
+  const open = (p: AgentProfile, t: string) => { setExisting(profiles.some((x) => x.name === p.name)); setEdit(p); setTools(t); setBaseline(snap(p, t)); };
   const running = runs.filter((r) => r.status === "running");
 
   return (
@@ -46,20 +53,20 @@ export function AgentsPage({ onOpenChat }: { onOpenChat: (id: string) => void })
       </div>
       <div className="panel">
         <h3>Saved agents</h3>
-        <div className="row"><button className="btn" onClick={() => { setEdit({ ...BLANK }); setTools(""); }}>New agent</button></div>
+        <div className="row"><button className="btn" onClick={() => open({ ...BLANK }, "")}>New agent</button></div>
         {profiles.length === 0 && !edit && <p className="muted small">No saved agents yet.</p>}
         {profiles.map((p) => (
           <div key={p.name} className="job">
             <div className="job-main"><strong>{p.name}</strong><div className="muted small">{p.description}</div></div>
             <div className="row">
-              <button className="btn" onClick={() => { setEdit(p); setTools(p.tools.join(", ")); }}>Edit</button>
+              <button className="btn" onClick={() => open(p, p.tools.join(", "))}>Edit</button>
               <button className="btn danger" onClick={() => setConfirm(p)}>Archive</button>
             </div>
           </div>
         ))}
         {edit && (
           <div className="panel">
-            <label className="field">Name (lowercase, - or _)<input value={edit.name} disabled={profiles.some((p) => p.name === edit.name)} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+            <label className="field">Name (lowercase, - or _)<input value={edit.name} disabled={existing} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
             <label className="field">When should it be used?<input value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} /></label>
             <label className="field">Instructions<textarea className="area" rows={6} value={edit.instructions} onChange={(e) => setEdit({ ...edit, instructions: e.target.value })} /></label>
             <label className="field">Allowed Copilot tools (comma-separated; empty = all)<input value={tools} onChange={(e) => setTools(e.target.value)} /></label>

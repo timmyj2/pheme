@@ -5,13 +5,18 @@ import type { Job, JobSchedule } from "./protocol.ts";
 import { readJson, writeJson } from "./settings.ts";
 
 const TICK_MS = 30_000;
+const MAX_INTERVAL_MIN = 525_600; // one year
 
 export function validateSchedule(s: unknown): JobSchedule {
   const x = s as Partial<{ kind: string; everyMinutes: number; time: string; at: number }>;
-  if (x?.kind === "interval" && Number.isFinite(x.everyMinutes) && x.everyMinutes! >= 1) return { kind: "interval", everyMinutes: Math.floor(x.everyMinutes!) };
+  if (x?.kind === "interval") {
+    const n = x.everyMinutes;
+    if (!Number.isInteger(n) || n! < 1 || n! > MAX_INTERVAL_MIN) throw new Error(`Repeat interval must be a whole number of minutes from 1 to ${MAX_INTERVAL_MIN.toLocaleString("en-US")}.`);
+    return { kind: "interval", everyMinutes: n! };
+  }
   if (x?.kind === "daily" && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.time ?? "")) return { kind: "daily", time: x.time! };
-  if (x?.kind === "once" && Number.isFinite(x.at)) return { kind: "once", at: x.at! };
-  throw new Error("bad schedule");
+  if (x?.kind === "once" && Number.isFinite(x.at) && x.at! > 0 && x.at! < 8.64e15) return { kind: "once", at: x.at! };
+  throw new Error(x?.kind === "daily" ? "Daily time must look like 09:30." : x?.kind === "once" ? "Pick a valid date and time." : "Choose how often the job repeats.");
 }
 
 /** First run time strictly after `from` (null when a one-time job has passed). */

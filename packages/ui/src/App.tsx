@@ -3,6 +3,7 @@ import { AgentsPage } from "./Agents.tsx";
 import { ChatView } from "./Chat.tsx";
 import type { ComposerHandle } from "./Composer.tsx";
 import { ConfirmDialog } from "./Dialog.tsx";
+import { clearUnsaved, hasUnsaved } from "./unsaved.ts";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { JobsPage } from "./Jobs.tsx";
 import { MemoryPage, SettingsPage, SkillsPage } from "./Pages.tsx";
@@ -24,7 +25,13 @@ export function App() {
   const toast = useToast();
   const conn = useConnection();
   const state = conn.state;
-  const [route, navigate] = useRoute();
+  const [route, rawNavigate] = useRoute();
+  const [leaving, setLeaving] = useState<null | (() => void)>(null);
+  // Leaving a page with unsaved edits (memory, skills) asks first; in-place replace navigations never do.
+  const navigate = useCallback<typeof rawNavigate>((r, opts) => {
+    if (!opts?.replace && hasUnsaved()) setLeaving(() => () => rawNavigate(r, opts));
+    else rawNavigate(r, opts);
+  }, [rawNavigate]);
   const [chats, setChats] = useState<ChatRow[]>([]);
   const [chatsLoaded, setChatsLoaded] = useState(false);
   const [unread, setUnread] = useState<Set<string>>(new Set());
@@ -286,6 +293,7 @@ export function App() {
       </main>
       {palette && <Palette commands={commands} onClose={() => setPalette(false)} />}
       {help && <ShortcutsHelp onClose={() => setHelp(false)} />}
+      {leaving && <ConfirmDialog title="Discard unsaved changes?" body="You have edits that are not saved. Leaving this page will discard them." confirmLabel="Discard" danger onConfirm={() => { const go = leaving; setLeaving(null); clearUnsaved(); go(); }} onClose={() => setLeaving(null)} />}
       {confirmDelete && (
         <ConfirmDialog
           title="Delete this chat?"
