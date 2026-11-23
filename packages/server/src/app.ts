@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AgentStore, Semaphore } from "./agents.ts";
+import { PromptStore } from "./prompts.ts";
+import { AttachmentStore, readForEngine, type AttachmentRef } from "./attachments.ts";
 import type { Engine, EngineEvent, EngineSession, PermissionAnswer, PermissionRequest } from "./engine.ts";
 import { Curator } from "./curator.ts";
 import { checkProjectDir } from "./git.ts";
@@ -48,6 +50,8 @@ export function titleFrom(text: string): string {
 
 export class App {
   readonly store: ChatStore;
+  readonly attachments: AttachmentStore;
+  readonly prompts: PromptStore;
   readonly settings: SettingsStore;
   readonly memory: MemoryStore;
   readonly skills: SkillStore;
@@ -66,6 +70,9 @@ export class App {
 
   constructor(readonly dataDir: string, readonly engine: Engine) {
     this.store = new ChatStore(dataDir);
+    this.attachments = new AttachmentStore(dataDir);
+    this.prompts = new PromptStore(dataDir);
+    try { this.attachments.sweepAll(); } catch { /* a stuck cleanup must never stop the app starting */ }
     this.settings = new SettingsStore(dataDir);
     this.memory = new MemoryStore(dataDir, () => {
       const s = this.settings.get();
@@ -120,6 +127,7 @@ export class App {
   async removeChat(chatId: string): Promise<void> {
     this.stop(chatId);
     this.store.remove(chatId);
+    this.attachments.removeChat(chatId);
     this.chatAllow.delete(chatId);
     this.chatPolicy.delete(chatId);
     await this.dropSession(chatId);
@@ -166,14 +174,14 @@ export class App {
   }
 
   /** Start a turn. Returns once the turn is accepted; events arrive through the store. */
-  send(chatId: string, text: string): void {
+  send(chatId: string, text: string, attached: { ref: AttachmentRef; path: string }[] = []): void {
     const meta = this.store.get(chatId);
     if (!meta || meta.hidden) throw new Error("no such chat");
     if (this.turns.has(chatId)) throw new Error("this chat is still working");
     const abort = new AbortController();
     const turn: Turn = { abort, approvals: new Map(), children: new Set(), done: Promise.resolve() };
     this.turns.set(chatId, turn);
-    turn.done = this.runTurn(chatId, meta, text, turn).finally(() => this.turns.delete(chatId));
+    turn.done = this.runTurn(chatId, meta, text, turn, attached).finally(() => this.turns.delete(chatId));
   }
 
   stop(chatId: string): void {
@@ -191,10 +199,11 @@ export class App {
     return true;
   }
 
-  private async runTurn(chatId: string, meta: ChatMeta, text: string, turn: Turn): Promise<void> {
+  private async runTurn(chatId: string, meta: ChatMeta, text: string, turn: Turn, attached: { ref: AttachmentRef; path: string }[] = []): Promise<void> {
     const { store } = this;
     const firstTime = meta.userMessages === 0;
-    store.append(chatId, { type: "user", text });
+    store.append(chatId, attached.length ? { type: "user", text, attachments: attached.map((a) => a.ref) } : { type: "user", text });
+    this.attachments.markSent(chatId, attached.map((a) => a.ref.id));
     store.update(chatId, {
       userMessages: meta.userMessages + 1,
       ...(meta.title === "New chat" ? { title: titleFrom(text) } : {}),
@@ -212,6 +221,7 @@ export class App {
           else store.append(chatId, e);
         },
         turn.abort.signal,
+        attached.length ? attached.map(readForEngine) : undefined,
       );
     } catch (e) {
       store.append(chatId, { type: "error", message: (e as Error).message });

@@ -11,7 +11,7 @@ const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 execFileSync(npm, ["run", "build:ui"], { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
 
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".woff2": "font/woff2" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2" };
 const assets = {};
 const uiDist = path.join(root, "packages", "ui", "dist");
 const walk = (d) => {

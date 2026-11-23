@@ -1,4 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { ACCEPT, checkFiles, DEFAULT_TEXT, isImage, nameForPasted, sizeLabel } from "./attach.ts";
+import { firstPlaceholder, PromptList, promptsFor, SaveAsPrompt, usePrompts } from "./PromptPicker.tsx";
 import { loadDraft, loadHistory, pushHistory, saveDraft } from "./drafts.ts";
 
 /** The server rejects bodies over 1,000,000 bytes; stay safely under that. */
@@ -13,6 +15,8 @@ export interface ComposerHandle {
   set: (text: string) => void;
   /** Append text (used to hand back queued messages after Stop). */
   insert: (text: string) => void;
+  /** Put files back in the composer (used when an upload fails, so nothing is lost). */
+  addFiles: (files: File[]) => void;
 }
 
 interface Props {
@@ -21,16 +25,30 @@ interface Props {
   offline: boolean;
   queue: string[];
   hasMessages: boolean;
-  onSend: (text: string) => void;
+  /** The chat's project folder, so project-specific prompts are offered. */
+  projectDir?: string;
+  onSend: (text: string, files: File[]) => void;
   onStop: () => void;
   onRemoveQueued: (i: number) => void;
 }
 
-export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, onSend, onStop, onRemoveQueued }, ref) {
+export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, projectDir, onSend, onStop, onRemoveQueued }, ref) {
   const [text, setText] = useState(() => loadDraft(chatId));
   const latest = useRef(text); // the current text, readable from cleanup code after the textarea is gone
   latest.current = text;
   const ta = useRef<HTMLTextAreaElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileNote, setFileNote] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
+  // saved prompts: a button opens a searchable list; typing "/" at the start of the box does the same inline
+  const [promptsOpen, setPromptsOpen] = useState(false);
+  const [promptFilter, setPromptFilter] = useState("");
+  const [active, setActive] = useState(0);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const filesRef = useRef(files);
+  filesRef.current = files;
   const histIdx = useRef(-1); // -1 = not browsing history
   const stash = useRef("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -66,24 +84,72 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
     return () => { flush(); window.removeEventListener("pagehide", flush); };
   }, [chatId]);
 
+  const addFiles = useCallback((incoming: File[], pasted = false) => {
+    const prepared = pasted ? incoming.map((f, i) => nameForPasted(f, filesRef.current.length + i + 1)) : incoming;
+    const { accepted, problems } = checkFiles(prepared, filesRef.current.length);
+    if (accepted.length) setFiles((cur) => [...cur, ...accepted]);
+    setFileNote(problems.join(" "));
+  }, []);
+  // Attachments belong to the message being written: switching chats starts with none.
+  useEffect(() => { setFiles([]); setFileNote(""); }, [chatId]);
+
   useImperativeHandle(ref, () => ({
     focus: () => ta.current?.focus(),
     set: (t: string) => { update(t); ta.current?.focus(); },
     insert: (t: string) => { setText((cur) => (cur ? cur + "\n" : "") + t); ta.current?.focus(); },
-  }), []);
+    addFiles: (f: File[]) => addFiles(f),
+  }), [addFiles]);
+
+  const slashMode = /^\/[^\n]*$/.test(text) && dismissedFor !== text && !promptsOpen;
+  const pickerVisible = promptsOpen || slashMode;
+  const promptQuery = slashMode ? text.slice(1) : promptFilter;
+  const prompts = usePrompts(pickerVisible);
+  const promptItems = useMemo(() => promptsFor(prompts.all, projectDir, promptQuery), [prompts.all, projectDir, promptQuery]);
+  useEffect(() => { setActive(0); }, [promptQuery, pickerVisible]);
+  const closePrompts = () => { setPromptsOpen(false); setPromptFilter(""); setSavingPrompt(false); };
+
+  const pickPrompt = (p: { text: string }) => {
+    const base = slashMode || !text.trim() ? "" : text.replace(/\s+$/, "") + "\n";
+    const next = base + p.text;
+    update(next);
+    closePrompts();
+    setDismissedFor(null);
+    requestAnimationFrame(() => {
+      const el = ta.current;
+      if (!el) return;
+      el.focus();
+      const ph = firstPlaceholder(p.text);
+      if (ph) el.setSelectionRange(base.length + ph[0], base.length + ph[1]); // the first {{blank}} is selected, ready to type over
+      else el.setSelectionRange(next.length, next.length);
+    });
+  };
+
+  /** Arrow keys, Enter, Tab and Escape inside the prompt list. Returns true when the key was used. */
+  const promptKey = (e: React.KeyboardEvent): boolean => {
+    if (!pickerVisible) return false;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (slashMode) setDismissedFor(text); closePrompts(); ta.current?.focus(); return true; }
+    if (!promptItems.length) return false;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => (i + 1) % promptItems.length); return true; }
+    if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => (i - 1 + promptItems.length) % promptItems.length); return true; }
+    if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) { e.preventDefault(); pickPrompt(promptItems[Math.min(active, promptItems.length - 1)]); return true; }
+    return false;
+  };
 
   const tooLong = text.length > MAX_CHARS;
-  const canSend = !!text.trim() && !tooLong && !offline;
+  const waitingForReply = busy && files.length > 0; // the queue holds text only, so attachments go out once the reply is done
+  const canSend = (!!text.trim() || files.length > 0) && !tooLong && !offline && !waitingForReply;
 
   const submit = () => {
     const t = text.trim();
-    if (!t || tooLong || offline) return;
-    pushHistory(t);
+    if ((!t && files.length === 0) || tooLong || offline || waitingForReply) return;
+    if (t) pushHistory(t);
     histIdx.current = -1;
-    onSend(t);
+    onSend(t || DEFAULT_TEXT(files.length), files);
     clearTimeout(saveTimer.current);
     saveDraft(chatId, "");
     setText("");
+    setFiles([]);
+    setFileNote("");
     requestAnimationFrame(() => ta.current?.focus());
   };
 
@@ -94,6 +160,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // keyCode 229 = an IME (Japanese, Chinese...) is composing; Enter then confirms the candidate, not the message.
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (slashMode && promptKey(e)) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       submit();
@@ -116,7 +183,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
   };
 
   return (
-    <div className="composer-wrap">
+    <div
+      className={`composer-wrap${dragging ? " dragging" : ""}`}
+      onDragOver={(e) => { if (e.dataTransfer?.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
+      onDrop={(e) => { if (e.dataTransfer?.files.length) { e.preventDefault(); setDragging(false); addFiles([...e.dataTransfer.files]); } }}
+    >
       {queue.length > 0 && (
         <ul className="queue" aria-label="Queued messages">
           {queue.map((q, i) => (
@@ -128,15 +200,54 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           ))}
         </ul>
       )}
+      {pickerVisible && (
+        <div className="prompt-picker" role="group" aria-label="Insert a saved prompt">
+          {promptsOpen && (
+            <input className="prompt-filter" autoFocus aria-label="Search prompts" placeholder="Search saved prompts…" value={promptFilter} onChange={(e) => setPromptFilter(e.target.value)} onKeyDown={(e) => { promptKey(e); }} />
+          )}
+          <PromptList items={promptItems} active={active} loading={prompts.loading} error={prompts.error} total={prompts.all.length} onPick={pickPrompt} onHover={setActive} onRetry={prompts.reload} />
+          <div className="prompt-foot small">
+            {slashMode ? <span className="muted">Enter to insert · Esc to close</span> : savingPrompt ? (
+              <SaveAsPrompt text={text.trim()} projectDir={projectDir} onSaved={closePrompts} onCancel={() => setSavingPrompt(false)} />
+            ) : (
+              <>
+                {text.trim() && <button className="link small" onClick={() => setSavingPrompt(true)}>Save this message as a prompt…</button>}
+                <a className="link small" href="#/prompts" onClick={closePrompts}>Manage prompts</a>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {files.length > 0 && (
+        <ul className="att-draft" aria-label="Files to send">
+          {files.map((f, i) => (
+            <li key={`${f.name}-${f.size}-${i}`}>
+              {isImage(f) ? <Thumb file={f} /> : <span aria-hidden="true">📎</span>}
+              <span className="att-name">{f.name}</span>
+              <span className="muted small">{sizeLabel(f.size)}</span>
+              <button className="icon-btn" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))}>×</button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className={`composer${tooLong ? " too-long" : ""}`}>
+        <input ref={picker} type="file" multiple hidden accept={ACCEPT} aria-hidden="true" tabIndex={-1} onChange={(e) => { addFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
+        <button className="icon-btn attach-btn" aria-label="Insert a saved prompt" aria-expanded={promptsOpen} title="Saved prompts (or type /)" onClick={() => { setPromptsOpen((o) => !o); setSavingPrompt(false); setPromptFilter(""); }}>📋</button>
+        <button className="icon-btn attach-btn" aria-label="Attach files" title="Attach images or text files (or drop or paste them)" disabled={offline} onClick={() => picker.current?.click()}>📎</button>
         <textarea
           ref={ta}
           value={text}
           rows={1}
           aria-label="Message"
+          aria-controls={slashMode ? "prompt-listbox" : undefined}
+          aria-activedescendant={slashMode && promptItems[active] ? `prompt-opt-${promptItems[active].id}` : undefined}
           placeholder={offline ? "Reconnecting to Pheme…" : busy ? "Pheme is replying. Type to queue a follow-up…" : placeholder}
           onChange={(e) => { histIdx.current = -1; update(e.target.value); }}
           onKeyDown={onKeyDown}
+          onPaste={(e) => {
+            const pasted = [...(e.clipboardData?.files ?? [])];
+            if (pasted.length) { e.preventDefault(); addFiles(pasted, true); } // text pastes are left alone
+          }}
           spellCheck
         />
         {busy && !text.trim() ? (
@@ -145,9 +256,22 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           <button className="btn primary" onClick={submit} disabled={!canSend} aria-label={busy ? "Queue message" : "Send message"}>{busy ? "Queue" : "Send"}</button>
         )}
       </div>
+      {fileNote && <div className="composer-note over" role="alert">{fileNote}</div>}
+      {waitingForReply && <div className="composer-note muted" role="status">Attachments are sent once the current reply finishes.</div>}
       {(tooLong || text.length > 20_000) && (
         <div className={`composer-note ${tooLong ? "over" : "muted"}`}>{tooLong ? `Too long to send: ${text.length.toLocaleString()} of ${MAX_CHARS.toLocaleString()} characters. Shorten it and try again.` : `${text.length.toLocaleString()} characters`}</div>
       )}
     </div>
   );
 });
+
+/** A small preview of a picked image. The temporary address is released when the preview goes away. */
+function Thumb({ file }: { file: File }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+  return url ? <img className="att-mini" src={url} alt="" /> : <span aria-hidden="true">🖼</span>;
+}

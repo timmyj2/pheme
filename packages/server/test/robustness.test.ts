@@ -79,7 +79,7 @@ describe("session management", () => {
     await app.drain();
     const last = engine.sessions.filter((s) => s.id === ids[0]).at(-1)!;
     expect(last.resume).toBe(true);
-    expect(app.store.events(ids[0]).at(-2)?.type).toBe("message");
+    expect(app.store.events(ids[0]).at(-3)?.type).toBe("message");
   });
 
   it("a failed turn drops the session so the next message starts a fresh one", async () => {
@@ -97,7 +97,7 @@ describe("session management", () => {
     app.send(c.id, "boom");
     await app.drain();
     expect(engine.sessions.filter((s) => s.id === c.id)).toHaveLength(2);
-    expect(app.store.events(c.id).at(-2)?.type).toBe("message");
+    expect(app.store.events(c.id).at(-3)?.type).toBe("message");
   });
 
   it("removeChat closes the session and forgets permissions", async () => {

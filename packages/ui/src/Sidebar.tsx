@@ -179,7 +179,7 @@ export function Sidebar(props: {
   const tabStopId = (shown.find((c) => c.id === props.activeId && props.view === "chat") ?? shown[0])?.id;
   const hiddenCount = rows.length - shownGroups.reduce((n, g) => n + g.chats.length, 0);
 
-  const navLabel: Record<string, string> = { skills: "Skills", memory: "Memory", agents: "Agents", jobs: "Scheduled jobs", settings: "Settings" };
+  const navLabel: Record<string, string> = { skills: "Skills", memory: "Memory", agents: "Agents", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" };
   return (
     <aside className="sidebar" aria-label="Sidebar">
       <Brand />
@@ -240,7 +240,7 @@ export function Sidebar(props: {
       </nav>
       <button className="link small" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Back to chats" : "Show archived"}</button>
       <nav className="nav" aria-label="Pages">
-        {(["skills", "memory", "agents", "jobs", "settings"] as const).map((v) => (
+        {(["skills", "memory", "agents", "prompts", "jobs", "settings"] as const).map((v) => (
           <button key={v} className={props.view === v ? "active" : ""} aria-current={props.view === v ? "page" : undefined} onClick={() => props.onView(v)}>{navLabel[v]}</button>
         ))}
       </nav>

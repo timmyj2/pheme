@@ -16,7 +16,7 @@ describe("Composer", () => {
     expect(base.onSend).not.toHaveBeenCalled();
     expect(box().value).toBe("hello\nworld");
     await user.keyboard("{Enter}");
-    expect(base.onSend).toHaveBeenCalledWith("hello\nworld");
+    expect(base.onSend).toHaveBeenCalledWith("hello\nworld", []);
     expect(box().value).toBe("");
   });
   it("ignores Enter while an IME is composing (Japanese/Chinese input)", () => {
@@ -25,7 +25,7 @@ describe("Composer", () => {
     fireEvent.keyDown(box(), { key: "Enter", isComposing: true, keyCode: 229 });
     expect(base.onSend).not.toHaveBeenCalled();
     fireEvent.keyDown(box(), { key: "Enter" });
-    expect(base.onSend).toHaveBeenCalledWith("にほん");
+    expect(base.onSend).toHaveBeenCalledWith("にほん", []);
   });
   it("never sends blank or whitespace-only text", async () => {
     const user = userEvent.setup();
@@ -74,7 +74,7 @@ describe("Composer", () => {
     await user.type(box(), "next thing");
     expect(screen.getByRole("button", { name: "Queue message" })).toBeEnabled();
     await user.keyboard("{Enter}");
-    expect(base.onSend).toHaveBeenCalledWith("next thing");
+    expect(base.onSend).toHaveBeenCalledWith("next thing", []);
     await user.keyboard("{Escape}");
     expect(base.onStop).toHaveBeenCalledTimes(1);
     rerender(<Composer {...base} busy queue={["one", "two"]} />);
@@ -120,7 +120,7 @@ describe("Composer", () => {
     const user = userEvent.setup();
     render(<Composer {...base} />);
     await user.type(box(), "hi{Enter}");
-    expect(base.onSend).toHaveBeenCalledWith("hi");
+    expect(base.onSend).toHaveBeenCalledWith("hi", []);
     spy.mockRestore();
     set.mockRestore();
   });

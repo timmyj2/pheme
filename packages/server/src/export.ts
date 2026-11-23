@@ -14,6 +14,7 @@ export function chatToMarkdown(meta: ChatMeta, events: SeqEvent[], now = Date.no
     switch (e.type) {
       case "user":
         out.push("## You", "", e.text.trim(), "");
+        if (e.attachments?.length) out.push(`_Attached: ${e.attachments.map((a) => oneLine(a.name, 80).replace(/[`_*[\]]/g, "")).join(", ")}_`, "");
         break;
       case "delta":
         streaming += e.text;

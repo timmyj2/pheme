@@ -1,3 +1,4 @@
+import { Attachments } from "./AttachmentView.tsx";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentCard } from "./AgentCard.tsx";
 import { LazyMarkdown as Markdown } from "./LazyMarkdown.tsx";
@@ -95,6 +96,7 @@ function Actions({ ts, onCopy, onRetry }: { ts?: number; onCopy: () => void; onR
 }
 
 interface Props {
+  chatId?: string | null;
   events: SeqEvent[];
   streaming: string;
   busy: boolean;
@@ -200,6 +202,7 @@ export function Transcript(props: Props) {
                 return (
                   <div key={b.key} className="msg user-msg">
                     <div className="bubble user">{b.text}</div>
+                    {b.attachments && <Attachments chatId={props.chatId ?? null} items={b.attachments} />}
                     <Actions ts={b.ts} onCopy={() => props.onCopy(b.text)} />
                   </div>
                 );
@@ -223,10 +226,11 @@ export function Transcript(props: Props) {
           {pending.map((p) => (
             <div key={`p${p.id}`} className={`msg user-msg pending${p.failed ? " failed" : ""}`}>
               <div className="bubble user">{p.text}</div>
+              {p.files?.length ? <ul className="att-list" aria-label="Attachments being sent">{p.files.map((n, i) => <li key={i}><span className="att-chip">📎 {n}</span></li>)}</ul> : null}
               {p.failed ? (
                 <div className="msg-actions show">
                   <span className="over small">Not sent: {p.failed}</span>
-                  <button className="icon-btn" onClick={() => props.onResendPending(p)}>Retry</button>
+                  {!p.files?.length && <button className="icon-btn" onClick={() => props.onResendPending(p)}>Retry</button>}
                   <button className="icon-btn" onClick={() => props.onDismissPending(p.id)}>Dismiss</button>
                 </div>
               ) : <div className="msg-actions show muted small">Sending…</div>}

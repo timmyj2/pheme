@@ -1,6 +1,9 @@
+import fs from "node:fs";
 import { applyBackup, backupFileName, createBackup, previewBackup } from "./backup.ts";
 import { chatToMarkdown, exportFileName, searchLimited } from "./export.ts";
-import { gitCommit, gitCreatePr, gitDiff, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
+import { MAX_IMAGE_BYTES, MAX_PER_MESSAGE } from "./attachments.ts";
+import { gitBranches, gitStashApply, gitStashDrop, gitStashList, gitStashPush, gitSwitch } from "./gitbranch.ts";
+import { gitCommit, gitCreatePr, gitDiff, gitPrDetail, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
 import { HttpError } from "./http-error.ts";
 import http from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -81,6 +84,32 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       app.store.resetCache();
       return json(res, 200, result);
     }
+    // --- attachments (raw file body, so these run before the JSON body parser)
+    if (seg[0] === "chats" && seg[2] === "attachments" && seg[1]) {
+      const chatId = seg[1];
+      const chat = app.store.get(chatId);
+      if (!chat || chat.hidden) throw new HttpError(404, "no such chat");
+      if (m === "POST" && seg.length === 3) {
+        const data = await readRaw(req, MAX_IMAGE_BYTES + 1024);
+        return json(res, 201, app.attachments.save(chatId, url.searchParams.get("name") ?? "file", data));
+      }
+      if (m === "GET" && seg.length === 4) {
+        const f = app.attachments.open(chatId, seg[3]);
+        if (!f) throw new HttpError(404, "That attachment is gone.");
+        const data = fs.readFileSync(f.path);
+        // Only the four raster image types are ever shown as images; everything else is plain text. Nothing can run in the browser.
+        res.writeHead(200, {
+          "content-type": f.ref.kind === "image" ? f.ref.mime : "text/plain; charset=utf-8",
+          "content-length": data.length,
+          "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(f.ref.name)}`,
+          "x-content-type-options": "nosniff",
+          "content-security-policy": "sandbox; default-src 'none'; style-src 'none'",
+          "cache-control": "no-store", // never kept in the browser cache: a deleted chat's files must not linger there
+        });
+        return void res.end(data);
+      }
+      throw new HttpError(405, "not allowed");
+    }
     const body = m === "POST" || m === "PUT" || m === "PATCH" ? await readBody(req) : {};
 
     // --- bootstrap, settings, models
@@ -133,10 +162,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         }
       }
       if (seg[2] === "messages" && m === "POST") {
-        const text = typeof body.text === "string" ? body.text.trim() : "";
-        if (!text) return json(res, 400, { error: "empty message" });
+        const raw = typeof body.text === "string" ? body.text.trim() : "";
+        const attached = app.attachments.resolve(id, body.attachments);
+        if (!raw && attached.length === 0) return json(res, 400, { error: "empty message" });
+        const text = raw || (attached.length === 1 ? "Please take a look at the attached file." : "Please take a look at the attached files.");
+        if (attached.length > MAX_PER_MESSAGE) return json(res, 400, { error: `At most ${MAX_PER_MESSAGE} attachments per message.` });
         try {
-          app.send(id, text);
+          app.send(id, text, attached);
         } catch (e) {
           return json(res, 409, { error: (e as Error).message });
         }
@@ -149,6 +181,23 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         const file = url.searchParams.get("path");
         if (!file) throw new HttpError(400, "path is required.");
         return json(res, 200, await gitDiff(dir, file));
+      }
+      if (seg[2] === "git" && m === "GET" && ((seg.length === 4 && seg[3] === "branches") || (seg.length === 4 && seg[3] === "stash"))) {
+        if (!meta.projectDir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        return json(res, 200, seg[3] === "branches" ? await gitBranches(meta.projectDir) : await gitStashList(meta.projectDir));
+      }
+      if (seg[2] === "git" && m === "POST" && ((seg.length === 4 && (seg[3] === "switch" || seg[3] === "stash")) || (seg.length === 5 && seg[3] === "stash" && (seg[4] === "apply" || seg[4] === "drop")))) {
+        const dir = meta.projectDir;
+        if (!dir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        if (app.isBusy(id)) throw new HttpError(409, "A reply is running and may still be editing files. Wait for it to finish (or stop it) first.");
+        if (seg[3] === "switch") return json(res, 200, await gitSwitch(dir, { name: String(body.name ?? ""), create: body.create === true, stash: body.stash === true }));
+        if (seg.length === 4) return json(res, 200, await gitStashPush(dir, { message: typeof body.message === "string" ? body.message : "", includeUntracked: body.includeUntracked !== false }));
+        if (seg[4] === "apply") return json(res, 200, await gitStashApply(dir, String(body.sha ?? ""), body.drop !== false));
+        return json(res, 200, await gitStashDrop(dir, String(body.sha ?? "")));
+      }
+      if (seg[2] === "git" && seg.length === 4 && seg[3] === "pr" && m === "GET") {
+        if (!meta.projectDir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        return json(res, 200, { pr: await gitPrDetail(meta.projectDir) });
       }
       if (seg[2] === "git" && seg.length === 4 && seg[3] === "remote" && m === "GET") {
         if (!meta.projectDir) throw new HttpError(400, "Choose a project folder for this chat first.");
@@ -189,6 +238,15 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         return json(res, app.resolveApproval(id, seg[3], d) ? 200 : 404, { ok: true });
       }
       if (seg[2] === "events" && m === "GET") return sse(req, res, id, Number(url.searchParams.get("after") ?? 0));
+    }
+
+    // --- saved prompts
+    if (seg[0] === "prompts") {
+      if (seg.length === 1 && m === "GET") return json(res, 200, app.prompts.list());
+      if (seg.length === 1 && m === "POST") return json(res, 201, app.prompts.create(body));
+      if (seg.length === 2 && m === "PUT") return json(res, 200, app.prompts.update(seg[1], body));
+      if (seg.length === 2 && m === "DELETE") { app.prompts.remove(seg[1]); return json(res, 200, { ok: true }); }
+      throw new HttpError(405, "not allowed");
     }
 
     // --- scheduled jobs

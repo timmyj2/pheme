@@ -1,3 +1,4 @@
+import type { AttachmentRef } from "./attachments.ts";
 // Types shared by the server and the browser UI. Keep this file dependency-free.
 
 export interface ChatMeta {
@@ -18,7 +19,7 @@ export interface ChatMeta {
 }
 
 export type ChatEvent =
-  | { type: "user"; text: string }
+  | { type: "user"; text: string; attachments?: AttachmentRef[] }
   | { type: "delta"; text: string }
   | { type: "message"; text: string }
   | { type: "tool_start"; id: string; name: string; args: unknown }
@@ -29,6 +30,7 @@ export type ChatEvent =
   | { type: "agent_update"; run: AgentRun }
   | { type: "turn_start" }
   | { type: "idle" }
+  | { type: "usage"; used: number; limit: number }
   | { type: "error"; message: string };
 
 /** An event as stored/streamed, numbered per chat. */

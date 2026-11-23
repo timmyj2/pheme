@@ -35,6 +35,14 @@ export interface GitResult {
  * Run `git` with a fixed argument list (never through a shell), a timeout and an output cap.
  * Prompts are disabled so a missing credential fails instead of hanging.
  */
+export interface GitOpts {
+  input?: string;
+  allowFail?: boolean;
+  timeoutMs?: number;
+  /** Treat file names as plain text, never patterns. Only turn this off for commands that take no names from the user (git stash needs it off for its own internal pathspecs). */
+  literal?: boolean;
+}
+
 const MAX_CONCURRENT_GIT = 6;
 let activeGit = 0;
 const gitWaiters: (() => void)[] = [];
@@ -51,7 +59,7 @@ async function gitSlot(): Promise<() => void> {
   };
 }
 
-export async function runGit(cwd: string, args: string[], opts: { input?: string; allowFail?: boolean; timeoutMs?: number } = {}): Promise<GitResult> {
+export async function runGit(cwd: string, args: string[], opts: GitOpts = {}): Promise<GitResult> {
   const release = await gitSlot();
   try {
     return await runGitNow(cwd, args, opts);
@@ -60,12 +68,12 @@ export async function runGit(cwd: string, args: string[], opts: { input?: string
   }
 }
 
-function runGitNow(cwd: string, args: string[], opts: { input?: string; allowFail?: boolean; timeoutMs?: number } = {}): Promise<GitResult> {
+function runGitNow(cwd: string, args: string[], opts: GitOpts = {}): Promise<GitResult> {
   return new Promise((resolve) => {
     const child = execFile(
       "git",
       // Literal pathspecs: a file called "*.txt" or ":(exclude)x" is just a name, never a pattern.
-      ["--literal-pathspecs", ...args],
+      opts.literal === false ? args : ["--literal-pathspecs", ...args],
       {
         cwd,
         timeout: opts.timeoutMs ?? TIMEOUT_MS,
@@ -293,7 +301,8 @@ export interface CommitResult {
 const COMMIT_TIMEOUT_MS = 90_000; // pre-commit hooks can be slow
 
 export async function validBranchName(cwd: string, name: string): Promise<boolean> {
-  if (!name || name.length > 200 || name.startsWith("-")) return false;
+  // eslint-disable-next-line no-control-regex
+  if (!name || name.length > 200 || name.startsWith("-") || /[\u0000-\u001f\u007f]/.test(name)) return false; // a NUL byte cannot even be passed to a program
   return (await runGit(cwd, ["check-ref-format", "--branch", name])).ok;
 }
 
@@ -316,7 +325,7 @@ export function draftMessage(files: Pick<ChangedFile, "path" | "staged" | "unsta
 
 const repoLocks = new Map<string, Promise<unknown>>();
 /** Run git-changing operations on one repository one at a time. Two clicks, two tabs or two chats on the same repo queue up. */
-async function withRepoLock<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
+export async function withRepoLock<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
   const key = (await runGit(cwd, ["rev-parse", "--show-toplevel"])).stdout.trim() || cwd;
   const before = repoLocks.get(key) ?? Promise.resolve();
   const mine = before.catch(() => {}).then(fn);
@@ -330,7 +339,7 @@ async function withRepoLock<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
 }
 
 /** Turn git's lock-file complaint into something a person can act on. */
-function lockMessage(why: string): string | null {
+export function lockMessage(why: string): string | null {
   return /index\.lock|Unable to create .*\.lock|another git process/i.test(why)
     ? "Another Git operation is running in this folder (another app, a second tab, or a crashed earlier one). Wait a moment and try again. If it keeps happening, close other Git tools and delete the file .git/index.lock."
     : null;
@@ -619,4 +628,103 @@ export async function gitCreatePr(cwd: string, req: PrRequest): Promise<{ url: s
   if (!url) throw new HttpError(500, "The pull request may have been created, but GitHub did not return its address. Check GitHub.");
   const num = /\/pull\/(\d+)/.exec(url)?.[1];
   return { url, number: num ? Number(num) : undefined };
+}
+
+export interface PrCheck {
+  name: string;
+  workflow?: string;
+  state: "passing" | "failing" | "pending" | "skipped";
+  url?: string;
+}
+
+export interface PrDetail {
+  number: number;
+  url: string;
+  title: string;
+  state: "open" | "closed" | "merged";
+  draft: boolean;
+  base: string;
+  head: string;
+  checks: PrCheck[];
+  checksSummary: PrInfo["checks"];
+  /** True when GitHub returned more checks than we show. */
+  moreChecks: number;
+  review: "approved" | "changes_requested" | "review_required" | "none";
+  mergeable: "mergeable" | "conflicting" | "unknown";
+  /** GitHub's own word for why it cannot merge yet (BLOCKED, BEHIND, UNSTABLE...), lower-cased. */
+  mergeState?: string;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+}
+
+const MAX_CHECKS = 60;
+
+/** Turn GitHub's mixed list of check runs and commit statuses into one simple list. Exported for tests. */
+export function normalizeChecks(rollup: unknown): { checks: PrCheck[]; more: number } {
+  if (!Array.isArray(rollup)) return { checks: [], more: 0 };
+  const out: PrCheck[] = [];
+  for (const c of rollup as Record<string, unknown>[]) {
+    if (!c || typeof c !== "object") continue;
+    const name = String(c.name ?? c.context ?? "").slice(0, 120);
+    if (!name) continue;
+    const status = String(c.status ?? "").toUpperCase();
+    const concl = String(c.conclusion ?? c.state ?? "").toUpperCase();
+    let state: PrCheck["state"];
+    if (["FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"].includes(concl)) state = "failing";
+    else if (["SKIPPED", "NEUTRAL", "STALE"].includes(concl)) state = "skipped";
+    else if ((status && status !== "COMPLETED") || concl === "PENDING" || concl === "EXPECTED" || concl === "") state = "pending";
+    else state = "passing";
+    const raw = String(c.detailsUrl ?? c.targetUrl ?? "");
+    const check: PrCheck = { name, state };
+    if (typeof c.workflowName === "string" && c.workflowName && c.workflowName !== name) check.workflow = c.workflowName.slice(0, 120);
+    if (/^https:\/\/[^\s]+$/.test(raw) && raw.length < 500) check.url = raw; // never hand the page a javascript: or data: address
+    out.push(check);
+  }
+  // failing first, then pending, then the rest, so the part you need to act on is at the top
+  const order = { failing: 0, pending: 1, passing: 2, skipped: 3 } as const;
+  out.sort((a, b) => order[a.state] - order[b.state] || a.name.localeCompare(b.name));
+  return { checks: out.slice(0, MAX_CHECKS), more: Math.max(0, out.length - MAX_CHECKS) };
+}
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
+
+/** The pull request for this folder's current branch (open, closed or merged), with every check. null when there is none. */
+export async function gitPrDetail(cwd: string): Promise<PrDetail | null> {
+  const st = await gitStatus(cwd);
+  if (!st.repo || !st.root || !st.branch || st.detached || st.branch.startsWith("-")) return null;
+  const r = await runGh(st.root, ["pr", "view", st.branch, "--json", "number,url,title,state,isDraft,reviewDecision,mergeable,mergeStateStatus,baseRefName,headRefName,additions,deletions,changedFiles,statusCheckRollup"]);
+  if (!r.ok) {
+    if (/no pull requests? found|could not find any pull request/i.test(r.stderr)) return null;
+    if (/not installed/i.test(r.stderr)) return null;
+    // no GitHub remote, or a host gh does not know: there is simply no PR to show
+    if (/none of the git remotes|no git remotes|known GitHub host|not a git repository|could not determine (base|the) repo/i.test(r.stderr)) return null;
+    throw new HttpError(502, r.stderr.split("\n")[0].slice(0, 300) || "GitHub did not answer.");
+  }
+  let j: Record<string, unknown>;
+  try { j = JSON.parse(r.stdout) as Record<string, unknown>; } catch { throw new HttpError(502, "GitHub sent an answer Pheme could not read."); }
+  const { checks, more } = normalizeChecks(j.statusCheckRollup);
+  const stateWord = String(j.state ?? "").toUpperCase();
+  const review = String(j.reviewDecision ?? "").toUpperCase();
+  const mergeable = String(j.mergeable ?? "").toUpperCase();
+  const url = String(j.url ?? "");
+  if (!/^https:\/\//.test(url)) return null;
+  return {
+    number: num(j.number),
+    url,
+    title: String(j.title ?? "").slice(0, 300),
+    state: stateWord === "MERGED" ? "merged" : stateWord === "CLOSED" ? "closed" : "open",
+    draft: j.isDraft === true,
+    base: String(j.baseRefName ?? "").slice(0, 200),
+    head: String(j.headRefName ?? "").slice(0, 200),
+    checks,
+    checksSummary: summariseChecks(j.statusCheckRollup),
+    moreChecks: more,
+    review: review === "APPROVED" ? "approved" : review === "CHANGES_REQUESTED" ? "changes_requested" : review === "REVIEW_REQUIRED" ? "review_required" : "none",
+    mergeable: mergeable === "MERGEABLE" ? "mergeable" : mergeable === "CONFLICTING" ? "conflicting" : "unknown",
+    mergeState: typeof j.mergeStateStatus === "string" && j.mergeStateStatus ? j.mergeStateStatus.toLowerCase() : undefined,
+    additions: num(j.additions),
+    deletions: num(j.deletions),
+    changedFiles: num(j.changedFiles),
+  };
 }

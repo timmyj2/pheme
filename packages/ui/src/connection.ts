@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, api, type BootstrapState } from "./api.ts";
+import { adoptSharedToken, ApiError, api, type BootstrapState } from "./api.ts";
 
 export type ConnStatus = "online" | "offline" | "unauthorized";
 
@@ -34,6 +34,7 @@ export function useConnection() {
     } catch (e) {
       if (!live.current) return;
       if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        if (adoptSharedToken()) { void ping(); return; } // another window opened Pheme with a newer key: use it
         setStatus("unauthorized");
         setError(e.message);
         return;

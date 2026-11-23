@@ -1,22 +1,41 @@
 import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun, CuratorState } from "../../server/src/protocol.ts";
 
 export type { BackupPreview } from "../../server/src/backup.ts";
-export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo } from "../../server/src/git.ts";
+import type { AttachmentRef } from "../../server/src/attachments.ts";
+export type { Prompt } from "../../server/src/prompts.ts";
+export type { AttachmentRef } from "../../server/src/attachments.ts";
+export type { BranchList, BranchInfo, StashEntry } from "../../server/src/gitbranch.ts";
+export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo, PrDetail, PrCheck } from "../../server/src/git.ts";
 export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
 export type ChatRow = ChatMeta & { busy?: boolean; /** A tool is waiting for the user's approval. */ waiting?: boolean };
 
 const KEY = "pheme-token";
 
-/** The launcher opens /?token=...; keep it for this tab and take it out of the address bar. */
+/**
+ * The launcher opens /?token=...; keep it for this tab and take it out of the address bar. A copy is also kept in this
+ * browser's local storage, so an installed Pheme window (which starts with no address and no tab storage) can pick up the
+ * key from the last time Pheme was opened. Each Pheme start makes a new key, so an old copy simply stops working.
+ */
 export function initToken(): string {
   const url = new URL(window.location.href);
   const t = url.searchParams.get("token");
   if (t) {
     sessionStorage.setItem(KEY, t);
+    try { localStorage.setItem(KEY, t); } catch { /* private mode: this tab still works */ }
     url.searchParams.delete("token");
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
   }
+  if (!sessionStorage.getItem(KEY)) adoptSharedToken();
   return sessionStorage.getItem(KEY) ?? "";
+}
+
+/** Take the newest key another window of this Pheme saved. Returns true when it differs from the one this tab has. */
+export function adoptSharedToken(): boolean {
+  let shared: string | null = null;
+  try { shared = localStorage.getItem(KEY); } catch { return false; }
+  if (!shared || shared === sessionStorage.getItem(KEY)) return false;
+  sessionStorage.setItem(KEY, shared);
+  return true;
 }
 export const token = () => sessionStorage.getItem(KEY) ?? "";
 
@@ -103,11 +122,25 @@ export const api = {
   gitDiff: (id: string, path: string) => call<import("../../server/src/git.ts").FileDiff>(`/chats/${id}/git/diff?path=${encodeURIComponent(path)}`),
   gitCommit: (id: string, body: { message: string; paths: string[]; branch?: string; allowRisky?: string[] }) => call<{ sha: string; short: string; branch: string; summary: string; files: number }>(`/chats/${id}/git/commit`, "POST", body),
   gitUndo: (id: string, sha: string) => call<{ undone: string }>(`/chats/${id}/git/undo`, "POST", { sha }),
+  gitBranches: (id: string) => call<import("../../server/src/gitbranch.ts").BranchList>(`/chats/${id}/git/branches`),
+  gitSwitch: (id: string, b: { name: string; create?: boolean; stash?: boolean }) => call<{ branch: string; created: boolean; stashed: boolean }>(`/chats/${id}/git/switch`, "POST", b),
+  gitStashes: (id: string) => call<{ stashes: import("../../server/src/gitbranch.ts").StashEntry[]; more: number }>(`/chats/${id}/git/stash`),
+  gitStashPush: (id: string, b: { message?: string; includeUntracked?: boolean }) => call<{ stashed: true }>(`/chats/${id}/git/stash`, "POST", b),
+  gitStashApply: (id: string, sha: string, drop: boolean) => call<{ applied: true; dropped: boolean }>(`/chats/${id}/git/stash/apply`, "POST", { sha, drop }),
+  gitStashDrop: (id: string, sha: string) => call<{ dropped: true }>(`/chats/${id}/git/stash/drop`, "POST", { sha }),
+  gitPrDetail: (id: string) => call<{ pr: import("../../server/src/git.ts").PrDetail | null }>(`/chats/${id}/git/pr`),
   gitRemote: (id: string) => call<import("../../server/src/git.ts").RemoteInfo>(`/chats/${id}/git/remote`),
   gitPush: (id: string) => call<{ branch: string; remote: string; output: string }>(`/chats/${id}/git/push`, "POST", {}),
   gitPr: (id: string, body: { title: string; body?: string; base?: string; draft?: boolean }) => call<{ url: string; number?: number }>(`/chats/${id}/git/pr`, "POST", body),
   deleteChat: (id: string) => call<{ ok: boolean }>(`/chats/${id}`, "DELETE"),
-  send: (id: string, text: string) => call<{ ok: boolean }>(`/chats/${id}/messages`, "POST", { text }),
+  send: (id: string, text: string, attachments?: string[]) => call<{ ok: boolean }>(`/chats/${id}/messages`, "POST", attachments?.length ? { text, attachments } : { text }),
+  uploadAttachment: (id: string, file: File) => postFile<AttachmentRef>(`/chats/${id}/attachments?name=${encodeURIComponent(file.name || "file")}`, file),
+  attachmentBlob: async (id: string, attId: string): Promise<Blob> => {
+    let r: Response;
+    try { r = await fetch(`/api/chats/${id}/attachments/${attId}`, { headers: { "x-pheme-token": token() } }); } catch { throw new ApiError(0, "Can't reach Pheme. Is it still running?"); }
+    if (!r.ok) throw new ApiError(r.status, r.status === 404 ? "This file is no longer available." : `HTTP ${r.status}`);
+    return r.blob();
+  },
   stop: (id: string) => call<{ ok: boolean }>(`/chats/${id}/stop`, "POST", {}),
   approve: (id: string, approvalId: string, decision: ApprovalDecision) => call<{ ok: boolean }>(`/chats/${id}/approvals/${approvalId}`, "POST", { decision }),
   memory: () => call<MemoryState>("/memory"),
@@ -116,6 +149,10 @@ export const api = {
   skill: (name: string) => call<{ name: string; content: string; files: string[] }>(`/skills/${encodeURIComponent(name)}`),
   saveSkill: (name: string, content: string) => call<{ ok: boolean }>(`/skills/${encodeURIComponent(name)}`, "PUT", { content }),
   archiveSkill: (name: string) => call<{ ok: boolean }>(`/skills/${encodeURIComponent(name)}`, "DELETE"),
+  prompts: () => call<import("../../server/src/prompts.ts").Prompt[]>("/prompts"),
+  createPrompt: (b: { name: string; text: string; projectDir?: string }) => call<import("../../server/src/prompts.ts").Prompt>("/prompts", "POST", b),
+  updatePrompt: (id: string, b: { name?: string; text?: string; projectDir?: string }) => call<import("../../server/src/prompts.ts").Prompt>(`/prompts/${id}`, "PUT", b),
+  deletePrompt: (id: string) => call<{ ok: boolean }>(`/prompts/${id}`, "DELETE"),
   jobs: () => call<Job[]>("/jobs"),
   createJob: (j: { name: string; prompt: string; schedule: JobSchedule; allowActions: boolean }) => call<Job>("/jobs", "POST", j),
   updateJob: (id: string, patch: Partial<Pick<Job, "enabled" | "name" | "prompt">>) => call<Job>(`/jobs/${id}`, "PUT", patch),

@@ -19,7 +19,8 @@
     "smoke": "node scripts/smoke.mjs",
     "stress": "node scripts/stress.mjs",
     "dev:fake": "node --experimental-strip-types packages/server/src/main.ts --fake",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "verify": "node scripts/verify.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

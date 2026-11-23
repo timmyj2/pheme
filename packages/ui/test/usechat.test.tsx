@@ -114,7 +114,7 @@ describe("useChat", () => {
     act(() => h.result.current.send("hello there"));
     expect(h.result.current.pending.map((p) => p.text)).toEqual(["hello there"]);
     expect(h.result.current.busy).toBe(true);
-    await waitFor(() => expect(sendApi).toHaveBeenCalledWith("c1", "hello there"));
+    await waitFor(() => expect(sendApi).toHaveBeenCalledWith("c1", "hello there", undefined));
     act(() => live().emit(ev({ type: "user", text: "hello there" })));
     expect(h.result.current.pending).toHaveLength(0);
     expect(h.result.current.events.filter((e) => e.type === "user")).toHaveLength(1);
@@ -139,11 +139,11 @@ describe("useChat", () => {
     expect(h.result.current.queue).toEqual(["one", "two"]);
     expect(sendApi).not.toHaveBeenCalled();
     act(() => { live().emit(ev({ type: "idle" })); });
-    await waitFor(() => expect(sendApi).toHaveBeenCalledWith("c1", "one"));
+    await waitFor(() => expect(sendApi).toHaveBeenCalledWith("c1", "one", undefined));
     expect(h.result.current.queue).toEqual(["two"]);
     act(() => { live().emit(ev({ type: "user", text: "one" })); live().emit(ev({ type: "turn_start" })); });
     act(() => { live().emit(ev({ type: "idle" })); });
-    await waitFor(() => expect(sendApi).toHaveBeenCalledWith("c1", "two"));
+    await waitFor(() => expect(sendApi).toHaveBeenCalledWith("c1", "two", undefined));
     expect(sendApi).toHaveBeenCalledTimes(2);
   });
 

@@ -60,7 +60,7 @@ await probe("A. 40 concurrent chats all finish with ordered events", async () =>
   const done = await Promise.all(chats.map((c) => waitIdle(c.id)));
   for (const d of done) {
     const types = d.events.map((e) => e.type).join(",");
-    if (types !== "user,turn_start,message,idle") return `bad event order: ${types}`;
+    if (types !== "user,turn_start,message,usage,idle") return `bad event order: ${types}`;
     const seqs = d.events.map((e) => e.seq);
     if (seqs.some((s, i) => i && s <= seqs[i - 1])) return "seq not increasing";
   }
@@ -159,7 +159,8 @@ await probe("G. rapid send/stop cycles leave the chat usable", async () => {
   }
   await api(`/chats/${c.id}/messages`, "POST", { text: "final hello" });
   const d = await waitIdle(c.id);
-  return d.events.at(-2).type === "message" || `last events ${d.events.slice(-3).map((e) => e.type)}`;
+  const tail = d.events.filter((e) => e.type !== "usage"); // a turn also reports context usage just before it ends
+  return tail.at(-2).type === "message" || `last events ${d.events.slice(-3).map((e) => e.type)}`;
 });
 await probe("H. 5,000-event transcript: read and append stay fast", async () => {
   const c = await newChat();
@@ -174,7 +175,7 @@ await probe("H. 5,000-event transcript: read and append stay fast", async () => 
   await waitIdle(c.id);
   const turnMs = Date.now() - t;
   const seqs = (await api(`/chats/${c.id}`)).json.events.map((e) => e.seq);
-  if (seqs.length !== 5004 || seqs[5000] !== 5001) return `seq continuity broken: len ${seqs.length}, next ${seqs[5000]}`;
+  if (seqs.length !== 5005 || seqs[5000] !== 5001) return `seq continuity broken: len ${seqs.length}, next ${seqs[5000]}`;
   return (readMs < 1500 && turnMs < 3000) || `slow: read ${readMs}ms, turn ${turnMs}ms`;
 });
 await probe("I. skills: 30 parallel creates + hostile names/paths", async () => {
@@ -256,7 +257,7 @@ await probe("N. chats started before a restart: busy flag cleared, can send agai
   const r = await api(`/chats/${c.id}/messages`, "POST", { text: "hello again" });
   if (r.status !== 202) return `send after restart -> ${r.status}`;
   const done = await waitIdle(c.id);
-  return done.events.at(-2).type === "message" || "no reply after restart";
+  return done.events.filter((e) => e.type !== "usage").at(-2).type === "message" || "no reply after restart";
 });
 await probe("O. static UI: SPA fallback, HEAD, unknown asset 404", async () => {
   const html = await fetch(base + "/some/route"); if (!(await html.text()).includes("<title>Pheme</title>")) return "no SPA fallback";

@@ -1,3 +1,4 @@
+import type { AttachmentRef } from "./api.ts";
 import type { AgentRun, ApprovalDecision, SeqEvent } from "./api.ts";
 
 export interface ToolItem {
@@ -11,7 +12,7 @@ export interface ToolItem {
 }
 
 export type Block =
-  | { kind: "user"; key: string; text: string; ts: number }
+  | { kind: "user"; key: string; text: string; ts: number; attachments?: AttachmentRef[] }
   | { kind: "assistant"; key: string; text: string; ts: number }
   | { kind: "tools"; key: string; items: ToolItem[] }
   | { kind: "approval"; key: string; id: string; title: string; detail: string; approvalKind: string; decision?: ApprovalDecision }
@@ -32,7 +33,7 @@ export function buildBlocks(events: SeqEvent[]): Block[] {
   for (const e of events) {
     switch (e.type) {
       case "user":
-        blocks.push({ kind: "user", key: `u${e.seq}`, text: e.text, ts: e.ts });
+        blocks.push({ kind: "user", key: `u${e.seq}`, text: e.text, ts: e.ts, ...(e.attachments?.length ? { attachments: e.attachments } : {}) });
         break;
       case "message":
         blocks.push({ kind: "assistant", key: `a${e.seq}`, text: e.text, ts: e.ts });

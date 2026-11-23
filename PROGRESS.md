@@ -74,3 +74,13 @@ Next (docs/NEXT.md items 7-11): desktop notifications, backup/restore, lazy-load
 ## v0.2.0 (branch feat/polish)
 Added since v0.1.0: Git panel (project folder, changes, commit, undo, push, PR), per-chat model, export, message search, notifications, backup/restore, keybindings, settings search, lazy-loaded markdown, Playwright e2e in CI, CI-built releases.
 Not done: context-usage meter (unverified SDK support). Not tested against real GitHub: PR creation. Windows: CI only.
+
+## Six-item goal (branch feat/git-workflow, merged when CI is green)
+1. PR panel: checks (failing first), review state, mergeability, 20 s refresh while checks run.
+2. Branch switcher and stash (create, switch, set aside, restore, delete), with confirm steps and rollback.
+3. Attachments: images and text files, validated by content, secrets refused, safe download, swept after 24 h.
+4. Prompt library: page, `/` and 📋 picker, {{blanks}}, per-project prompts, save-from-composer.
+5. Context meter from the SDK usage event (once per turn).
+6. Installable app: manifest, PNG icons, remembered access key, no service worker.
+Stress found and fixed along the way: parallel commits (500), search bursts, stash left untracked files (literal pathspecs), NUL in a branch name, PR detail without a remote (502), `.env` slipping past the attachment check, attachments cached by the browser, world-readable attachment folders.
+Still not verified: real GitHub PR creation and checks (fake gh only), real Copilot image/file attachments (the SDK mapping is unit-tested; a real send costs quota), Windows UI on a real work PC (CI only), the install prompt on a real desktop (Chrome's installability check passes).

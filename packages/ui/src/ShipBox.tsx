@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type GitStatus, type RemoteInfo } from "./api.ts";
+import { PrDetails } from "./PrDetails.tsx";
 import { useToast } from "./toast.tsx";
 
 interface Props {
@@ -119,6 +120,7 @@ export function ShipBox({ chatId, status, busy, suggestedTitle, onDone }: Props)
         <div className="pr-card">
           <a href={info.pr.url} target="_blank" rel="noreferrer noopener">#{info.pr.number} {info.pr.title}</a>
           <span className={`checks ${info.pr.checks}`}>{info.pr.draft ? "Draft · " : ""}{CHECKS[info.pr.checks]}</span>
+          <PrDetails chatId={chatId} number={info.pr.number} />
         </div>
       ) : canPr ? (
         <>
