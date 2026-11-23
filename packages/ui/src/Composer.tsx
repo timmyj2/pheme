@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { ACCEPT, checkFiles, DEFAULT_TEXT, isImage, nameForPasted, sizeLabel } from "./attach.ts";
+import { firstPlaceholder, PromptList, promptsFor, SaveAsPrompt, usePrompts } from "./PromptPicker.tsx";
 import { loadDraft, loadHistory, pushHistory, saveDraft } from "./drafts.ts";
 
 /** The server rejects bodies over 1,000,000 bytes; stay safely under that. */
@@ -24,12 +25,14 @@ interface Props {
   offline: boolean;
   queue: string[];
   hasMessages: boolean;
+  /** The chat's project folder, so project-specific prompts are offered. */
+  projectDir?: string;
   onSend: (text: string, files: File[]) => void;
   onStop: () => void;
   onRemoveQueued: (i: number) => void;
 }
 
-export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, onSend, onStop, onRemoveQueued }, ref) {
+export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, projectDir, onSend, onStop, onRemoveQueued }, ref) {
   const [text, setText] = useState(() => loadDraft(chatId));
   const latest = useRef(text); // the current text, readable from cleanup code after the textarea is gone
   latest.current = text;
@@ -38,6 +41,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
   const [fileNote, setFileNote] = useState("");
   const [dragging, setDragging] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
+  // saved prompts: a button opens a searchable list; typing "/" at the start of the box does the same inline
+  const [promptsOpen, setPromptsOpen] = useState(false);
+  const [promptFilter, setPromptFilter] = useState("");
+  const [active, setActive] = useState(0);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const [savingPrompt, setSavingPrompt] = useState(false);
   const filesRef = useRef(files);
   filesRef.current = files;
   const histIdx = useRef(-1); // -1 = not browsing history
@@ -91,6 +100,41 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
     addFiles: (f: File[]) => addFiles(f),
   }), [addFiles]);
 
+  const slashMode = /^\/[^\n]*$/.test(text) && dismissedFor !== text && !promptsOpen;
+  const pickerVisible = promptsOpen || slashMode;
+  const promptQuery = slashMode ? text.slice(1) : promptFilter;
+  const prompts = usePrompts(pickerVisible);
+  const promptItems = useMemo(() => promptsFor(prompts.all, projectDir, promptQuery), [prompts.all, projectDir, promptQuery]);
+  useEffect(() => { setActive(0); }, [promptQuery, pickerVisible]);
+  const closePrompts = () => { setPromptsOpen(false); setPromptFilter(""); setSavingPrompt(false); };
+
+  const pickPrompt = (p: { text: string }) => {
+    const base = slashMode || !text.trim() ? "" : text.replace(/\s+$/, "") + "\n";
+    const next = base + p.text;
+    update(next);
+    closePrompts();
+    setDismissedFor(null);
+    requestAnimationFrame(() => {
+      const el = ta.current;
+      if (!el) return;
+      el.focus();
+      const ph = firstPlaceholder(p.text);
+      if (ph) el.setSelectionRange(base.length + ph[0], base.length + ph[1]); // the first {{blank}} is selected, ready to type over
+      else el.setSelectionRange(next.length, next.length);
+    });
+  };
+
+  /** Arrow keys, Enter, Tab and Escape inside the prompt list. Returns true when the key was used. */
+  const promptKey = (e: React.KeyboardEvent): boolean => {
+    if (!pickerVisible) return false;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (slashMode) setDismissedFor(text); closePrompts(); ta.current?.focus(); return true; }
+    if (!promptItems.length) return false;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => (i + 1) % promptItems.length); return true; }
+    if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => (i - 1 + promptItems.length) % promptItems.length); return true; }
+    if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) { e.preventDefault(); pickPrompt(promptItems[Math.min(active, promptItems.length - 1)]); return true; }
+    return false;
+  };
+
   const tooLong = text.length > MAX_CHARS;
   const waitingForReply = busy && files.length > 0; // the queue holds text only, so attachments go out once the reply is done
   const canSend = (!!text.trim() || files.length > 0) && !tooLong && !offline && !waitingForReply;
@@ -116,6 +160,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // keyCode 229 = an IME (Japanese, Chinese...) is composing; Enter then confirms the candidate, not the message.
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (slashMode && promptKey(e)) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       submit();
@@ -155,6 +200,24 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           ))}
         </ul>
       )}
+      {pickerVisible && (
+        <div className="prompt-picker" role="group" aria-label="Insert a saved prompt">
+          {promptsOpen && (
+            <input className="prompt-filter" autoFocus aria-label="Search prompts" placeholder="Search saved prompts…" value={promptFilter} onChange={(e) => setPromptFilter(e.target.value)} onKeyDown={(e) => { promptKey(e); }} />
+          )}
+          <PromptList items={promptItems} active={active} loading={prompts.loading} error={prompts.error} total={prompts.all.length} onPick={pickPrompt} onHover={setActive} onRetry={prompts.reload} />
+          <div className="prompt-foot small">
+            {slashMode ? <span className="muted">Enter to insert · Esc to close</span> : savingPrompt ? (
+              <SaveAsPrompt text={text.trim()} projectDir={projectDir} onSaved={closePrompts} onCancel={() => setSavingPrompt(false)} />
+            ) : (
+              <>
+                {text.trim() && <button className="link small" onClick={() => setSavingPrompt(true)}>Save this message as a prompt…</button>}
+                <a className="link small" href="#/prompts" onClick={closePrompts}>Manage prompts</a>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {files.length > 0 && (
         <ul className="att-draft" aria-label="Files to send">
           {files.map((f, i) => (
@@ -169,12 +232,15 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
       )}
       <div className={`composer${tooLong ? " too-long" : ""}`}>
         <input ref={picker} type="file" multiple hidden accept={ACCEPT} aria-hidden="true" tabIndex={-1} onChange={(e) => { addFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
+        <button className="icon-btn attach-btn" aria-label="Insert a saved prompt" aria-expanded={promptsOpen} title="Saved prompts (or type /)" onClick={() => { setPromptsOpen((o) => !o); setSavingPrompt(false); setPromptFilter(""); }}>📋</button>
         <button className="icon-btn attach-btn" aria-label="Attach files" title="Attach images or text files (or drop or paste them)" disabled={offline} onClick={() => picker.current?.click()}>📎</button>
         <textarea
           ref={ta}
           value={text}
           rows={1}
           aria-label="Message"
+          aria-controls={slashMode ? "prompt-listbox" : undefined}
+          aria-activedescendant={slashMode && promptItems[active] ? `prompt-opt-${promptItems[active].id}` : undefined}
           placeholder={offline ? "Reconnecting to Pheme…" : busy ? "Pheme is replying. Type to queue a follow-up…" : placeholder}
           onChange={(e) => { histIdx.current = -1; update(e.target.value); }}
           onKeyDown={onKeyDown}

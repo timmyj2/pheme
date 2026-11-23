@@ -260,3 +260,16 @@ kbd { font-family: var(--dt-font-mono); font-size: 12px; }
 .att-loading { display: block; padding: 20px 12px; font-size: 12px; color: var(--muted-foreground); }
 .att-chip { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; font-size: 12px; color: var(--foreground); cursor: pointer; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .att-chip.gone { cursor: default; color: var(--muted-foreground); }
+
+.prompt-picker { border: 1px solid var(--border); border-radius: 10px; background: var(--card, var(--background)); padding: 6px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 6px; max-height: 300px; }
+.prompt-filter { width: 100%; }
+.prompt-pop ul { list-style: none; margin: 0; padding: 0; max-height: 200px; overflow-y: auto; }
+.prompt-pop li { display: flex; flex-direction: column; padding: 5px 8px; border-radius: 6px; cursor: pointer; min-width: 0; }
+.prompt-pop li.active, .prompt-pop li:hover { background: var(--muted, rgba(128,128,128,.18)); }
+.prompt-opt-name { font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
+.prompt-opt-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-foot { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.prompt-save { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.prompt-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.prompt-preview { white-space: pre-wrap; overflow-wrap: anywhere; }
+.row .grow { flex: 1; min-width: 0; }

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AgentStore, Semaphore } from "./agents.ts";
+import { PromptStore } from "./prompts.ts";
 import { AttachmentStore, readForEngine, type AttachmentRef } from "./attachments.ts";
 import type { Engine, EngineEvent, EngineSession, PermissionAnswer, PermissionRequest } from "./engine.ts";
 import { Curator } from "./curator.ts";
@@ -50,6 +51,7 @@ export function titleFrom(text: string): string {
 export class App {
   readonly store: ChatStore;
   readonly attachments: AttachmentStore;
+  readonly prompts: PromptStore;
   readonly settings: SettingsStore;
   readonly memory: MemoryStore;
   readonly skills: SkillStore;
@@ -69,6 +71,7 @@ export class App {
   constructor(readonly dataDir: string, readonly engine: Engine) {
     this.store = new ChatStore(dataDir);
     this.attachments = new AttachmentStore(dataDir);
+    this.prompts = new PromptStore(dataDir);
     try { this.attachments.sweepAll(); } catch { /* a stuck cleanup must never stop the app starting */ }
     this.settings = new SettingsStore(dataDir);
     this.memory = new MemoryStore(dataDir, () => {

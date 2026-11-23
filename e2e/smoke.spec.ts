@@ -230,6 +230,69 @@ test.describe("Pheme in a real browser", () => {
     await expect(page.getByRole("list", { name: "Files to send" }).getByText("data.csv")).toBeVisible();
   });
 
+  test("prompt library: save a prompt on the Prompts page, insert it with / in a chat, and the blank is selected", async ({ page }) => {
+    await open(page, "#/prompts");
+    await page.getByRole("button", { name: "New prompt" }).click();
+    const form = page.getByRole("group", { name: "New prompt" });
+    await form.getByLabel("Name").fill("Explain simply");
+    await form.getByLabel("Text").fill("Explain {{this concept}} to me as if I am new to it.");
+    await form.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Explain simply")).toBeVisible();
+    // the same name again is refused with a reason
+    await page.getByRole("button", { name: "New prompt" }).click();
+    await form.getByLabel("Name").fill("explain SIMPLY");
+    await form.getByLabel("Text").fill("dup");
+    await form.getByRole("button", { name: "Save" }).click();
+    await expect(form.getByRole("alert")).toContainText("already have a prompt");
+    await form.getByRole("button", { name: "Cancel" }).click();
+
+    await page.goto(`/?token=${TOKEN}#/`);
+    const box = composer(page);
+    await box.click();
+    await box.pressSequentially("/expl");
+    const option = page.getByRole("option", { name: /Explain simply/ });
+    await expect(option).toBeVisible();
+    await box.press("Enter"); // inserts, does not send
+    await expect(box).toHaveValue("Explain {{this concept}} to me as if I am new to it.");
+    await expect.poll(() => box.evaluate((t: HTMLTextAreaElement) => t.value.slice(t.selectionStart, t.selectionEnd))).toBe("{{this concept}}");
+    await expect(page).not.toHaveURL(/#\/chat\//); // nothing was sent
+    await page.keyboard.type("recursion"); // typing replaces the selected blank
+    await expect(box).toHaveValue("Explain recursion to me as if I am new to it.");
+    // clean up so other tests see an empty library
+    await page.goto(`/?token=${TOKEN}#/prompts`);
+    await page.getByRole("button", { name: "Delete Explain simply" }).click();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(page.getByText("Explain simply")).toHaveCount(0);
+  });
+
+  test("installable: manifest and icons are public, Chrome finds nothing blocking install, no service worker, and a fresh window reuses the saved key", async ({ page, context, request }) => {
+    await open(page);
+    await expect(page.getByRole("button", { name: "New chat" })).toBeVisible();
+    // the manifest and icons are plain public files (the API still needs the key)
+    const m = await request.get("/manifest.webmanifest");
+    expect(m.status()).toBe(200);
+    expect(m.headers()["content-type"]).toBe("application/manifest+json");
+    expect((await m.json()).display).toBe("standalone");
+    for (const f of ["/icon-192.png", "/icon-512.png", "/icon-maskable-512.png"]) {
+      const r = await request.get(f);
+      expect(r.status(), f).toBe(200);
+      expect(r.headers()["content-type"], f).toBe("image/png");
+    }
+    expect((await request.get("/api/state")).status()).toBe(401);
+    // Chrome's own installability check
+    const cdp = await context.newCDPSession(page);
+    const { installabilityErrors } = (await cdp.send("Page.getInstallabilityErrors")) as { installabilityErrors: { errorId: string }[] };
+    // (the test browser runs like a private window, which Chrome always reports; anything else would be a real problem)
+    expect(installabilityErrors.map((e) => e.errorId).filter((id) => id !== "in-incognito")).toEqual([]);
+    // nothing is cached or intercepted
+    expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
+    // an installed window starts with no address key and empty tab storage: it picks up the key this browser saved
+    const fresh = await context.newPage();
+    await fresh.goto("/");
+    await expect(fresh.getByRole("button", { name: "New chat" })).toBeVisible();
+    await fresh.close();
+  });
+
   test("backup downloads a file that previews as a valid backup", async ({ page }) => {
     await open(page, "#/settings");
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download backup" }).click()]);

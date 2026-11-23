@@ -50,6 +50,12 @@ Options: `--port <n>`, `--no-open`, `--data-dir <path>`, `--fake`.
 - **Scheduled jobs:** daily, every-N-minutes or one-time prompts. Jobs run only while Pheme is open; a missed job runs once at start. A job can run commands or edit files only if you allowed that when you created it.
 - **Appearance:** 11 themes with light/dark/system modes. **Ctrl+K** opens the command palette. Shortcuts can be changed in Settings.
 - **Projects and Git:** give a chat a project folder; Copilot works there. The **Changes** panel shows changed files and diffs, and lets you commit (you pick the files and confirm; it never commits on `main` without a new branch, and asks before committing anything that looks like a secret), undo the last commit, push, and open a pull request with the GitHub CLI (`gh`). It never force-pushes. Without `gh`, it offers a link to open the pull request on GitHub.
+- **Branches and stash:** switch or create branches from the Changes panel. If a switch would overwrite your unsaved work, Pheme asks first and can set the work aside (stash) for you; restoring is one click. Nothing is ever discarded.
+- **Pull request status:** once a pull request is open, the panel shows each check (failing ones first), the review state and whether it can merge. It refreshes while checks are running.
+- **Attachments:** attach images (PNG, JPG, GIF, WebP, up to 5 MB) and plain-text or code files (up to 512 KB), by the 📎 button, drag and drop, or pasting a screenshot. Up to 5 per message. Files that look like secrets (`.env`, keys, credentials) are refused. Attachments are sent once any reply in progress has finished.
+- **Prompt library:** save messages you reuse (Prompts page, or "Save this message as a prompt" in the 📋 menu). Insert one with the 📋 button or by typing `/`. Write `{{like this}}` for a blank; the first one is selected for you to type over. A prompt can be limited to one project folder.
+- **Context meter:** shows how full the model's memory is for this chat (for example "105k / 128k"), and warns in words as it fills.
+- **Install as an app:** in Chrome or Edge, use the install icon in the address bar (or the menu, "Install Pheme"). The installed window remembers the last access key, so after starting Pheme once with the launcher you can open the app directly. If the key is out of date it tells you to start Pheme again. Pheme has no service worker, so nothing is cached.
 - **Per-chat model**, **export a chat to Markdown**, and **search inside message text**.
 - **Desktop notifications** (reply ready, approval needed), **backup and restore** of all your data, and **settings search**, all in Settings.
 - Background reviews use the cheapest model available (changeable in Settings), and Settings shows a usage counter. One switch turns all learning loops off.
@@ -62,6 +68,7 @@ npm run typecheck && npm run lint && npm test
 npm run build          # dist/pheme.mjs
 npm run smoke          # runs the built file alone in an empty folder, fake mode
 npm run e2e            # browser tests (Playwright); set PW_CHANNEL=chrome to use an installed Chrome
+npm run verify         # every check CI runs, in order, stopping at the first failure (add -- --e2e for the browser tests)
 node dist/pheme.mjs --fake
 ```
 

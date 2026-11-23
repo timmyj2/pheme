@@ -38,3 +38,5 @@ Build all six, stress test each as it lands, fix any bug the stress tests find, 
 5. Context meter from the SDK `session.usage_info` event (currentTokens / tokenLimit).
 6. Installable app (PWA): manifest and icons; no caching of the app shell or API.
 Rule for every push: `npm run lint && npm run typecheck && npm test` first (CI lints scripts/ and e2e/ too).
+
+Status of the six: all built and tested on branch feat/git-workflow (see PROGRESS.md). Ideas not started: attachments in backups, queueing a message with attachments, prompt import/export, a "resolve conflicts" helper in the Git panel, an install button inside Settings.

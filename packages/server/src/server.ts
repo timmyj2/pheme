@@ -240,6 +240,15 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (seg[2] === "events" && m === "GET") return sse(req, res, id, Number(url.searchParams.get("after") ?? 0));
     }
 
+    // --- saved prompts
+    if (seg[0] === "prompts") {
+      if (seg.length === 1 && m === "GET") return json(res, 200, app.prompts.list());
+      if (seg.length === 1 && m === "POST") return json(res, 201, app.prompts.create(body));
+      if (seg.length === 2 && m === "PUT") return json(res, 200, app.prompts.update(seg[1], body));
+      if (seg.length === 2 && m === "DELETE") { app.prompts.remove(seg[1]); return json(res, 200, { ok: true }); }
+      throw new HttpError(405, "not allowed");
+    }
+
     // --- scheduled jobs
     if (seg[0] === "jobs") {
       try {

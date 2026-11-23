@@ -6,6 +6,7 @@ import { ConfirmDialog } from "./Dialog.tsx";
 import { clearUnsaved, hasUnsaved } from "./unsaved.ts";
 import { NOTIFY_CHANGED, notifyEnabled, useNotifications } from "./notify.ts";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
+import { PromptsPage } from "./Prompts.tsx";
 import { JobsPage } from "./Jobs.tsx";
 import { MemoryPage, SettingsPage, SkillsPage } from "./Pages.tsx";
 import { Palette, type Command } from "./Palette.tsx";
@@ -23,6 +24,9 @@ import { useRoute, type View } from "./router.ts";
 
 const NARROW = "(max-width: 820px)";
 const HIDE_KEY = "pheme-sidebar-hidden";
+
+/** True in a window opened from an installed Pheme app (no address bar), as opposed to a normal browser tab. */
+export const isInstalledApp = () => typeof window !== "undefined" && !!window.matchMedia?.("(display-mode: standalone)").matches;
 
 export function App() {
   const toast = useToast();
@@ -91,7 +95,7 @@ export function App() {
 
   // Window title: the chat's name, with a dot while it is working.
   useEffect(() => {
-    const names: Record<string, string> = { skills: "Skills", memory: "Memory", agents: "Agents", jobs: "Scheduled jobs", settings: "Settings" };
+    const names: Record<string, string> = { skills: "Skills", memory: "Memory", agents: "Agents", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" };
     const name = route.view === "chat" ? (activeChat?.title ?? "New chat") : names[route.view];
     document.title = `${activeBusy && route.view === "chat" ? "● " : ""}${name} · Pheme`;
   }, [route, activeChat?.title, activeBusy]);
@@ -227,6 +231,7 @@ export function App() {
       { id: "skills", label: "Go to Skills", run: () => go({ view: "skills", name: null }) },
       { id: "memory", label: "Go to Memory", run: () => go({ view: "memory" }) },
       { id: "agents", label: "Go to Agents", run: () => go({ view: "agents" }) },
+      { id: "prompts", label: "Go to Prompts", run: () => go({ view: "prompts" }) },
       { id: "jobs", label: "Go to Scheduled jobs", run: () => go({ view: "jobs" }) },
       { id: "settings", label: "Go to Settings", run: () => go({ view: "settings" }) },
       { id: "help", label: "Keyboard shortcuts", hint: "?", run: () => setHelp(true) },
@@ -253,8 +258,10 @@ export function App() {
     return (
       <div className="fatal">
         <h1>Pheme</h1>
-        <p>{conn.status === "unauthorized" ? "This tab's access key is no longer valid." : conn.error}</p>
-        <p className="muted">Open Pheme from the link printed in the terminal window (it contains a one-time key), or restart Pheme and use the new link.</p>
+        <p>{conn.status === "unauthorized" ? (isInstalledApp() ? "This app window's access key is out of date." : "This tab's access key is no longer valid.") : conn.error}</p>
+        <p className="muted">{isInstalledApp()
+          ? "Pheme makes a new key each time it starts. Start Pheme again (start-pheme, or the terminal command you used). It opens a browser tab that refreshes the key, then press Try again here."
+          : "Open Pheme from the link printed in the terminal window (it contains a one-time key), or restart Pheme and use the new link."}</p>
         <button className="btn" onClick={() => void conn.retry()}>Try again</button>
       </div>
     );
@@ -263,7 +270,7 @@ export function App() {
 
   const view: View = route.view;
   const offline = conn.status === "offline";
-  const pageTitle = view === "chat" ? (activeChat?.title ?? "New chat") : { skills: "Skills", memory: "Memory", agents: "Agents", jobs: "Scheduled jobs", settings: "Settings" }[view];
+  const pageTitle = view === "chat" ? (activeChat?.title ?? "New chat") : { skills: "Skills", memory: "Memory", agents: "Agents", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" }[view];
   const shellClass = `shell${hidden ? " sidebar-hidden" : ""}${drawer ? " drawer-open" : ""}`;
 
   return (
@@ -323,6 +330,7 @@ export function App() {
           {view === "skills" && <SkillsPage name={route.view === "skills" ? route.name : null} onOpen={(name) => navigate({ view: "skills", name }, { replace: true })} />}
           {view === "memory" && <MemoryPage />}
           {view === "agents" && <AgentsPage onOpenChat={openChat} />}
+          {view === "prompts" && <PromptsPage />}
           {view === "jobs" && <JobsPage onOpenChat={openChat} />}
           {view === "settings" && <SettingsPage state={state} onChange={(settings) => conn.setState({ ...state, settings })} />}
         </ErrorBoundary>

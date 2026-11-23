@@ -157,6 +157,29 @@ for (const [p, b] of [[`/chats/${chat}/git/commit`, { message: 5, paths: "x" }],
   check("deleting a chat deletes its attachments", !fs.existsSync(path.join(data, "attachments", c4)));
 }
 
+// ---- prompts
+{
+  const mk = (b) => J("/prompts", { method: "POST", body: JSON.stringify(b) });
+  const par = await time("60 parallel prompt creates", async () => (await Promise.all(Array.from({ length: 60 }, (_, i) => mk({ name: `p${i}`, text: `text ${i}` })))).map((r) => r.s));
+  check("all 60 created (no lost writes)", par.every((c) => c === 201) && (await J("/prompts")).j.length === 60);
+  const dup = await Promise.all(Array.from({ length: 10 }, () => mk({ name: "same", text: "x" })));
+  check("10 parallel creates of one name: exactly one wins, the rest 409", dup.filter((r) => r.s === 201).length === 1 && dup.filter((r) => r.s === 409).length === 9);
+  for (let i = 0; i < 138; i++) await mk({ name: `fill${i}`, text: "t" });
+  check("199 saved, one more fits", (await mk({ name: "last", text: "t" })).s === 201);
+  check("the 201st is refused", (await mk({ name: "overflow", text: "t" })).s === 409);
+  const list = await time("list 200 prompts", async () => (await J("/prompts")).j);
+  check("sorted by name, all present", list.length === 200 && list.every((p, i) => i === 0 || list[i - 1].name.localeCompare(p.name, undefined, { sensitivity: "base" }) <= 0));
+  for (const body of [{ name: "x".repeat(81), text: "t" }, { name: "n", text: "x".repeat(20001) }, { name: "n", text: "a\u0000b" }, { name: {}, text: "t" }, { name: "n", text: "t", projectDir: 5 }, { name: "n", text: "t", projectDir: "x".repeat(501) }]) {
+    const r = await mk(body); check(`prompt ${JSON.stringify(body).slice(0, 36)}... -> 4xx`, r.s >= 400 && r.s < 500, `(${r.s})`);
+  }
+  const big = await mk({ name: "biggest", text: "y".repeat(20000) });
+  check("a 20,000-character prompt is fine", big.s === 409 || big.s === 201, `(${big.s})`); // 409 only because the library is full
+  const del = await Promise.all(list.slice(0, 50).map((p) => J(`/prompts/${p.id}`, { method: "DELETE" })));
+  check("50 parallel deletes all succeed", del.every((r) => r.s === 200) && (await J("/prompts")).j.length === 150);
+  const again = await J(`/prompts/${list[0].id}`, { method: "DELETE" });
+  check("deleting twice -> 404", again.s === 404);
+}
+
 srv.kill();
 await new Promise((r) => setTimeout(r, 500));
 {

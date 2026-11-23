@@ -48,6 +48,25 @@ describe("useConnection", () => {
     expect(h.result.current.error).toBe("bad token");
   });
 
+  it("a rejected key is replaced by a newer one another window saved, and the connection recovers on its own", async () => {
+    sessionStorage.setItem("pheme-token", "old"); localStorage.setItem("pheme-token", "newer");
+    state.mockRejectedValueOnce(new ApiError(401, "bad token")).mockResolvedValue(S);
+    const h = renderHook(() => useConnection());
+    await waitFor(() => expect(h.result.current.status).toBe("online"));
+    expect(sessionStorage.getItem("pheme-token")).toBe("newer");
+    expect(state).toHaveBeenCalledTimes(2);
+    sessionStorage.clear(); localStorage.clear();
+  });
+
+  it("does not loop when the saved key is the same one that was rejected", async () => {
+    sessionStorage.setItem("pheme-token", "same"); localStorage.setItem("pheme-token", "same");
+    state.mockRejectedValue(new ApiError(401, "bad token"));
+    const h = renderHook(() => useConnection());
+    await waitFor(() => expect(h.result.current.status).toBe("unauthorized"));
+    expect(state.mock.calls.length).toBeLessThanOrEqual(2);
+    sessionStorage.clear(); localStorage.clear();
+  });
+
   it("reports the first failure as an error when there is no state yet", async () => {
     state.mockRejectedValue(new ApiError(0, "Can't reach Pheme."));
     const h = renderHook(() => useConnection());

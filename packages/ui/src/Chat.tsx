@@ -123,6 +123,7 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
         offline={offline}
         queue={chat.queue}
         hasMessages={chat.events.length > 0}
+        projectDir={projectDir}
         onSend={send}
         onStop={() => void stop()}
         onRemoveQueued={chat.removeQueued}

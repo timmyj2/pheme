@@ -5,6 +5,7 @@ export type Route =
   | { view: "skills"; name: string | null }
   | { view: "memory" }
   | { view: "agents" }
+  | { view: "prompts" }
   | { view: "jobs" }
   | { view: "settings" };
 
@@ -30,6 +31,7 @@ export function parseHash(hash: string): Route {
       return { view: "skills", name: arg && NAME_RE.test(arg) ? arg : null };
     case "memory":
     case "agents":
+    case "prompts":
     case "jobs":
     case "settings":
       return { view: head };

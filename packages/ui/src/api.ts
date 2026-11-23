@@ -2,6 +2,7 @@ import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, Seq
 
 export type { BackupPreview } from "../../server/src/backup.ts";
 import type { AttachmentRef } from "../../server/src/attachments.ts";
+export type { Prompt } from "../../server/src/prompts.ts";
 export type { AttachmentRef } from "../../server/src/attachments.ts";
 export type { BranchList, BranchInfo, StashEntry } from "../../server/src/gitbranch.ts";
 export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo, PrDetail, PrCheck } from "../../server/src/git.ts";
@@ -10,16 +11,31 @@ export type ChatRow = ChatMeta & { busy?: boolean; /** A tool is waiting for the
 
 const KEY = "pheme-token";
 
-/** The launcher opens /?token=...; keep it for this tab and take it out of the address bar. */
+/**
+ * The launcher opens /?token=...; keep it for this tab and take it out of the address bar. A copy is also kept in this
+ * browser's local storage, so an installed Pheme window (which starts with no address and no tab storage) can pick up the
+ * key from the last time Pheme was opened. Each Pheme start makes a new key, so an old copy simply stops working.
+ */
 export function initToken(): string {
   const url = new URL(window.location.href);
   const t = url.searchParams.get("token");
   if (t) {
     sessionStorage.setItem(KEY, t);
+    try { localStorage.setItem(KEY, t); } catch { /* private mode: this tab still works */ }
     url.searchParams.delete("token");
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
   }
+  if (!sessionStorage.getItem(KEY)) adoptSharedToken();
   return sessionStorage.getItem(KEY) ?? "";
+}
+
+/** Take the newest key another window of this Pheme saved. Returns true when it differs from the one this tab has. */
+export function adoptSharedToken(): boolean {
+  let shared: string | null = null;
+  try { shared = localStorage.getItem(KEY); } catch { return false; }
+  if (!shared || shared === sessionStorage.getItem(KEY)) return false;
+  sessionStorage.setItem(KEY, shared);
+  return true;
 }
 export const token = () => sessionStorage.getItem(KEY) ?? "";
 
@@ -133,6 +149,10 @@ export const api = {
   skill: (name: string) => call<{ name: string; content: string; files: string[] }>(`/skills/${encodeURIComponent(name)}`),
   saveSkill: (name: string, content: string) => call<{ ok: boolean }>(`/skills/${encodeURIComponent(name)}`, "PUT", { content }),
   archiveSkill: (name: string) => call<{ ok: boolean }>(`/skills/${encodeURIComponent(name)}`, "DELETE"),
+  prompts: () => call<import("../../server/src/prompts.ts").Prompt[]>("/prompts"),
+  createPrompt: (b: { name: string; text: string; projectDir?: string }) => call<import("../../server/src/prompts.ts").Prompt>("/prompts", "POST", b),
+  updatePrompt: (id: string, b: { name?: string; text?: string; projectDir?: string }) => call<import("../../server/src/prompts.ts").Prompt>(`/prompts/${id}`, "PUT", b),
+  deletePrompt: (id: string) => call<{ ok: boolean }>(`/prompts/${id}`, "DELETE"),
   jobs: () => call<Job[]>("/jobs"),
   createJob: (j: { name: string; prompt: string; schedule: JobSchedule; allowActions: boolean }) => call<Job>("/jobs", "POST", j),
   updateJob: (id: string, patch: Partial<Pick<Job, "enabled" | "name" | "prompt">>) => call<Job>(`/jobs/${id}`, "PUT", patch),
