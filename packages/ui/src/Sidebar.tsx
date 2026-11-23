@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Menu, type MenuItem } from "./Menu.tsx";
 import { api, type ChatRow, type SearchHit } from "./api.ts";
 import type { View } from "./router.ts";
-import { ALT } from "./shortcuts.ts";
+import { formatCombo } from "./keybindings.ts";
+import { useBindings } from "./useBindings.ts";
 
 /** Rows rendered before "Show more": keeps the sidebar fast with thousands of chats. */
 export const ROW_LIMIT = 150;
@@ -144,6 +145,7 @@ export function Sidebar(props: {
   onDelete: (c: ChatRow) => void;
   onExport: (c: ChatRow) => void;
 }) {
+  const keys = useBindings();
   const [q, setQ] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [limit, setLimit] = useState(ROW_LIMIT);
@@ -181,7 +183,7 @@ export function Sidebar(props: {
   return (
     <aside className="sidebar" aria-label="Sidebar">
       <Brand />
-      <button className="btn primary new-chat" onClick={props.onNew} title={`New chat (${ALT}+N)`}>New chat</button>
+      <button className="btn primary new-chat" onClick={props.onNew} title={`New chat (${formatCombo(keys.new)})`}>New chat</button>
       <input
         ref={props.searchRef}
         className="search"

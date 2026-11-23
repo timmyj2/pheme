@@ -204,3 +204,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .restore-preview ul { margin: 0; padding-left: 18px; }
 label.btn { cursor: pointer; display: inline-flex; align-items: center; } label.btn.disabled { opacity: .5; pointer-events: none; }
 label.btn:focus-within { outline: 2px solid var(--dt-ring); outline-offset: 2px; }
+
+.panel[hidden] { display: none; }
+.settings-find { padding: 0 24px 4px; }
+.settings-find input { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--dt-border); background: var(--dt-background); color: var(--dt-foreground); font: inherit; }
+.key-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.key-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.key-btn { min-width: 96px; justify-content: center; } .key-btn.capturing { outline: 2px solid var(--dt-ring); }
+.key-msg { flex-basis: 100%; margin: 0; }
+kbd { font-family: var(--dt-font-mono); font-size: 12px; }
