@@ -59,3 +59,6 @@ Automated: `packages/server/test/e2e.test.ts`. A chat with 12 tool steps trigger
 
 ## UI stress round (2026-11-22)
 Hermes-style UI pass: markdown, 11 themes with contrast checks, queue-while-busy, history, drafts, reconnect, drawer. 346 tests, stress 20/20, smoke ok.
+
+## Test-everything round (2026-11-22)
+Browser-tested pages, keyboard/a11y, two tabs, fresh install, real Copilot (2 requests). Fixed: unsaved-edit guard, page scrollbar, job interval validation, agent name lock, sidebar tab stop/focus, unknown CLI flags, license texts. Release zip v0.1.0 re-uploaded with current build. 354 tests, CI green.
