@@ -116,4 +116,41 @@ describe("Sidebar", () => {
     expect(screen.getByText("Zeta")).toBeInTheDocument();
     expect(screen.queryByText("Alpha")).toBeNull();
   });
+
+  it("is a single Tab stop (the open chat, else the first), with arrows/Home/End moving across groups", async () => {
+    const user = userEvent.setup();
+    setup([chat("a", "Alpha", 1000), chat("b", "Beta", DAY), chat("c", "Gamma", 30 * DAY)], { activeId: "b" });
+    const rows = screen.getAllByRole("button").filter((b) => b.classList.contains("chat-row"));
+    expect(rows.map((r) => r.tabIndex)).toEqual([-1, 0, -1]); // open chat "Beta" is the tab stop
+    screen.getAllByLabelText(/^Actions for/).forEach((b) => expect(b.tabIndex).toBe(-1));
+    rows[1].focus();
+    await user.keyboard("{ArrowDown}");
+    expect(rows[2]).toHaveFocus(); // crossed into the "Older" group
+    await user.keyboard("{Home}");
+    expect(rows[0]).toHaveFocus();
+    await user.keyboard("{End}");
+    expect(rows[2]).toHaveFocus();
+    await user.keyboard("{ArrowUp}{ArrowUp}{ArrowUp}");
+    expect(screen.getByRole("searchbox", { name: /search/i })).toHaveFocus();
+  });
+
+  it("falls back to the first row as the Tab stop when no chat is open", () => {
+    setup([chat("a", "Alpha", 1000), chat("b", "Beta", 2000)]);
+    const rows = screen.getAllByRole("button").filter((b) => b.classList.contains("chat-row"));
+    expect(rows.map((r) => r.tabIndex)).toEqual([0, -1]);
+  });
+
+  it("returns focus to the row after a rename is committed or cancelled with the keyboard", async () => {
+    const user = userEvent.setup();
+    const p = setup([chat("a", "Alpha", 1000)]);
+    const row = () => screen.getAllByRole("button").find((b) => b.classList.contains("chat-row"))!;
+    row().focus();
+    await user.keyboard("{F2}");
+    expect(screen.getByLabelText("Chat title")).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(row()).toHaveFocus();
+    await user.keyboard("{F2}Renamed{Enter}");
+    expect(p.onRename).toHaveBeenCalled();
+    expect(row()).toHaveFocus();
+  });
 });

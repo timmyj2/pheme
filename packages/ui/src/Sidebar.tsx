@@ -44,15 +44,22 @@ export function groupChats(chats: ChatRow[], now = Date.now()): Group[] {
   return buckets.filter((b) => b.chats.length);
 }
 
-function Item({ c, active, unread, onOpen, onRename, onPin, onArchive, onDelete }: {
-  c: ChatRow; active: boolean; unread: boolean;
+function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, onDelete }: {
+  c: ChatRow; active: boolean; unread: boolean; tabStop: boolean;
   onOpen: () => void; onRename: (t: string) => void; onPin: () => void; onArchive: () => void; onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(c.title);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (editing) { input.current?.focus(); input.current?.select(); } }, [editing]);
+  const rowBtn = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (editing) { input.current?.focus(); input.current?.select(); }
+    // Finishing a rename (Enter/Esc) puts the keyboard back on the row instead of dropping it on the page.
+    else if (wasEditing.current && (!document.activeElement || document.activeElement === document.body)) rowBtn.current?.focus();
+    wasEditing.current = editing;
+  }, [editing]);
 
   const items: MenuItem[] = [
     { label: "Rename", run: () => { setDraft(c.title); setEditing(true); } },
@@ -67,7 +74,12 @@ function Item({ c, active, unread, onOpen, onRename, onPin, onArchive, onDelete 
   };
 
   return (
-    <li className={`chat-item${active ? " active" : ""}`} data-chat-id={c.id} onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
+    <li className={`chat-item${active ? " active" : ""}`} data-chat-id={c.id} onContextMenu={(e) => {
+      e.preventDefault();
+      // From the keyboard (Menu key / Shift+F10) there are no pointer coordinates: open it under the row.
+      const r = e.currentTarget.getBoundingClientRect();
+      setMenu(e.clientX === 0 && e.clientY === 0 ? { x: r.left + 24, y: r.bottom } : { x: e.clientX, y: e.clientY });
+    }}>
       {editing ? (
         <input
           ref={input}
@@ -85,14 +97,21 @@ function Item({ c, active, unread, onOpen, onRename, onPin, onArchive, onDelete 
       ) : (
         <button
           className="chat-row"
+          ref={rowBtn}
+          tabIndex={tabStop ? 0 : -1}
           onClick={onOpen}
           onDoubleClick={() => { setDraft(c.title); setEditing(true); }}
           aria-current={active ? "page" : undefined}
           title={c.title}
           onKeyDown={(e) => {
-            const row = e.currentTarget.closest("li");
-            if (e.key === "ArrowDown") { e.preventDefault(); (row?.nextElementSibling?.querySelector(".chat-row") as HTMLElement | null)?.focus(); }
-            else if (e.key === "ArrowUp") { e.preventDefault(); (row?.previousElementSibling?.querySelector(".chat-row") as HTMLElement | null)?.focus(); }
+            // The list is one Tab stop; arrows (also Home/End) move between rows, across date groups.
+            const rows = [...(e.currentTarget.closest("nav")?.querySelectorAll<HTMLElement>(".chat-row") ?? [])];
+            const i = rows.indexOf(e.currentTarget);
+            const go = (n: number) => { e.preventDefault(); rows[Math.max(0, Math.min(rows.length - 1, n))]?.focus(); };
+            if (e.key === "ArrowDown") go(i + 1);
+            else if (e.key === "ArrowUp") { if (i === 0) { e.preventDefault(); (e.currentTarget.closest("nav")?.parentElement?.querySelector<HTMLElement>("input[aria-label=\"Search chats\"]") ?? document.querySelector<HTMLElement>("input[aria-label=\"Search chats\"]"))?.focus(); } else go(i - 1); }
+            else if (e.key === "Home") go(0);
+            else if (e.key === "End") go(rows.length - 1);
             else if (e.key === "F2") { e.preventDefault(); setDraft(c.title); setEditing(true); }
             else if (e.key === "Delete") { e.preventDefault(); onDelete(); }
           }}
@@ -102,7 +121,7 @@ function Item({ c, active, unread, onOpen, onRename, onPin, onArchive, onDelete 
         </button>
       )}
       {!editing && (
-        <button className="icon-btn row-more" aria-label={`Actions for ${c.title}`} aria-haspopup="menu" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4 }); }}>⋯</button>
+        <button className="icon-btn row-more" tabIndex={-1} aria-label={`Actions for ${c.title}`} aria-haspopup="menu" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4 }); }}>⋯</button>
       )}
       {menu && <Menu x={menu.x} y={menu.y} items={items} onClose={() => setMenu(null)} />}
     </li>
@@ -137,6 +156,9 @@ export function Sidebar(props: {
 
   let budget = limit;
   const shownGroups = groups.map((g) => { const chats = g.chats.slice(0, Math.max(0, budget)); budget -= chats.length; return { ...g, chats }; }).filter((g) => g.chats.length);
+  // Roving tab stop: the open chat, else the first row, so Tab skips the rest of the list.
+  const shown = shownGroups.flatMap((g) => g.chats);
+  const tabStopId = (shown.find((c) => c.id === props.activeId && props.view === "chat") ?? shown[0])?.id;
   const hiddenCount = rows.length - shownGroups.reduce((n, g) => n + g.chats.length, 0);
 
   const navLabel: Record<string, string> = { skills: "Skills", memory: "Memory", agents: "Agents", jobs: "Scheduled jobs", settings: "Settings" };
@@ -165,6 +187,7 @@ export function Sidebar(props: {
                   c={c}
                   active={c.id === props.activeId && props.view === "chat"}
                   unread={props.unread.has(c.id)}
+                  tabStop={c.id === tabStopId}
                   onOpen={() => props.onOpen(c.id)}
                   onRename={(t) => props.onRename(c, t)}
                   onPin={() => props.onPin(c)}
