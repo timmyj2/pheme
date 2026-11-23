@@ -127,7 +127,7 @@ export async function searchLimited(store: ChatStore, query: string, opts: { log
   if (running >= MAX_SEARCHES) {
     if (queue.length >= MAX_QUEUED) return "busy";
     await new Promise<void>((resolve) => queue.push(resolve));
-    if (opts.cancelled?.()) { queue.length && queue.shift()?.(); return { hits: [], partial: true }; }
+    if (opts.cancelled?.()) { queue.shift()?.(); return { hits: [], partial: true }; }
   }
   running++;
   const p = searchMessages(store, query, opts).finally(() => {
