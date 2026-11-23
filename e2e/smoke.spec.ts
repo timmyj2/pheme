@@ -148,6 +148,49 @@ test.describe("Pheme in a real browser", () => {
     try { fs.rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* left for the OS temp cleanup */ }
   });
 
+  test("branches and stash: create a branch, set work aside, restore it, and a switch that would overwrite asks first", async ({ page }) => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "pheme-e2e-br-"));
+    const git = (...a: string[]) => execFileSync("git", ["-c", "user.name=E2E", "-c", "user.email=e2e@example.com", "-c", "commit.gpgsign=false", ...a], { cwd: repo, encoding: "utf8" }).trim();
+    git("init", "-q", "-b", "main");
+    fs.writeFileSync(path.join(repo, "a.txt"), "base\n"); git("add", "."); git("commit", "-q", "-m", "init");
+    git("switch", "-q", "-c", "other"); fs.writeFileSync(path.join(repo, "a.txt"), "other side\n"); git("commit", "-q", "-am", "other edits a.txt"); git("switch", "-q", "main");
+    fs.writeFileSync(path.join(repo, "a.txt"), "my edit\n");
+
+    await open(page);
+    await send(page, "branch test chat");
+    await expect(page).toHaveURL(/#\/chat\//);
+    await page.getByRole("button", { name: /Choose a project folder/ }).click();
+    await page.getByLabel("Folder path").fill(repo);
+    await page.getByRole("button", { name: "Use this folder" }).click();
+    await page.getByRole("button", { name: /^Changes/ }).click();
+    await page.locator(".branch-pill").click();
+
+    // switching onto a branch that would overwrite the edit asks first and changes nothing
+    await page.getByRole("button", { name: /other/ }).filter({ hasText: "other edits a.txt" }).click();
+    const confirm = page.getByRole("group", { name: "Confirm stash and switch" });
+    await expect(confirm).toBeVisible();
+    expect(git("rev-parse", "--abbrev-ref", "HEAD")).toBe("main");
+    expect(fs.readFileSync(path.join(repo, "a.txt"), "utf8")).toBe("my edit\n");
+    await confirm.getByRole("button", { name: "Set aside and switch" }).click();
+    await expect(page.locator(".stash-list li")).toHaveCount(1);
+    expect(git("rev-parse", "--abbrev-ref", "HEAD")).toBe("other");
+    expect(fs.readFileSync(path.join(repo, "a.txt"), "utf8")).toBe("other side\n");
+
+    // back to main and restore: the edit returns, the stash list empties
+    await page.getByRole("button", { name: /main/ }).filter({ hasText: "init" }).click();
+    await expect.poll(() => git("rev-parse", "--abbrev-ref", "HEAD")).toBe("main");
+    await page.getByRole("button", { name: /^Restore stash/ }).click();
+    await expect(page.locator(".stash-list li")).toHaveCount(0);
+    expect(fs.readFileSync(path.join(repo, "a.txt"), "utf8")).toBe("my edit\n");
+
+    // a new branch keeps the edit
+    await page.getByLabel("Branch to create from here").fill("feat/from-e2e");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect.poll(() => git("rev-parse", "--abbrev-ref", "HEAD")).toBe("feat/from-e2e");
+    expect(fs.readFileSync(path.join(repo, "a.txt"), "utf8")).toBe("my edit\n");
+    try { fs.rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* Windows may still hold the folder */ }
+  });
+
   test("backup downloads a file that previews as a valid backup", async ({ page }) => {
     await open(page, "#/settings");
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download backup" }).click()]);

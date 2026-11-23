@@ -26,3 +26,15 @@ green before merging, one line in `docs/DECISIONS.md`, update `PROGRESS.md`. Rea
 - Windows run on the work computer.
 - Cut v0.2.0 and replace the hand-uploaded zip with a CI-built one.
 - Whether to turn on branch protection and PR-only merges.
+
+
+## Current goal (set 2026-11-23, after v0.2.0)
+Build all six, stress test each as it lands, fix any bug the stress tests find, merge to main when CI is green on Windows and macOS. The owner has pre-approved fixes and merges. Real Copilot runs still cost the owner's Free quota: keep to 2-3 short requests, otherwise use --fake and a fake gh.
+
+1. PR panel: PR status, each CI check, review state, mergeability; refreshes while checks run.
+2. Branch switcher and stash: list/create/switch branches; stash and restore work; never lose changes.
+3. Attach files and images to a message (SDK `attachments`: file and blob).
+4. Prompt library: saved prompts, optionally per project; insert from the composer and palette.
+5. Context meter from the SDK `session.usage_info` event (currentTokens / tokenLimit).
+6. Installable app (PWA): manifest and icons; no caching of the app shell or API.
+Rule for every push: `npm run lint && npm run typecheck && npm test` first (CI lints scripts/ and e2e/ too).

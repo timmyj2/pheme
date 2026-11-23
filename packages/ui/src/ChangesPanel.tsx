@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BranchBar } from "./BranchBar.tsx";
 import { CommitBox } from "./CommitBox.tsx";
 import { ShipBox } from "./ShipBox.tsx";
 import { api, type ChangedFile, type FileDiff, type GitStatus } from "./api.ts";
@@ -91,6 +92,7 @@ export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClos
         <button className="icon-btn" aria-label="Refresh changes" title="Refresh" onClick={onRefresh} disabled={loading}>{loading ? "…" : "↻"}</button>
         <button className="icon-btn" aria-label="Close changes" title="Close" onClick={onClose}>✕</button>
       </header>
+      {status?.repo && !status.problem && status.hasCommits && <BranchBar key={`branch-${chatId}`} chatId={chatId} status={status} busy={busy} onChanged={onRefresh} />}
       <div className="changes-body">
         {error && <p className="notice error" role="alert">{error}</p>}
         {!status && !error && <p className="muted small">Loading…</p>}

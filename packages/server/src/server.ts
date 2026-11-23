@@ -1,6 +1,7 @@
 import { applyBackup, backupFileName, createBackup, previewBackup } from "./backup.ts";
 import { chatToMarkdown, exportFileName, searchLimited } from "./export.ts";
-import { gitCommit, gitCreatePr, gitDiff, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
+import { gitBranches, gitStashApply, gitStashDrop, gitStashList, gitStashPush, gitSwitch } from "./gitbranch.ts";
+import { gitCommit, gitCreatePr, gitDiff, gitPrDetail, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
 import { HttpError } from "./http-error.ts";
 import http from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -149,6 +150,23 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         const file = url.searchParams.get("path");
         if (!file) throw new HttpError(400, "path is required.");
         return json(res, 200, await gitDiff(dir, file));
+      }
+      if (seg[2] === "git" && m === "GET" && ((seg.length === 4 && seg[3] === "branches") || (seg.length === 4 && seg[3] === "stash"))) {
+        if (!meta.projectDir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        return json(res, 200, seg[3] === "branches" ? await gitBranches(meta.projectDir) : await gitStashList(meta.projectDir));
+      }
+      if (seg[2] === "git" && m === "POST" && ((seg.length === 4 && (seg[3] === "switch" || seg[3] === "stash")) || (seg.length === 5 && seg[3] === "stash" && (seg[4] === "apply" || seg[4] === "drop")))) {
+        const dir = meta.projectDir;
+        if (!dir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        if (app.isBusy(id)) throw new HttpError(409, "A reply is running and may still be editing files. Wait for it to finish (or stop it) first.");
+        if (seg[3] === "switch") return json(res, 200, await gitSwitch(dir, { name: String(body.name ?? ""), create: body.create === true, stash: body.stash === true }));
+        if (seg.length === 4) return json(res, 200, await gitStashPush(dir, { message: typeof body.message === "string" ? body.message : "", includeUntracked: body.includeUntracked !== false }));
+        if (seg[4] === "apply") return json(res, 200, await gitStashApply(dir, String(body.sha ?? ""), body.drop !== false));
+        return json(res, 200, await gitStashDrop(dir, String(body.sha ?? "")));
+      }
+      if (seg[2] === "git" && seg.length === 4 && seg[3] === "pr" && m === "GET") {
+        if (!meta.projectDir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        return json(res, 200, { pr: await gitPrDetail(meta.projectDir) });
       }
       if (seg[2] === "git" && seg.length === 4 && seg[3] === "remote" && m === "GET") {
         if (!meta.projectDir) throw new HttpError(400, "Choose a project folder for this chat first.");

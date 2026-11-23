@@ -1,7 +1,8 @@
 import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun, CuratorState } from "../../server/src/protocol.ts";
 
 export type { BackupPreview } from "../../server/src/backup.ts";
-export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo } from "../../server/src/git.ts";
+export type { BranchList, BranchInfo, StashEntry } from "../../server/src/gitbranch.ts";
+export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo, PrDetail, PrCheck } from "../../server/src/git.ts";
 export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
 export type ChatRow = ChatMeta & { busy?: boolean; /** A tool is waiting for the user's approval. */ waiting?: boolean };
 
@@ -103,6 +104,13 @@ export const api = {
   gitDiff: (id: string, path: string) => call<import("../../server/src/git.ts").FileDiff>(`/chats/${id}/git/diff?path=${encodeURIComponent(path)}`),
   gitCommit: (id: string, body: { message: string; paths: string[]; branch?: string; allowRisky?: string[] }) => call<{ sha: string; short: string; branch: string; summary: string; files: number }>(`/chats/${id}/git/commit`, "POST", body),
   gitUndo: (id: string, sha: string) => call<{ undone: string }>(`/chats/${id}/git/undo`, "POST", { sha }),
+  gitBranches: (id: string) => call<import("../../server/src/gitbranch.ts").BranchList>(`/chats/${id}/git/branches`),
+  gitSwitch: (id: string, b: { name: string; create?: boolean; stash?: boolean }) => call<{ branch: string; created: boolean; stashed: boolean }>(`/chats/${id}/git/switch`, "POST", b),
+  gitStashes: (id: string) => call<{ stashes: import("../../server/src/gitbranch.ts").StashEntry[]; more: number }>(`/chats/${id}/git/stash`),
+  gitStashPush: (id: string, b: { message?: string; includeUntracked?: boolean }) => call<{ stashed: true }>(`/chats/${id}/git/stash`, "POST", b),
+  gitStashApply: (id: string, sha: string, drop: boolean) => call<{ applied: true; dropped: boolean }>(`/chats/${id}/git/stash/apply`, "POST", { sha, drop }),
+  gitStashDrop: (id: string, sha: string) => call<{ dropped: true }>(`/chats/${id}/git/stash/drop`, "POST", { sha }),
+  gitPrDetail: (id: string) => call<{ pr: import("../../server/src/git.ts").PrDetail | null }>(`/chats/${id}/git/pr`),
   gitRemote: (id: string) => call<import("../../server/src/git.ts").RemoteInfo>(`/chats/${id}/git/remote`),
   gitPush: (id: string) => call<{ branch: string; remote: string; output: string }>(`/chats/${id}/git/push`, "POST", {}),
   gitPr: (id: string, body: { title: string; body?: string; base?: string; draft?: boolean }) => call<{ url: string; number?: number }>(`/chats/${id}/git/pr`, "POST", body),

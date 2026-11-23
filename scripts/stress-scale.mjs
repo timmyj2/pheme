@@ -69,6 +69,49 @@ for (const body of [{ projectDir: "x".repeat(5000) }, { projectDir: "/etc/passwd
 for (const [p, b] of [[`/chats/${chat}/git/commit`, { message: 5, paths: "x" }], [`/chats/${chat}/git/commit`, {}], [`/chats/${chat}/git/pr`, { title: {} }], [`/chats/${chat}/git/undo`, { sha: ["a"] }]]) {
   const r = await J(p, { method: "POST", body: JSON.stringify(b) }); check(`POST ${p.split("/").slice(-2).join("/")} ${JSON.stringify(b)} -> 4xx`, r.s >= 400 && r.s < 500, `(${r.s})`);
 }
+
+// ---- branches and stash at scale
+{
+  const r2 = fs.mkdtempSync(path.join(os.tmpdir(), "s2-br-")); git(r2, "init", "-q", "-b", "main"); fs.writeFileSync(path.join(r2, "a.txt"), "1\n"); git(r2, "add", "."); git(r2, "commit", "-qm", "init");
+  const refs = Array.from({ length: 400 }, (_, i) => `update-ref refs/heads/topic/b${i}-${"x".repeat(i % 30)}-é HEAD`).join("\n") + "\n";
+  execFileSync("git", ["update-ref", "--stdin"], { cwd: r2, input: refs.replace(/update-ref /g, "update ").replace(/ HEAD\n/g, " HEAD\n") });
+  const c2 = (await J("/chats", { method: "POST", body: "{}" })).j.id;
+  await J(`/chats/${c2}`, { method: "PATCH", body: JSON.stringify({ projectDir: r2 }) });
+  const bl = await time("list 401 branches", async () => (await J(`/chats/${c2}/git/branches`)).j);
+  check("branches capped at 200, current first, count of the rest", bl.branches.length === 200 && bl.branches[0].current && bl.more === 201, `(${bl.branches.length}, more ${bl.more})`);
+  for (let i = 0; i < 70; i++) { fs.writeFileSync(path.join(r2, "a.txt"), `v${i}\n`); await J(`/chats/${c2}/git/stash`, { method: "POST", body: JSON.stringify({ message: `s${i}` }) }); }
+  const sl = await time("list 70 stashes", async () => (await J(`/chats/${c2}/git/stash`)).j);
+  check("stashes capped at 50 with a count of the rest", sl.stashes.length === 50 && sl.more === 20 && sl.stashes[0].message === "s69", `(${sl.stashes.length}, more ${sl.more})`);
+  const oldest = sl.stashes[49];
+  const ap = await J(`/chats/${c2}/git/stash/apply`, { method: "POST", body: JSON.stringify({ sha: oldest.sha, drop: true }) });
+  check("apply the 50th stash by id", ap.s === 200 && fs.readFileSync(path.join(r2, "a.txt"), "utf8") === "v20\n", `(${ap.s} ${ap.j.error ?? ""})`);
+  git(r2, "checkout", "--", "a.txt");
+  // 3000 untracked files: stash, switch, restore, byte-for-byte
+  fs.mkdirSync(path.join(r2, "bulk")); for (let i = 0; i < 3000; i++) fs.writeFileSync(path.join(r2, "bulk", `f${i}.txt`), `${i}\n`);
+  fs.writeFileSync(path.join(r2, "a.txt"), "edited\n");
+  const st1 = await time("stash 3000 untracked files + edit", async () => (await J(`/chats/${c2}/git/stash`, { method: "POST", body: JSON.stringify({ message: "bulk" }) })).s);
+  check("working folder clean after stash (untracked removed too)", st1 === 200 && git(r2, "status", "--porcelain") === "" && !fs.existsSync(path.join(r2, "bulk")));
+  const [bulk] = (await J(`/chats/${c2}/git/stash`)).j.stashes;
+  const rs = await time("restore it", async () => (await J(`/chats/${c2}/git/stash/apply`, { method: "POST", body: JSON.stringify({ sha: bulk.sha, drop: true }) })).s);
+  check("all 3000 files and the edit came back", rs === 200 && fs.readdirSync(path.join(r2, "bulk")).length === 3000 && fs.readFileSync(path.join(r2, "a.txt"), "utf8") === "edited\n");
+  // concurrent switches/creates from many requests: all succeed, repo healthy, HEAD is one of them
+  const names = Array.from({ length: 25 }, (_, i) => `race/${i}`);
+  const rr = await time("25 simultaneous branch creations", async () => (await Promise.all(names.map((n) => J(`/chats/${c2}/git/switch`, { method: "POST", body: JSON.stringify({ name: n, create: true }) })))).map((x) => x.s));
+  check("all 25 succeeded, no 5xx", rr.every((c) => c === 200), `(${rr.filter((c) => c !== 200).join(",")})`);
+  check("repo healthy and the 25 branches exist", (() => { try { execFileSync("git", ["fsck", "--no-progress"], { cwd: r2, stdio: "pipe" }); } catch { return false; } return git(r2, "branch", "--list", "race/*").split("\n").length === 25 && !fs.existsSync(path.join(r2, ".git", "index.lock")); })());
+  const mix = await time("60 mixed reads+writes at once", async () => (await Promise.all(Array.from({ length: 60 }, (_, i) => i % 3 === 0 ? J(`/chats/${c2}/git/branches`) : i % 3 === 1 ? J(`/chats/${c2}/git/stash`) : J(`/chats/${c2}/git`)))).map((x) => x.s));
+  check("mixed burst all 200", mix.every((c) => c === 200));
+  // hostile
+  for (const body of [{ name: "../../x", create: true }, { name: "a\u0000b", create: true }, { name: "--orphan", create: true }, { name: 5 }, { sha: "x" }]) {
+    const x = await J(`/chats/${c2}/git/switch`, { method: "POST", body: JSON.stringify(body) }); check(`switch ${JSON.stringify(body)} -> 4xx`, x.s >= 400 && x.s < 500, `(${x.s})`);
+  }
+  for (const body of [{ sha: "stash@{0}" }, { sha: "--all" }, { sha: ["a"] }, {}]) {
+    for (const act of ["apply", "drop"]) { const x = await J(`/chats/${c2}/git/stash/${act}`, { method: "POST", body: JSON.stringify(body) }); check(`stash/${act} ${JSON.stringify(body)} -> 4xx`, x.s >= 400 && x.s < 500, `(${x.s})`); }
+  }
+  // PR detail with no gh / no remote: must not 500
+  const pd = await J(`/chats/${c2}/git/pr`); check("PR detail on a repo without a remote -> 200 {pr:null} or clear 4xx", (pd.s === 200 && pd.j.pr === null) || (pd.s >= 400 && pd.s < 500), `(${pd.s})`);
+}
+
 srv.kill();
 console.log(fails ? `\n${fails} FAILED` : "\nALL PASSED");
 process.exit(fails ? 1 : 0);
