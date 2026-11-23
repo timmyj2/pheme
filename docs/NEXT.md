@@ -28,7 +28,7 @@ green before merging, one line in `docs/DECISIONS.md`, update `PROGRESS.md`. Rea
 - Whether to turn on branch protection and PR-only merges.
 
 
-## Current goal (set 2026-11-23, after v0.2.0)
+## Done in v0.3.0 (goal set 2026-11-23, after v0.2.0)
 Build all six, stress test each as it lands, fix any bug the stress tests find, merge to main when CI is green on Windows and macOS. The owner has pre-approved fixes and merges. Real Copilot runs still cost the owner's Free quota: keep to 2-3 short requests, otherwise use --fake and a fake gh.
 
 1. PR panel: PR status, each CI check, review state, mergeability; refreshes while checks run.
@@ -40,3 +40,8 @@ Build all six, stress test each as it lands, fix any bug the stress tests find, 
 Rule for every push: `npm run lint && npm run typecheck && npm test` first (CI lints scripts/ and e2e/ too).
 
 Status of the six: all built and tested on branch feat/git-workflow (see PROGRESS.md). Ideas not started: attachments in backups, queueing a message with attachments, prompt import/export, a "resolve conflicts" helper in the Git panel, an install button inside Settings.
+
+## Next (after v0.3.0)
+1. Visual pass against real Hermes screenshots (see PROGRESS.md, v0.3.0 open items).
+2. Re-test text attachments on real Copilot (one short request).
+3. Check the SSE connection count after rapid chat switching.

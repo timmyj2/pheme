@@ -12,7 +12,7 @@ vi.mock("../src/api.ts", async (orig) => {
 const downloadBackup = api.downloadBackup as unknown as ReturnType<typeof vi.fn>;
 const previewRestore = api.previewRestore as unknown as ReturnType<typeof vi.fn>;
 const restore = api.restore as unknown as ReturnType<typeof vi.fn>;
-const preview = { createdAt: 1_700_000_000_000, appVersion: "0.2.0", files: 10, chats: 3, skills: 2, agents: 1, hasMemory: true, hasSettings: true, newFiles: 8, existingFiles: 2, existingChats: 1 };
+const preview = { createdAt: 1_700_000_000_000, appVersion: "0.3.0", files: 10, chats: 3, skills: 2, agents: 1, hasMemory: true, hasSettings: true, newFiles: 8, existingFiles: 2, existingChats: 1 };
 const ui = () => <ToastProvider><BackupSetting /></ToastProvider>;
 const file = (name = "b.pheme-backup", size = 10) => new File([new Uint8Array(size)], name);
 beforeEach(() => { downloadBackup.mockReset(); previewRestore.mockReset(); restore.mockReset(); vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() })); });

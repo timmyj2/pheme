@@ -19,9 +19,9 @@ chat with a session list, skills and memory that improve themselves, sub-agents,
    npm i -g @github/copilot@1.0.112
    ```
 3. **Sign in to Copilot.** Type `copilot` and press Enter. When it starts, type `/login` and follow the steps in your browser. Then close it (press Ctrl+C twice).
-4. **Download Pheme.** Open https://github.com/timmyj2/pheme/releases/latest, scroll to **Assets**, and click `pheme-v0.2.0.zip`.
+4. **Download Pheme.** Open https://github.com/timmyj2/pheme/releases/latest, scroll to **Assets**, and click `pheme-v0.3.0.zip`.
 5. **Unzip it.** Right-click the zip, choose **Extract All**, and pick a folder you'll remember, for example `C:\Users\<you>\pheme`. If Windows blocks the files, right-click the zip first, choose **Properties**, tick **Unblock**, click OK, then extract.
-6. **Check everything works.** Open the unzipped `pheme-v0.2.0` folder, click its address bar, type `cmd` and press Enter. Then type `start-pheme.cmd doctor` and press Enter. Every line should say `PASS` (a `WARN` about models is fine). If a line says `FAIL`, it tells you what to fix.
+6. **Check everything works.** Open the unzipped `pheme-v0.3.0` folder, click its address bar, type `cmd` and press Enter. Then type `start-pheme.cmd doctor` and press Enter. Every line should say `PASS` (a `WARN` about models is fine). If a line says `FAIL`, it tells you what to fix.
 
 **Every day**
 
