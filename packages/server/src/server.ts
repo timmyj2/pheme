@@ -104,7 +104,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
           "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(f.ref.name)}`,
           "x-content-type-options": "nosniff",
           "content-security-policy": "sandbox; default-src 'none'; style-src 'none'",
-          "cache-control": "private, max-age=3600",
+          "cache-control": "no-store", // never kept in the browser cache: a deleted chat's files must not linger there
         });
         return void res.end(data);
       }

@@ -107,7 +107,7 @@ export class AttachmentStore {
   save(chatId: string, rawName: string, data: Buffer): AttachmentRef {
     const c = checkAttachment(rawName, data);
     const dir = this.dir(chatId);
-    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     this.sweep(chatId);
     let used = 0;
     for (const f of fs.readdirSync(dir)) { try { used += fs.statSync(path.join(dir, f)).size; } catch { /* gone */ } }

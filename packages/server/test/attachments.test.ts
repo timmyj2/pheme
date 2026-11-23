@@ -64,6 +64,10 @@ describe("AttachmentStore", () => {
     const f = s.open("chat-1", ref.id)!;
     expect(f.path.startsWith(path.join(dir, "attachments", "chat-1") + path.sep)).toBe(true);
     expect(path.basename(f.path)).toBe(`${ref.id}.md`);
+    if (process.platform !== "win32") {
+      expect(fs.statSync(path.dirname(f.path)).mode & 0o077).toBe(0); // only the owner can open the folder or the files
+      expect(fs.statSync(f.path).mode & 0o077).toBe(0);
+    }
     expect(fs.readFileSync(f.path, "utf8")).toBe("hello");
     expect(s.open("chat-2", ref.id)).toBeNull(); // another chat cannot read it
     expect(s.open("chat-1", "../../x")).toBeNull();
@@ -140,6 +144,7 @@ describe("attachments over HTTP", () => {
     expect(dl.headers.get("content-type")).toBe("image/png");
     expect(dl.headers.get("x-content-type-options")).toBe("nosniff");
     expect(dl.headers.get("content-security-policy")).toContain("sandbox");
+    expect(dl.headers.get("cache-control")).toBe("no-store");
     expect(Buffer.from(await dl.arrayBuffer()).equals(PNG)).toBe(true);
     const dlt = await fetch(`${base}/api/chats/${chat.id}/attachments/${txt.id}`, { headers: h });
     expect(dlt.headers.get("content-type")).toBe("text/plain; charset=utf-8");

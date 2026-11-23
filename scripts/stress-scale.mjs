@@ -112,6 +112,66 @@ for (const [p, b] of [[`/chats/${chat}/git/commit`, { message: 5, paths: "x" }],
   const pd = await J(`/chats/${c2}/git/pr`); check("PR detail on a repo without a remote -> 200 {pr:null} or clear 4xx", (pd.s === 200 && pd.j.pr === null) || (pd.s >= 400 && pd.s < 500), `(${pd.s})`);
 }
 
+// ---- attachments
+{
+  const c3 = (await J("/chats", { method: "POST", body: "{}" })).j.id;
+  const up = (name, body, id = c3) => fetch(`http://127.0.0.1:${PORT}/api/chats/${id}/attachments?name=${encodeURIComponent(name)}`, { method: "POST", headers: { "x-pheme-token": T, "content-type": "application/octet-stream" }, body }).then(async (r) => ({ s: r.status, j: await r.json().catch(() => ({})) })).catch(() => ({ s: -1, j: {} }));
+  const png = (extra) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(extra, 7)]);
+  const big = await time("upload a 5 MB image", async () => (await up("big.png", png(5 * 1024 * 1024 - 100))).s);
+  check("5 MB image accepted", big === 201);
+  const par = await time("20 parallel uploads", async () => (await Promise.all(Array.from({ length: 20 }, (_, i) => up(`p${i}.txt`, `file ${i}\n`)))).map((x) => x.s));
+  check("all 20 accepted", par.every((c) => c === 201));
+  const ids = new Set((await Promise.all(Array.from({ length: 20 }, (_, i) => up(`q${i}.txt`, `q ${i}`)))).map((x) => x.j.id));
+  check("ids are unique", ids.size === 20);
+  const hostile = [
+    ["../../../etc/passwd.txt", "x"], ["a\u0000b.txt", "x"], ["x".repeat(5000) + ".txt", "x"], ["..", "x"], ["", "x"], ["con.txt", "x"], ["a:b*c?.txt", "x"], ["日本語ファイル.md", "# 日本語"], ["emoji🎉.json", "{}"],
+  ];
+  for (const [n, b] of hostile) { const r = await up(n, b); check(`hostile name ${JSON.stringify(n.slice(0, 24))} -> 201 with a clean name, or 4xx; never 5xx`, r.s === 201 ? ![...r.j.name].some((ch) => "\\/:*?\u0000".includes(ch)) && r.j.name.length <= 100 : r.s >= 400 && r.s < 500, `(${r.s} ${r.j.name ?? r.j.error ?? ""})`.slice(0, 80)); }
+  const trav = fs.readdirSync(path.join(data, "attachments", c3)).filter((f) => f.includes("passwd") || f.includes(".."));
+  check("nothing named from the client reached the disk", trav.length === 0);
+  check("empty body -> 400", (await up("e.txt", "")).s === 400);
+  check("zip renamed .txt -> 415", (await up("z.txt", Buffer.from([0x50, 0x4b, 3, 4, 0, 0, 0]))).s === 415);
+  check("svg -> 415", (await up("a.svg", '<svg onload="alert(1)"/>')).s === 415);
+  check(".env -> 422", (await up(".env", "A=1")).s === 422);
+  const over = await up("over.png", png(6 * 1024 * 1024));
+  check("6 MB image -> 413 (or the connection cut)", over.s === 413 || over.s === -1, `(${over.s})`);
+  // storage cap: 5 MB images until the 50 MB cap
+  const c4 = (await J("/chats", { method: "POST", body: "{}" })).j.id;
+  const codes = []; for (let i = 0; i < 12; i++) codes.push((await up(`i${i}.png`, png(5 * 1024 * 1024 - 100), c4)).s);
+  const okCount = codes.filter((c) => c === 201).length;
+  check("per-chat 50 MB cap holds (9-10 accepted, the rest 413, nothing else)", okCount >= 9 && okCount <= 10 && codes.every((c) => c === 201 || c === 413) && codes.at(-1) === 413, `(${codes.join(",")})`);
+  // send limits
+  const five = []; for (let i = 0; i < 6; i++) five.push((await up(`s${i}.txt`, `s${i}`)).j.id);
+  const send6 = await J(`/chats/${c3}/messages`, { method: "POST", body: JSON.stringify({ text: "six", attachments: five }) });
+  check("six attachments in one message -> 400", send6.s === 400, `(${send6.s})`);
+  const send5 = await J(`/chats/${c3}/messages`, { method: "POST", body: JSON.stringify({ text: "five", attachments: five.slice(0, 5) }) });
+  check("five attachments -> 202", send5.s === 202, `(${send5.s})`);
+  await new Promise((r) => setTimeout(r, 400));
+  const busy2 = await J(`/chats/${c3}/messages`, { method: "POST", body: JSON.stringify({ text: "again", attachments: [five[5]] }) });
+  check("a message that reuses nothing wrong while idle is accepted", busy2.s === 202 || busy2.s === 409, `(${busy2.s})`);
+  // download of the 5 MB image
+  const dl = await time("download the 5 MB image", async () => { const r = await call(`/chats/${c3}/attachments/${big === 201 ? (await J(`/chats/${c3}`)).j.events.find((e) => e.attachments)?.attachments?.[0]?.id ?? "x" : "x"}`); return r.status; });
+  void dl;
+  // delete chat removes files
+  await J(`/chats/${c4}`, { method: "DELETE" });
+  check("deleting a chat deletes its attachments", !fs.existsSync(path.join(data, "attachments", c4)));
+}
+
 srv.kill();
+await new Promise((r) => setTimeout(r, 500));
+{
+  // startup sweep: 2000 chat folders of stale, never-sent uploads
+  let made = 0;
+  for (let i = 0; i < 2000; i++) { const d = path.join(data, "attachments", `old${String(i).padStart(5, "0")}`); fs.mkdirSync(d, { recursive: true }); for (let k = 0; k < 2; k++) { const id = `abcdef01-0000-4000-8000-${String(i * 10 + k).padStart(12, "0")}`; fs.writeFileSync(path.join(d, `${id}.txt`), "x"); fs.writeFileSync(path.join(d, `${id}.json`), JSON.stringify({ id, name: "o.txt", kind: "text", mime: "text/plain", size: 1, file: `${id}.txt`, createdAt: Date.now() - 3 * 86400_000, sent: false })); made++; } }
+  const t0 = performance.now();
+  const srv2 = spawn("node", [path.resolve(import.meta.dirname, "../dist/pheme.mjs"), "--fake", "--no-open", "--port", String(PORT), "--data-dir", data], { env: { ...process.env, PHEME_TOKEN: T }, stdio: "ignore" });
+  let ready = false; for (let i = 0; i < 300 && !ready; i++) { ready = await fetch(`http://127.0.0.1:${PORT}/`).then((r) => r.ok).catch(() => false); if (!ready) await new Promise((r) => setTimeout(r, 50)); }
+  const ms = Math.round(performance.now() - t0);
+  console.log(`restart with ${made} stale uploads in 2000 folders: ready in ${ms} ms`);
+  check("startup stays quick with 2000 stale folders (< 8 s)", ready && ms < 8000);
+  const left = fs.readdirSync(path.join(data, "attachments")).filter((d) => d.startsWith("old")).reduce((n, d) => n + fs.readdirSync(path.join(data, "attachments", d)).length, 0);
+  check("stale uploads were swept", left === 0, `(${left} files left)`);
+  srv2.kill();
+}
 console.log(fails ? `\n${fails} FAILED` : "\nALL PASSED");
 process.exit(fails ? 1 : 0);

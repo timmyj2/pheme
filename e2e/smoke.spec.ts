@@ -191,6 +191,45 @@ test.describe("Pheme in a real browser", () => {
     try { fs.rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* Windows may still hold the folder */ }
   });
 
+  test("attachments and the context meter: attach, send, see them in the chat, and a bad file is refused", async ({ page }) => {
+    const PNG_1PX = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    const dialogs: string[] = [];
+    page.on("dialog", (d) => { dialogs.push(d.message()); void d.dismiss(); }); // the attached file contains <script>alert(1)</script>
+    await open(page);
+    const picker = page.locator("input[type=file]");
+    await picker.setInputFiles([
+      { name: "shot.png", mimeType: "image/png", buffer: PNG_1PX },
+      { name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from("# Notes\nhello <script>alert(1)</script>\n") },
+      { name: "tool.exe", mimeType: "application/octet-stream", buffer: Buffer.from("MZ") },
+    ]);
+    await expect(page.getByRole("alert")).toContainText('"tool.exe" can\'t be attached');
+    const draft = page.getByRole("list", { name: "Files to send" });
+    await expect(draft.getByRole("listitem")).toHaveCount(2);
+    await composer(page).fill("please check these [context:110000]");
+    await composer(page).press("Enter");
+    await expect(page).toHaveURL(/#\/chat\//);
+    const msg = page.locator(".user-msg").first();
+    await expect(msg.locator(".bubble")).toContainText("please check these");
+    await expect(msg.getByRole("button", { name: /notes\.md/ })).toBeVisible();
+    const thumb = msg.getByRole("img", { name: "shot.png" });
+    await expect(thumb).toBeVisible();
+    await expect.poll(() => thumb.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1); // really decoded, through the authorised download
+    await expect(page.getByRole("meter", { name: "Context used" })).toHaveAttribute("aria-valuetext", /110k of 128k tokens, 8\d percent/);
+    await expect(page.locator(".ctx-meter")).toContainText("getting full");
+    await expect(page.getByRole("list", { name: "Files to send" })).toHaveCount(0); // the composer is empty again
+    // open the text file the way a user would: it must show as text and never run
+    const [popup] = await Promise.all([page.waitForEvent("popup"), msg.getByRole("button", { name: /notes\.md/ }).click()]);
+    await popup.waitForLoadState();
+    await expect(popup.locator("body")).toContainText("<script>alert(1)</script>");
+    await popup.close();
+    expect(dialogs).toEqual([]);
+    // drag and drop onto the composer also attaches
+    const dt = await page.evaluateHandle(() => { const d = new DataTransfer(); d.items.add(new File(["a,b\n1,2\n"], "data.csv", { type: "text/csv" })); return d; });
+    await page.locator(".composer-wrap").dispatchEvent("dragover", { dataTransfer: dt });
+    await page.locator(".composer-wrap").dispatchEvent("drop", { dataTransfer: dt });
+    await expect(page.getByRole("list", { name: "Files to send" }).getByText("data.csv")).toBeVisible();
+  });
+
   test("backup downloads a file that previews as a valid backup", async ({ page }) => {
     await open(page, "#/settings");
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download backup" }).click()]);
