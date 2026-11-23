@@ -186,3 +186,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .changes-panel { overflow-y: auto; }
 
 .ship-box .approval { display: flex; flex-direction: column; gap: 6px; }
+
+.chat-toolbar { display: flex; align-items: center; border-bottom: 1px solid var(--dt-border); }
+.chat-toolbar .project-bar { flex: 1; min-width: 0; border-bottom: 0; }
+.model-pick { display: flex; align-items: center; gap: 6px; padding: 0 16px 0 0; font-size: 12px; flex: none; }
+@media (max-width: 560px) { .chat-toolbar { flex-wrap: wrap; } .model-pick { padding: 0 16px 6px; } }
+.model-pick select { background: var(--dt-muted); color: var(--dt-foreground); border: 1px solid var(--dt-border); border-radius: 6px; padding: 3px 8px; font-size: 12px; max-width: 100%; }
+
+.msg-hit { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; background: none; border: 0; color: var(--dt-foreground); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+.msg-hit:hover { background: var(--dt-muted); }
+.msg-hit .snippet { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.search-status { padding: 4px 10px; }

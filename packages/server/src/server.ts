@@ -1,3 +1,4 @@
+import { chatToMarkdown, exportFileName, searchMessages } from "./export.ts";
 import { gitCommit, gitCreatePr, gitDiff, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
 import { HttpError } from "./http-error.ts";
 import http from "node:http";
@@ -72,6 +73,9 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (m === "PUT") return json(res, 200, app.settings.update(body as Partial<Settings>));
       return json(res, 200, app.settings.get());
     }
+    if (seg[0] === "search" && m === "GET") {
+      return json(res, 200, searchMessages(app.store, url.searchParams.get("q") ?? "", { logPath: (id) => app.store.logPath(id) }));
+    }
     if (seg[0] === "models" && m === "GET") return json(res, 200, await app.engine.listModels().catch(() => []));
 
     // --- chats
@@ -90,6 +94,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
           if (typeof body.title === "string") patch.title = body.title.slice(0, 120);
           if (typeof body.pinned === "boolean") patch.pinned = body.pinned;
           if (typeof body.archived === "boolean") patch.archived = body.archived;
+          if ("model" in body) {
+            if (body.model !== null && typeof body.model !== "string") throw new HttpError(400, "model must be a name or null.");
+            await app.setChatModel(id, body.model as string | null);
+          }
           if ("projectDir" in body) {
             if (body.projectDir !== null && typeof body.projectDir !== "string") throw new HttpError(400, "projectDir must be a path or null.");
             await app.setProjectDir(id, body.projectDir as string | null);
@@ -136,6 +144,17 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         if (app.isBusy(id)) throw new HttpError(409, "A reply is running and may still be editing files. Wait for it to finish (or stop it), then commit.");
         if (seg[3] === "undo") return json(res, 200, await gitUndo(dir, String(body.sha ?? "")));
         return json(res, 200, await gitCommit(dir, { message: body.message as string, paths: body.paths as string[], branch: typeof body.branch === "string" ? body.branch : undefined, allowRisky: Array.isArray(body.allowRisky) ? (body.allowRisky as string[]) : [] }));
+      }
+      if (seg[2] === "export" && seg.length === 3 && m === "GET") {
+        const md = chatToMarkdown(meta, app.store.events(id));
+        const name = exportFileName(meta.title);
+        res.writeHead(200, {
+          "content-type": "text/markdown; charset=utf-8",
+          "content-disposition": `attachment; filename="chat.md"; filename*=UTF-8''${encodeURIComponent(name)}`,
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        });
+        return res.end(md);
       }
       if (seg[2] === "stop" && m === "POST") {
         app.stop(id);

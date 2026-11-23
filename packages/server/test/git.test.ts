@@ -212,3 +212,26 @@ describe("project folder reaches the engine", () => {
     await expect(app.setProjectDir(chat.id, path.join(a, "nope"))).rejects.toThrow(/does not exist/);
   });
 });
+
+describe("per-chat model", () => {
+  it("sets, clears and validates a chat's model, drops the session, and refuses mid-turn", async () => {
+    const { app, engine } = makeApp();
+    const chat = app.store.create();
+    app.send(chat.id, "hi"); await app.drain();
+    expect(engine.sessions.at(-1)?.model).toBe("auto");
+    await app.setChatModel(chat.id, "fake-large");
+    expect(app.store.get(chat.id)?.model).toBe("fake-large");
+    expect(engine.closed.length).toBeGreaterThan(0);
+    app.send(chat.id, "again"); await app.drain();
+    expect(engine.sessions.at(-1)?.model).toBe("fake-large");
+    await expect(app.setChatModel(chat.id, "x".repeat(101))).rejects.toThrow(/not a valid model/);
+    await expect(app.setChatModel(chat.id, "bad\u0007name")).rejects.toThrow(/not a valid model/);
+    await expect(app.setChatModel("missing", "m")).rejects.toThrow(/no such chat/);
+    app.send(chat.id, "run ls");
+    await expect(app.setChatModel(chat.id, "fake-mini")).rejects.toThrow(/Wait for the current reply/);
+    app.stop(chat.id); await app.drain();
+    await app.setChatModel(chat.id, null);
+    expect(app.store.get(chat.id)?.model).toBeUndefined();
+    expect("model" in app.store.get(chat.id)!).toBe(false); // really removed, not stored as undefined/null
+  });
+});

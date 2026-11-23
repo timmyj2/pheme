@@ -42,14 +42,34 @@ async function call<T>(path: string, method = "GET", body?: unknown): Promise<T>
   return data as T;
 }
 
+export interface SearchHit { id: string; title: string; updatedAt: number; snippet: string; role: "you" | "pheme" }
+
+/** Download a chat as Markdown: returns the file contents and the name the server suggested. */
+async function exportChat(id: string): Promise<{ blob: Blob; name: string }> {
+  let r: Response;
+  try {
+    r = await fetch(`/api/chats/${id}/export`, { headers: { "x-pheme-token": token() } });
+  } catch {
+    throw new ApiError(0, "Can't reach Pheme. Is it still running?");
+  }
+  if (!r.ok) throw new ApiError(r.status, ((await r.json().catch(() => ({}))) as { error?: string }).error ?? `HTTP ${r.status}`);
+  const cd = r.headers.get("content-disposition") ?? "";
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd)?.[1];
+  let name = "chat.md";
+  try { if (star) name = decodeURIComponent(star); } catch { /* keep the default */ }
+  return { blob: await r.blob(), name };
+}
+
 export const api = {
+  exportChat,
+  search: (q: string) => call<{ hits: SearchHit[]; partial: boolean }>(`/search?q=${encodeURIComponent(q)}`),
   state: () => call<BootstrapState>("/state"),
   models: () => call<ModelOption[]>("/models"),
   settings: (patch: Partial<Settings>) => call<Settings>("/settings", "PUT", patch),
   chats: () => call<ChatRow[]>("/chats"),
   newChat: () => call<ChatMeta>("/chats", "POST", {}),
   chat: (id: string) => call<{ meta: ChatMeta; busy: boolean; events: SeqEvent[] }>(`/chats/${id}`),
-  patchChat: (id: string, patch: Partial<Pick<ChatMeta, "title" | "pinned" | "archived">> & { projectDir?: string | null }) => call<ChatMeta>(`/chats/${id}`, "PATCH", patch),
+  patchChat: (id: string, patch: Partial<Pick<ChatMeta, "title" | "pinned" | "archived">> & { projectDir?: string | null; model?: string | null }) => call<ChatMeta>(`/chats/${id}`, "PATCH", patch),
   gitStatus: (id: string) => call<import("../../server/src/git.ts").GitStatus>(`/chats/${id}/git`),
   gitDiff: (id: string, path: string) => call<import("../../server/src/git.ts").FileDiff>(`/chats/${id}/git/diff?path=${encodeURIComponent(path)}`),
   gitCommit: (id: string, body: { message: string; paths: string[]; branch?: string; allowRisky?: string[] }) => call<{ sha: string; short: string; branch: string; summary: string; files: number }>(`/chats/${id}/git/commit`, "POST", body),

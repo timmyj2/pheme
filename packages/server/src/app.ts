@@ -136,6 +136,18 @@ export class App {
     return updated;
   }
 
+  /** Pick the model for one chat ("" or null = follow the default in Settings). Takes effect from the next message. */
+  async setChatModel(chatId: string, model: string | null): Promise<ChatMeta> {
+    const meta = this.store.get(chatId);
+    if (!meta) throw new HttpError(404, "no such chat");
+    if (this.isBusy(chatId)) throw new HttpError(409, "Wait for the current reply to finish (or stop it) before changing the model.");
+    const clean = model === null || model === "" ? undefined : String(model).trim();
+    if (clean !== undefined && (clean.length > 100 || [...clean].some((c) => c.charCodeAt(0) < 32))) throw new HttpError(400, "That is not a valid model name.");
+    const updated = this.store.update(chatId, { model: clean })!;
+    await this.dropSession(chatId);
+    return updated;
+  }
+
   isBusy(chatId: string): boolean {
     return this.turns.has(chatId);
   }

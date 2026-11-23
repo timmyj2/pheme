@@ -20,6 +20,11 @@ export class ChatStore {
   private metaFile(id: string) {
     return path.join(this.dir, `${safeId(id)}.meta.json`);
   }
+  /** Path of a chat's event log (for search; callers must pass an id they got from `list()`). */
+  logPath(id: string): string {
+    return this.logFile(id);
+  }
+
   private logFile(id: string) {
     return path.join(this.dir, `${safeId(id)}.jsonl`);
   }
@@ -64,6 +69,7 @@ export class ChatStore {
     if (!m) return undefined;
     Object.assign(m, patch, { updatedAt: Date.now() });
     if (m.projectDir === undefined) delete m.projectDir;
+    if (m.model === undefined) delete m.model;
     writeJson(this.metaFile(id), m);
     return m;
   }

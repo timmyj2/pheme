@@ -68,4 +68,5 @@ Done and tested (425 tests, smoke, stress, browser runs against throwaway repos)
 commit box (pick files, message, new branch on main, secret confirm, undo); push and pull request with confirm steps, CI status on an
 open PR, compare-link fallback without gh.
 Not tested against real GitHub (would create a real PR): `gh pr create` path was exercised with a fake gh only.
-Next: queue items 5-11 in docs/NEXT.md.
+Also done on this branch: per-chat model picker, export chat to Markdown, search inside message text.
+Next (docs/NEXT.md items 7-11): desktop notifications, backup/restore, lazy-load markdown code, Playwright smoke test in CI, settings search and keybindings. Context-usage readout was skipped: the Copilot SDK events I have not verified expose token counts.
