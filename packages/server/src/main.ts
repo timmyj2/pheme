@@ -1,3 +1,4 @@
+import { checkArgs } from "./args.ts";
 import { spawn } from "node:child_process";
 import { App } from "./app.ts";
 import { loadAssets } from "./assets.ts";
@@ -41,6 +42,11 @@ function openBrowser(url: string) {
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes("-h") || args.includes("--help")) return console.log(HELP);
+  const problem = checkArgs(args);
+  if (problem) {
+    console.error(`Pheme: ${problem}`);
+    process.exit(2);
+  }
   const dir = dataDir(arg(args, "--data-dir"));
   if (args[0] === "doctor") {
     const ok = await runDoctor(dir);

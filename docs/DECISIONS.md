@@ -43,3 +43,4 @@ One line each: **decision** — why. The owner reviews these.
 - **One Pheme per data folder (`pheme.lock` with the pid)** — two instances would both run scheduled jobs and reviews. A stale lock from a crash is replaced. `--port` is validated with a plain message.
 - UI stress round: chat titles now strip markdown (titleFrom); sending your own message always scrolls to bottom; drafts flush on chat switch; offline detection is immediate on a refused connection and polls every 1.2 s while down; mobile drawer closes on Esc and manages focus; PHEME_TOKEN env var fixes the access key for tests.
 - Markdown renderer is react-markdown + remark-gfm + highlight.js (20 languages); bundle grew to ~725 kB JS (accepted).
+- Unknown CLI options are now errors (a typo like --fak used to start the real engine). THIRD_PARTY_LICENSES.txt now covers the UI dependency tree with full license texts (111 packages).

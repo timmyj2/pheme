@@ -56,18 +56,41 @@ const result = await build({
 
 fs.copyFileSync(path.join(root, "scripts", "start-pheme.cmd"), path.join(dist, "start-pheme.cmd"));
 
-// License summary for bundled packages.
-const pkgs = new Map();
+// Licenses for everything that ships: server packages bundled by esbuild plus the UI's runtime dependency tree
+// (react, react-dom, the markdown stack and their dependencies), each with its full license text.
+const found = new Map(); // name -> { dir, json }
+function locate(name, from) {
+  for (const base of [path.join(from, "node_modules"), path.join(root, "packages", "ui", "node_modules"), path.join(root, "node_modules")]) {
+    const dir = path.join(base, name);
+    try { return { dir, json: JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")) }; } catch { /* try the next place */ }
+  }
+  return null;
+}
+function collect(name, from) {
+  if (found.has(name)) return;
+  const hit = locate(name, from);
+  if (!hit) return;
+  found.set(name, hit);
+  for (const dep of Object.keys(hit.json.dependencies ?? {})) collect(dep, hit.dir);
+}
 for (const input of Object.keys(result.metafile.inputs)) {
   const m = /node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(input);
-  if (m && !pkgs.has(m[1])) {
-    try {
-      const j = JSON.parse(fs.readFileSync(path.join(root, "node_modules", m[1], "package.json"), "utf8"));
-      pkgs.set(m[1], `${m[1]}@${j.version} — ${typeof j.license === "string" ? j.license : j.license?.type ?? "see package"}`);
-    } catch { /* ignore */ }
-  }
+  if (m) collect(m[1], root);
 }
-fs.writeFileSync(path.join(dist, "THIRD_PARTY_LICENSES.txt"), `Packages bundled into pheme.mjs\n\n${[...pkgs.values()].sort().join("\n")}\n\nSee THIRD_PARTY_NOTICES.md in the repository for the adapted UI code notice.\n`);
+const uiPkg = JSON.parse(fs.readFileSync(path.join(root, "packages", "ui", "package.json"), "utf8"));
+for (const name of ["react", "react-dom", ...Object.keys(uiPkg.dependencies ?? {})]) collect(name, path.join(root, "packages", "ui"));
+const licenseOf = (j) => (typeof j.license === "string" ? j.license : j.license?.type ?? (j.licenses ?? []).map((l) => l.type).join(" OR ")) || "see package";
+const licenseText = (dir) => {
+  const f = fs.readdirSync(dir).find((n) => /^(licen[sc]e|copying)(\.(md|txt))?$/i.test(n));
+  return f ? fs.readFileSync(path.join(dir, f), "utf8").trim() : "(no license file in the package; see its package.json)";
+};
+const sorted = [...found.entries()].sort(([x], [y]) => x.localeCompare(y));
+const summary = sorted.map(([n, { json }]) => `${n}@${json.version} — ${licenseOf(json)}`).join("\n");
+const texts = sorted.map(([n, { dir, json }]) => `${"=".repeat(72)}\n${n}@${json.version} (${licenseOf(json)})\n${"=".repeat(72)}\n${licenseText(dir)}\n`).join("\n");
+fs.writeFileSync(
+  path.join(dist, "THIRD_PARTY_LICENSES.txt"),
+  `Third-party packages bundled with or required by Pheme (${sorted.length})\n\n${summary}\n\nSee THIRD_PARTY_NOTICES.md in the repository for the adapted UI code notice.\n\n${texts}`,
+);
 
 const kb = Math.round(fs.statSync(path.join(dist, "pheme.mjs")).size / 1024);
-console.log(`Built dist/pheme.mjs (${kb} KB), ${Object.keys(assets).length} UI assets, ${pkgs.size} bundled packages.`);
+console.log(`Built dist/pheme.mjs (${kb} KB), ${Object.keys(assets).length} UI assets, ${sorted.length} licensed packages.`);
