@@ -48,7 +48,7 @@ export function App() {
   const [activeBusy, setActiveBusy] = useState(false);
   const composerRef = useRef<ComposerHandle>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const firstMessage = useRef<{ id: string; text: string } | null>(null);
+  const firstMessage = useRef<{ id: string; text: string; files: File[] } | null>(null);
   const seen = useRef(loadSeen());
 
   const activeId = route.view === "chat" ? route.chatId : null;
@@ -142,15 +142,16 @@ export function App() {
   }, []);
   useNotifications(chats, chatsLoaded, activeId, notifyOn, openChat);
 
-  const createAndSend = useCallback(async (text: string) => {
+  const createAndSend = useCallback(async (text: string, files: File[] = []) => {
     try {
       const c = await api.newChat();
-      firstMessage.current = { id: c.id, text };
+      firstMessage.current = { id: c.id, text, files };
       setChats((prev) => [{ ...c }, ...prev]);
       navigate({ view: "chat", chatId: c.id });
     } catch (e) {
       toast.error((e as Error).message);
       composerRef.current?.insert(text);
+      composerRef.current?.addFiles(files);
     }
   }, [navigate, toast]);
 
@@ -311,8 +312,9 @@ export function App() {
               offline={offline}
               composerRef={composerRef}
               autoSend={firstMessage.current?.id === activeId ? firstMessage.current?.text : undefined}
+              autoFiles={firstMessage.current?.id === activeId ? firstMessage.current?.files : undefined}
               onAutoSent={() => { firstMessage.current = null; }}
-              onCreate={(t) => void createAndSend(t)}
+              onCreate={(t, f) => void createAndSend(t, f)}
               onChanged={refresh}
               onOpenChat={openChat}
               onBusy={setActiveBusy}

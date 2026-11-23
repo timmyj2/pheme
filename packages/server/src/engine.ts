@@ -22,6 +22,7 @@ export type EngineEvent =
   | { type: "tool_start"; id: string; name: string; args: unknown }
   | { type: "tool_end"; id: string; name: string; ok: boolean; result: string }
   | { type: "subagent"; phase: "start" | "end"; id: string; name: string; task?: string; ok?: boolean; result?: string }
+  | { type: "usage"; used: number; limit: number }
   | { type: "error"; message: string };
 
 export interface SessionOptions {
@@ -42,9 +43,14 @@ export interface SessionOptions {
   agents?: { name: string; description: string; prompt: string; tools?: string[] }[];
 }
 
+/** Something the user attached to a message: an image (sent inline) or a text file (sent by path). */
+export type EngineAttachment =
+  | { kind: "image"; name: string; mime: string; /** base64 */ data: string }
+  | { kind: "file"; name: string; path: string };
+
 export interface EngineSession {
   /** Run one turn; resolves when the engine is idle. Events are delivered through onEvent. */
-  send(prompt: string, onEvent: (e: EngineEvent) => void, signal?: AbortSignal): Promise<void>;
+  send(prompt: string, onEvent: (e: EngineEvent) => void, signal?: AbortSignal, attachments?: EngineAttachment[]): Promise<void>;
   close(): Promise<void>;
 }
 

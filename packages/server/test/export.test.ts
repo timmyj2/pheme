@@ -38,6 +38,11 @@ describe("chatToMarkdown", () => {
 });
 
 describe("exportFileName", () => {
+  it("lists attachment names in a user message, without letting a name inject markdown", () => {
+    const md = chatToMarkdown(meta("t"), [ev({ type: "user", text: "see files", attachments: [{ id: "i", name: "a_b.png", kind: "image", mime: "image/png", size: 1 }, { id: "j", name: "[x](http://evil)\n# H.md", kind: "text", mime: "text/plain", size: 1 }] })]);
+    expect(md).toContain("_Attached: ab.png, x(http://evil) # H.md_");
+    expect(md).not.toContain("[x](");
+  });
   it("is safe on every platform", () => {
     expect(exportFileName("Plan: A/B <test>?")).toBe("Plan A B test.md");
     expect(exportFileName("../../etc/passwd")).toBe("etc passwd.md");

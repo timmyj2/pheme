@@ -136,9 +136,10 @@ export class CopilotEngine implements Engine {
       : await client.createSession({ ...config, sessionId: opts.id } as never);
 
     return {
-      async send(prompt, onEvent, signal) {
+      async send(prompt, onEvent, signal, attachments) {
         const names = new Map<string, string>();
         await new Promise<void>((resolve, reject) => {
+          let lastUsage: { used: number; limit: number } | undefined;
           const off = session.on(((raw: unknown) => {
             const ev = raw as { type: string; data?: Record<string, unknown> };
             const d = ev.data ?? {};
@@ -171,7 +172,13 @@ export class CopilotEngine implements Engine {
               case "session.error":
                 onEvent({ type: "error", message: String(d.message ?? "Copilot error") });
                 break;
+              case "session.usage_info": {
+                const used = Number(d.currentTokens), limit = Number(d.tokenLimit);
+                if (Number.isFinite(used) && Number.isFinite(limit) && used >= 0 && limit > 0) lastUsage = { used: Math.round(used), limit: Math.round(limit) };
+                break;
+              }
               case "session.idle":
+                if (lastUsage) onEvent({ type: "usage", ...lastUsage }); // once per turn: the log stays small
                 off();
                 resolve();
                 break;
@@ -182,7 +189,8 @@ export class CopilotEngine implements Engine {
             off();
             resolve();
           });
-          session.send({ prompt }).catch((e: Error) => {
+          const sdkAttachments = (attachments ?? []).map((a) => (a.kind === "image" ? { type: "blob" as const, data: a.data, mimeType: a.mime, displayName: a.name } : { type: "file" as const, path: a.path, displayName: a.name }));
+          session.send(sdkAttachments.length ? { prompt, attachments: sdkAttachments } : { prompt }).catch((e: Error) => {
             off();
             reject(e);
           });

@@ -1,6 +1,8 @@
 import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun, CuratorState } from "../../server/src/protocol.ts";
 
 export type { BackupPreview } from "../../server/src/backup.ts";
+import type { AttachmentRef } from "../../server/src/attachments.ts";
+export type { AttachmentRef } from "../../server/src/attachments.ts";
 export type { BranchList, BranchInfo, StashEntry } from "../../server/src/gitbranch.ts";
 export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo, PrDetail, PrCheck } from "../../server/src/git.ts";
 export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
@@ -115,7 +117,14 @@ export const api = {
   gitPush: (id: string) => call<{ branch: string; remote: string; output: string }>(`/chats/${id}/git/push`, "POST", {}),
   gitPr: (id: string, body: { title: string; body?: string; base?: string; draft?: boolean }) => call<{ url: string; number?: number }>(`/chats/${id}/git/pr`, "POST", body),
   deleteChat: (id: string) => call<{ ok: boolean }>(`/chats/${id}`, "DELETE"),
-  send: (id: string, text: string) => call<{ ok: boolean }>(`/chats/${id}/messages`, "POST", { text }),
+  send: (id: string, text: string, attachments?: string[]) => call<{ ok: boolean }>(`/chats/${id}/messages`, "POST", attachments?.length ? { text, attachments } : { text }),
+  uploadAttachment: (id: string, file: File) => postFile<AttachmentRef>(`/chats/${id}/attachments?name=${encodeURIComponent(file.name || "file")}`, file),
+  attachmentBlob: async (id: string, attId: string): Promise<Blob> => {
+    let r: Response;
+    try { r = await fetch(`/api/chats/${id}/attachments/${attId}`, { headers: { "x-pheme-token": token() } }); } catch { throw new ApiError(0, "Can't reach Pheme. Is it still running?"); }
+    if (!r.ok) throw new ApiError(r.status, r.status === 404 ? "This file is no longer available." : `HTTP ${r.status}`);
+    return r.blob();
+  },
   stop: (id: string) => call<{ ok: boolean }>(`/chats/${id}/stop`, "POST", {}),
   approve: (id: string, approvalId: string, decision: ApprovalDecision) => call<{ ok: boolean }>(`/chats/${id}/approvals/${approvalId}`, "POST", { decision }),
   memory: () => call<MemoryState>("/memory"),

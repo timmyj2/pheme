@@ -1,3 +1,4 @@
+import { ContextMeter } from "./ContextMeter.tsx";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { api } from "./api.ts";
 import { ChangesPanel } from "./ChangesPanel.tsx";
@@ -21,16 +22,18 @@ interface Props {
   composerRef: RefObject<ComposerHandle | null>;
   /** Text to send as soon as the chat has loaded (the message that created it). */
   autoSend?: string;
+  /** Files that went with that first message. */
+  autoFiles?: File[];
   onAutoSent: () => void;
-  onCreate: (text: string) => void;
+  onCreate: (text: string, files: File[]) => void;
   onChanged: () => void;
   onOpenChat: (id: string) => void;
   onBusy: (busy: boolean) => void;
 }
 
-export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaultModel, offline, composerRef, autoSend, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
+export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaultModel, offline, composerRef, autoSend, autoFiles, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
   const toast = useToast();
-  const chat = useChat(chatId, { onChange: onChanged, onError: (m) => toast.error(m) });
+  const chat = useChat(chatId, { onChange: onChanged, onError: (m) => toast.error(m), onRestore: (text, files) => { composerRef.current?.insert(text); composerRef.current?.addFiles(files); } });
   const sentAuto = useRef(false);
   // The folder shown right away after a change; the chat list catches up on its next refresh.
   const [dirOverride, setDirOverride] = useState<{ dir: string | undefined } | null>(null);
@@ -61,12 +64,12 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
   useEffect(() => {
     if (chatId && autoSend && chat.loaded && !sentAuto.current) {
       sentAuto.current = true;
-      chat.send(autoSend);
+      chat.send(autoSend, autoFiles);
       onAutoSent();
     }
   }, [chatId, autoSend, chat.loaded]);
 
-  const send = (text: string) => (chatId ? chat.send(text) : onCreate(text));
+  const send = (text: string, files: File[] = []) => (chatId ? chat.send(text, files) : onCreate(text, files));
 
   const stop = async () => {
     const held = await chat.stop();
@@ -98,6 +101,7 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
       <div className="chat-col">
       {chat.live === "reconnecting" && !offline && <div className="banner warn" role="status">Connection lost. Reconnecting…</div>}
       <Transcript
+        chatId={chatId}
         events={chat.events}
         streaming={chat.streaming}
         busy={chat.busy}
@@ -111,6 +115,7 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
         onSuggest={(t) => composerRef.current?.set(t)}
         onOpenChat={onOpenChat}
       />
+      <ContextMeter events={chat.events} />
       <Composer
         ref={composerRef}
         chatId={chatId}

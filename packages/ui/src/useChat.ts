@@ -5,6 +5,8 @@ import { TROUBLE_EVENT } from "./connection.ts";
 export interface Pending {
   id: number;
   text: string;
+  /** Names of files being sent with it. */
+  files?: string[];
   failed?: string;
 }
 
@@ -18,7 +20,7 @@ const BACKOFF = [500, 1000, 2000, 4000, 8000];
  * - shows the user's message immediately (pending) and marks it failed if the send is rejected
  * - queues messages typed while a reply is running and sends them one by one
  */
-export function useChat(chatId: string | null, opts: { onChange: () => void; onError: (m: string) => void }) {
+export function useChat(chatId: string | null, opts: { onChange: () => void; onError: (m: string) => void; /** An upload failed: give the text and files back to the composer. */ onRestore?: (text: string, files: File[]) => void }) {
   const [events, setEvents] = useState<SeqEvent[]>([]);
   const [streaming, setStreaming] = useState("");
   const [busy, setBusy] = useState(false);
@@ -120,11 +122,26 @@ export function useChat(chatId: string | null, opts: { onChange: () => void; onE
     };
   }, [chatId]);
 
-  const post = useCallback(async (id: string, text: string, p: Pending) => {
+  const post = useCallback(async (id: string, text: string, p: Pending, files: File[] = []) => {
     sending.current = true;
     setBusy(true);
+    let ids: string[] | undefined;
+    if (files.length) {
+      try {
+        ids = [];
+        for (const f of files) ids.push((await api.uploadAttachment(id, f)).id);
+      } catch (e) {
+        // Nothing was sent: hand everything back so the user can fix it and press Send again.
+        sending.current = false;
+        setBusy(false);
+        setPending((ps) => ps.filter((x) => x.id !== p.id));
+        optsRef.current.onRestore?.(text, files);
+        optsRef.current.onError((e as Error).message);
+        return;
+      }
+    }
     try {
-      await api.send(id, text);
+      await api.send(id, text, ids);
     } catch (e) {
       sending.current = false;
       if (e instanceof ApiError && e.status === 409) {
@@ -140,15 +157,16 @@ export function useChat(chatId: string | null, opts: { onChange: () => void; onE
     sending.current = false;
   }, []);
 
-  const send = useCallback((text: string) => {
+  const send = useCallback((text: string, files: File[] = []) => {
     if (!chatId) return;
     if (busy || sending.current) {
+      if (files.length) { optsRef.current.onRestore?.(text, files); optsRef.current.onError("Attachments can be sent once the current reply finishes."); return; }
       setQueue((q) => [...q, text]);
       return;
     }
-    const p: Pending = { id: nextId.current++, text };
+    const p: Pending = { id: nextId.current++, text, ...(files.length ? { files: files.map((f) => f.name) } : {}) };
     setPending((ps) => [...ps, p]);
-    void post(chatId, text, p);
+    void post(chatId, text, p, files);
   }, [chatId, busy, post]);
 
   // Send the next queued message as soon as the reply finishes.

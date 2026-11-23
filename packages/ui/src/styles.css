@@ -239,3 +239,24 @@ kbd { font-family: var(--dt-font-mono); font-size: 12px; }
 .branch-item .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .stash-list li { border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
 .stash-info { display: flex; flex-direction: column; font-size: 12px; overflow-wrap: anywhere; }
+
+.ctx-meter { display: flex; align-items: center; gap: 8px; justify-content: flex-end; padding: 0 16px 2px; color: var(--muted-foreground); }
+.ctx-bar { width: 84px; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.ctx-bar > i { display: block; height: 100%; background: var(--accent); }
+.ctx-meter.warn { color: var(--foreground); }
+.ctx-meter.warn .ctx-bar > i { background: #d9a400; }
+.ctx-meter.full { color: var(--dt-destructive-text, var(--foreground)); }
+.ctx-meter.full .ctx-bar > i { background: var(--dt-destructive-text, #e5534b); }
+
+.composer-wrap.dragging .composer { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.attach-btn { align-self: flex-end; }
+.att-draft, .att-list { list-style: none; margin: 0; padding: 0 0 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+.att-draft li { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 3px 4px 3px 6px; max-width: 100%; }
+.att-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+.att-mini { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; }
+.user-msg .att-list { justify-content: flex-end; padding: 4px 0 0; }
+.att-thumb { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 0; cursor: pointer; overflow: hidden; max-width: 220px; }
+.att-thumb img { display: block; max-width: 220px; max-height: 180px; object-fit: contain; }
+.att-loading { display: block; padding: 20px 12px; font-size: 12px; color: var(--muted-foreground); }
+.att-chip { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; font-size: 12px; color: var(--foreground); cursor: pointer; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-chip.gone { cursor: default; color: var(--muted-foreground); }

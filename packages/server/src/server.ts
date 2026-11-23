@@ -1,5 +1,7 @@
+import fs from "node:fs";
 import { applyBackup, backupFileName, createBackup, previewBackup } from "./backup.ts";
 import { chatToMarkdown, exportFileName, searchLimited } from "./export.ts";
+import { MAX_IMAGE_BYTES, MAX_PER_MESSAGE } from "./attachments.ts";
 import { gitBranches, gitStashApply, gitStashDrop, gitStashList, gitStashPush, gitSwitch } from "./gitbranch.ts";
 import { gitCommit, gitCreatePr, gitDiff, gitPrDetail, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
 import { HttpError } from "./http-error.ts";
@@ -82,6 +84,32 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       app.store.resetCache();
       return json(res, 200, result);
     }
+    // --- attachments (raw file body, so these run before the JSON body parser)
+    if (seg[0] === "chats" && seg[2] === "attachments" && seg[1]) {
+      const chatId = seg[1];
+      const chat = app.store.get(chatId);
+      if (!chat || chat.hidden) throw new HttpError(404, "no such chat");
+      if (m === "POST" && seg.length === 3) {
+        const data = await readRaw(req, MAX_IMAGE_BYTES + 1024);
+        return json(res, 201, app.attachments.save(chatId, url.searchParams.get("name") ?? "file", data));
+      }
+      if (m === "GET" && seg.length === 4) {
+        const f = app.attachments.open(chatId, seg[3]);
+        if (!f) throw new HttpError(404, "That attachment is gone.");
+        const data = fs.readFileSync(f.path);
+        // Only the four raster image types are ever shown as images; everything else is plain text. Nothing can run in the browser.
+        res.writeHead(200, {
+          "content-type": f.ref.kind === "image" ? f.ref.mime : "text/plain; charset=utf-8",
+          "content-length": data.length,
+          "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(f.ref.name)}`,
+          "x-content-type-options": "nosniff",
+          "content-security-policy": "sandbox; default-src 'none'; style-src 'none'",
+          "cache-control": "private, max-age=3600",
+        });
+        return void res.end(data);
+      }
+      throw new HttpError(405, "not allowed");
+    }
     const body = m === "POST" || m === "PUT" || m === "PATCH" ? await readBody(req) : {};
 
     // --- bootstrap, settings, models
@@ -134,10 +162,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         }
       }
       if (seg[2] === "messages" && m === "POST") {
-        const text = typeof body.text === "string" ? body.text.trim() : "";
-        if (!text) return json(res, 400, { error: "empty message" });
+        const raw = typeof body.text === "string" ? body.text.trim() : "";
+        const attached = app.attachments.resolve(id, body.attachments);
+        if (!raw && attached.length === 0) return json(res, 400, { error: "empty message" });
+        const text = raw || (attached.length === 1 ? "Please take a look at the attached file." : "Please take a look at the attached files.");
+        if (attached.length > MAX_PER_MESSAGE) return json(res, 400, { error: `At most ${MAX_PER_MESSAGE} attachments per message.` });
         try {
-          app.send(id, text);
+          app.send(id, text, attached);
         } catch (e) {
           return json(res, 409, { error: (e as Error).message });
         }

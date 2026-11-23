@@ -1,4 +1,4 @@
-import type { Engine, EngineEvent, EngineSession, PermissionRequest, SessionOptions } from "./engine.ts";
+import type { Engine, EngineAttachment, EngineEvent, EngineSession, PermissionRequest, SessionOptions } from "./engine.ts";
 import type { ModelOption } from "./protocol.ts";
 
 export type FakeStep =
@@ -89,7 +89,7 @@ export class FakeEngine implements Engine {
   /** Ids of sessions that were closed. */
   readonly closed: string[] = [];
   /** Every prompt sent, with the session options it was sent to. */
-  readonly prompts: { prompt: string; opts: SessionOptions }[] = [];
+  readonly prompts: { prompt: string; opts: SessionOptions; attachments?: EngineAttachment[] }[] = [];
   constructor(private script: FakeScript = defaultScript, private streamDelayMs = 0) {}
 
   async listModels(): Promise<ModelOption[]> {
@@ -103,9 +103,14 @@ export class FakeEngine implements Engine {
   async createSession(opts: SessionOptions): Promise<EngineSession> {
     this.sessions.push(opts);
     const self = this;
+    let chars = 0; // a rough stand-in for how much the conversation holds
+    let boost = 0; // a prompt containing [context:N] pretends the conversation holds N more tokens (for trying the meter)
     return {
-      async send(prompt, onEvent, signal) {
-        self.prompts.push({ prompt, opts });
+      async send(prompt, onEvent, signal, attachments) {
+        chars += prompt.length + opts.systemMessage.length;
+        const ctx = /\[context:(\d{1,9})\]/.exec(prompt);
+        if (ctx) boost = Number(ctx[1]);
+        self.prompts.push({ prompt, opts, attachments });
         const steps = await self.script({ prompt, opts });
         let n = 0;
         const runTool = async (step: { tool: string; args: Record<string, unknown> }) => {
@@ -146,12 +151,16 @@ export class FakeEngine implements Engine {
             onEvent({ type: "tool_end", id, name, ok: true, result: `(fake ${step.builtin}) ${step.detail}` });
           }
         }
+        onEvent({ type: "usage", used: Math.ceil(chars / 4) + boost + (self.usageBoost ?? 0), limit: self.usageLimit ?? 128_000 });
       },
       async close() {
         self.closed.push(opts.id);
       },
     };
   }
+  /** Tests and the stress script can push the meter up (extra tokens) or change the limit. */
+  usageBoost?: number;
+  usageLimit?: number;
   async close() {}
 }
 

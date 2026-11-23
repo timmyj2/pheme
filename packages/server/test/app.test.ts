@@ -9,7 +9,7 @@ describe("App turns", () => {
     const chat = app.store.create();
     app.send(chat.id, "hello there");
     await app.drain();
-    expect(types(app, chat.id)).toEqual(["user", "turn_start", "message", "idle"]);
+    expect(types(app, chat.id)).toEqual(["user", "turn_start", "message", "usage", "idle"]);
     expect(app.store.get(chat.id)?.title).toBe("hello there");
     expect(app.settings.usage().turns).toBe(1);
   });
