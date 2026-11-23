@@ -4,6 +4,7 @@ import { ChatView } from "./Chat.tsx";
 import type { ComposerHandle } from "./Composer.tsx";
 import { ConfirmDialog } from "./Dialog.tsx";
 import { clearUnsaved, hasUnsaved } from "./unsaved.ts";
+import { NOTIFY_CHANGED, notifyEnabled, useNotifications } from "./notify.ts";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { JobsPage } from "./Jobs.tsx";
 import { MemoryPage, SettingsPage, SkillsPage } from "./Pages.tsx";
@@ -13,7 +14,9 @@ import { Sidebar } from "./Sidebar.tsx";
 import { api, type BootstrapState, type ChatRow } from "./api.ts";
 import { useConnection } from "./connection.ts";
 import { computeUnread, loadSeen, saveSeen } from "./seen.ts";
-import { ALT, MOD, isTyping } from "./shortcuts.ts";
+import { isTyping } from "./shortcuts.ts";
+import { formatCombo, matches } from "./keybindings.ts";
+import { useBindings } from "./useBindings.ts";
 import { THEMES, applyTheme, parseTheme, themeValue } from "./themes/presets.ts";
 import { useToast } from "./toast.tsx";
 import { useRoute, type View } from "./router.ts";
@@ -26,6 +29,7 @@ export function App() {
   const conn = useConnection();
   const state = conn.state;
   const [route, rawNavigate] = useRoute();
+  const keys = useBindings();
   const [leaving, setLeaving] = useState<null | (() => void)>(null);
   // Leaving a page with unsaved edits (memory, skills) asks first; in-place replace navigations never do.
   const navigate = useCallback<typeof rawNavigate>((r, opts) => {
@@ -59,7 +63,8 @@ export function App() {
 
   useEffect(() => {
     refresh();
-    const t = setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 4000);
+    // A hidden tab keeps polling only when notifications are on (browsers slow hidden timers to about once a minute).
+    const t = setInterval(() => { if (document.visibilityState === "visible" || notifyEnabled()) refresh(); }, 4000);
     document.addEventListener("visibilitychange", refresh);
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", refresh); };
   }, [refresh]);
@@ -128,6 +133,14 @@ export function App() {
     setTimeout(() => composerRef.current?.focus(), 0);
   }, [go]);
   const openChat = useCallback((id: string) => (id ? go({ view: "chat", chatId: id }) : newChat()), [go, newChat]);
+  const [notifyOn, setNotifyOn] = useState(notifyEnabled);
+  useEffect(() => {
+    const sync = () => setNotifyOn(notifyEnabled());
+    window.addEventListener(NOTIFY_CHANGED, sync);
+    window.addEventListener("storage", sync); // another tab changed it
+    return () => { window.removeEventListener(NOTIFY_CHANGED, sync); window.removeEventListener("storage", sync); };
+  }, []);
+  useNotifications(chats, chatsLoaded, activeId, notifyOn, openChat);
 
   const createAndSend = useCallback(async (text: string) => {
     try {
@@ -179,21 +192,22 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.code === "KeyK") { e.preventDefault(); setPalette((p) => !p); return; }
+      if (matches(e, keys.palette)) { e.preventDefault(); setPalette((p) => !p); return; }
       if (palette || help || confirmDelete) return;
-      if (mod && e.code === "KeyB") { e.preventDefault(); if (window.matchMedia(NARROW).matches) setDrawer((d) => !d); else setHidden((h) => !h); return; }
+      if (matches(e, keys.sidebar)) { e.preventDefault(); if (window.matchMedia(NARROW).matches) setDrawer((d) => !d); else setHidden((h) => !h); return; }
+      if (matches(e, keys.new)) { e.preventDefault(); newChat(); return; }
+      if (matches(e, keys.search)) { e.preventDefault(); setHidden(false); setDrawer(true); setTimeout(() => searchRef.current?.focus(), 0); return; }
+      if (matches(e, keys.prev) || matches(e, keys.next)) {
+        e.preventDefault();
+        const down = matches(e, keys.next);
+        const i = recent.findIndex((c) => c.id === activeId);
+        const next = recent[down ? i + 1 : i < 0 ? 0 : i - 1];
+        if (next) openChat(next.id);
+        return;
+      }
       if (e.altKey && !mod) {
-        if (e.code === "KeyN") { e.preventDefault(); newChat(); return; }
-        if (e.code === "KeyS") { e.preventDefault(); setHidden(false); setDrawer(true); setTimeout(() => searchRef.current?.focus(), 0); return; }
         const slot = /^Digit([1-9])$/.exec(e.code);
         if (slot) { const c = recent[Number(slot[1]) - 1]; if (c) { e.preventDefault(); openChat(c.id); } return; }
-        if (e.code === "ArrowUp" || e.code === "ArrowDown") {
-          e.preventDefault();
-          const i = recent.findIndex((c) => c.id === activeId);
-          const next = recent[e.code === "ArrowDown" ? i + 1 : i < 0 ? 0 : i - 1];
-          if (next) openChat(next.id);
-          return;
-        }
       }
       if (isTyping(e.target) || mod || e.altKey) return;
       if (e.key === "/") { e.preventDefault(); composerRef.current?.focus(); }
@@ -201,21 +215,21 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [palette, help, confirmDelete, recent, activeId, newChat, openChat]);
+  }, [palette, help, confirmDelete, recent, activeId, newChat, openChat, keys]);
 
   useEffect(() => { if (palette) api.skills().then((l) => setSkillNames(l.map((x) => x.name))).catch(() => {}); }, [palette]);
 
   const commands = useMemo<Command[]>(() => {
     const cur = state ? parseTheme(state.settings.theme) : null;
     const pageCmds: Command[] = [
-      { id: "new", label: "New chat", hint: `${ALT}+N`, run: newChat },
+      { id: "new", label: "New chat", hint: formatCombo(keys.new), run: newChat },
       { id: "skills", label: "Go to Skills", run: () => go({ view: "skills", name: null }) },
       { id: "memory", label: "Go to Memory", run: () => go({ view: "memory" }) },
       { id: "agents", label: "Go to Agents", run: () => go({ view: "agents" }) },
       { id: "jobs", label: "Go to Scheduled jobs", run: () => go({ view: "jobs" }) },
       { id: "settings", label: "Go to Settings", run: () => go({ view: "settings" }) },
       { id: "help", label: "Keyboard shortcuts", hint: "?", run: () => setHelp(true) },
-      { id: "sidebar", label: hidden ? "Show sidebar" : "Hide sidebar", hint: `${MOD}+B`, run: () => setHidden((h) => !h) },
+      { id: "sidebar", label: hidden ? "Show sidebar" : "Hide sidebar", hint: formatCombo(keys.sidebar), run: () => setHidden((h) => !h) },
       { id: "mode", label: "Toggle light/dark mode", run: () => { if (cur) void setSetting({ theme: themeValue(cur.theme.name, document.documentElement.classList.contains("dark") ? "light" : "dark") }); } },
       { id: "auto", label: state?.settings.autoApproveAll ? "Turn off Auto-approve all" : "Turn on Auto-approve all", run: () => void setSetting({ autoApproveAll: !state?.settings.autoApproveAll }) },
       { id: "loops", label: state?.settings.loopsEnabled ? "Turn off learning loops" : "Turn on learning loops", run: () => void setSetting({ loopsEnabled: !state?.settings.loopsEnabled }) },
@@ -274,7 +288,7 @@ export function App() {
       {drawer && <div className="backdrop" onClick={closeDrawer} aria-hidden />}
       <main className="main" id="main" tabIndex={-1}>
         <header className="topbar">
-          <button className="icon-btn menu-btn" aria-label={hidden || drawer ? "Show sidebar" : "Hide sidebar"} aria-expanded={!hidden || drawer} title={`Toggle sidebar (${MOD}+B)`} onClick={() => { if (window.matchMedia(NARROW).matches) setDrawer((d) => !d); else setHidden((h) => !h); }}>☰</button>
+          <button className="icon-btn menu-btn" aria-label={hidden || drawer ? "Show sidebar" : "Hide sidebar"} aria-expanded={!hidden || drawer} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (window.matchMedia(NARROW).matches) setDrawer((d) => !d); else setHidden((h) => !h); }}>☰</button>
           <h1 className="topbar-title" title={pageTitle}>{pageTitle}</h1>
           <span className="spacer" />
           {state.fake && <span className="pill" title="Using the built-in fake engine">fake engine</span>}

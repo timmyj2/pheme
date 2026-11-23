@@ -163,6 +163,8 @@ export function parseNumstat(out: string): Map<string, { a: number; d: number; b
 }
 
 export async function gitStatus(cwd: string): Promise<GitStatus> {
+  // A folder that was deleted or moved (or came from a restored backup made elsewhere) must not look like "git is missing".
+  if (!fs.existsSync(cwd)) return { repo: false, files: [], problem: `This folder no longer exists: ${cwd}. Choose a folder again.` };
   const top = await runGit(cwd, ["rev-parse", "--show-toplevel"]);
   if (!top.ok) {
     const missing = /not installed/.test(top.stderr);
@@ -217,6 +219,7 @@ export function safeRepoPath(p: string): string {
 /** Unified diff of one file against HEAD (staged and unstaged together). Untracked files are shown as all-added. */
 export async function gitDiff(cwd: string, file: string): Promise<FileDiff> {
   const f = safeRepoPath(file);
+  if (!fs.existsSync(cwd)) throw new HttpError(400, `This folder no longer exists: ${cwd}`);
   const root = (await runGit(cwd, ["rev-parse", "--show-toplevel"])).stdout.trim();
   if (!root) throw new HttpError(400, "This folder is not a Git repository.");
   const tracked = await runGit(root, ["ls-files", "--error-unmatch", "--", f]);
@@ -297,6 +300,19 @@ export async function gitCommit(cwd: string, req: CommitRequest): Promise<Commit
   const risky = chosen.filter((f) => f.risky && !(req.allowRisky ?? []).includes(f.path));
   if (risky.length) throw new HttpError(409, `These look like secrets and were not committed: ${risky.map((f) => f.path).join(", ")}. Untick them, or confirm you really want them in Git.`);
 
+  // Everything below can fail half-way (a hook, a missing Git identity). Remember how things were so a failure leaves no trace.
+  const indexSnapshot = (await runGit(root, ["write-tree"])).stdout.trim();
+  const original = status.detached ? (await runGit(root, ["rev-parse", "HEAD"])).stdout.trim() : (status.branch ?? "");
+  let createdBranch = "";
+  const rollback = async () => {
+    if (createdBranch) {
+      await runGit(root, status.detached ? ["switch", "--detach", original] : ["switch", original]);
+      await runGit(root, ["branch", "-D", createdBranch]);
+      createdBranch = "";
+    }
+    if (indexSnapshot) await runGit(root, ["read-tree", indexSnapshot]); // the index exactly as it was; the working tree is untouched
+  };
+
   // Where to commit: never straight onto main/master/detached HEAD.
   let branch = status.branch ?? "";
   if (status.protectedBranch) {
@@ -308,6 +324,7 @@ export async function gitCommit(cwd: string, req: CommitRequest): Promise<Commit
     const sw = await runGit(root, ["switch", "-c", name]);
     if (!sw.ok) throw new HttpError(409, sw.stderr || "Could not create the branch.");
     branch = name;
+    createdBranch = name;
   } else if (req.branch?.trim() && req.branch.trim() !== branch) {
     throw new HttpError(400, "A new branch is only needed when you are on main or master.");
   }
@@ -319,14 +336,15 @@ export async function gitCommit(cwd: string, req: CommitRequest): Promise<Commit
   const unstage = status.files.filter((f) => f.staged && !wanted.has(f.path)).flatMap((f) => (f.from ? [f.path, f.from] : [f.path]));
   if (unstage.length) {
     const r = await runGit(root, status.hasCommits ? ["reset", "-q", "HEAD", "--", ...unstage] : ["rm", "--cached", "-r", "-q", "--", ...unstage]);
-    if (!r.ok) throw new HttpError(500, r.stderr || "Could not set aside the files you did not tick.");
+    if (!r.ok) { await rollback(); throw new HttpError(500, r.stderr || "Could not set aside the files you did not tick."); }
   }
   const add = await runGit(root, ["add", "-A", "--", ...toAdd]);
-  if (!add.ok) throw new HttpError(500, add.stderr || "Could not stage the files.");
+  if (!add.ok) { await rollback(); throw new HttpError(500, add.stderr || "Could not stage the files."); }
 
   // Message on stdin: no quoting problems, no length limit from the command line.
   const c = await runGit(root, ["commit", "-q", "-F", "-"], { input: message + "\n", timeoutMs: COMMIT_TIMEOUT_MS });
   if (!c.ok) {
+    await rollback();
     const why = (c.stderr || c.stdout).trim();
     if (/tell me who you are|Please tell me|empty ident|unable to auto-detect|useConfigOnly/i.test(why)) throw new HttpError(409, 'Git does not know who you are yet. In a terminal run:  git config --global user.name "Your Name"  and  git config --global user.email "you@example.com"  then try again.');
     if (/nothing (added )?to commit|no changes added/i.test(why)) throw new HttpError(409, "Nothing to commit: the chosen files have no changes.");

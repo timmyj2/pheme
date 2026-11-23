@@ -1,3 +1,4 @@
+import { applyBackup, backupFileName, createBackup, previewBackup } from "./backup.ts";
 import { chatToMarkdown, exportFileName, searchMessages } from "./export.ts";
 import { gitCommit, gitCreatePr, gitDiff, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
 import { HttpError } from "./http-error.ts";
@@ -32,6 +33,8 @@ export interface RunningServer {
 }
 
 const MAX_BODY = 1_000_000;
+/** Largest backup file accepted for restore (compressed bytes). */
+const MAX_RESTORE = 250_000_000;
 
 export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const { app } = opts;
@@ -62,6 +65,22 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
     const m = req.method ?? "GET";
     const seg = p.slice(5).split("/").filter(Boolean).map(decodeURIComponent);
+
+    // --- backup and restore (raw file body, so these run before the JSON body parser)
+    if (seg[0] === "backup" && m === "GET") {
+      const now = Date.now();
+      const file = createBackup(app.dataDir, opts.version, now);
+      res.writeHead(200, { "content-type": "application/octet-stream", "content-length": file.length, "content-disposition": `attachment; filename="${backupFileName(now)}"`, "cache-control": "no-store", "x-content-type-options": "nosniff" });
+      return res.end(file);
+    }
+    if (seg[0] === "restore" && m === "POST" && (seg[1] === "preview" || seg.length === 1)) {
+      const data = await readRaw(req, MAX_RESTORE);
+      if (seg[1] === "preview") return json(res, 200, previewBackup(data, app.dataDir));
+      if (app.busyCount() > 0) throw new HttpError(409, "A reply is running. Wait for it to finish (or stop it), then restore.");
+      const result = applyBackup(data, app.dataDir, { overwrite: url.searchParams.get("overwrite") === "1", appVersion: opts.version });
+      app.store.resetCache();
+      return json(res, 200, result);
+    }
     const body = m === "POST" || m === "PUT" || m === "PATCH" ? await readBody(req) : {};
 
     // --- bootstrap, settings, models
@@ -81,7 +100,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     // --- chats
     if (seg[0] === "chats") {
       if (seg.length === 1) {
-        if (m === "GET") return json(res, 200, app.store.list().map((c) => ({ ...c, busy: app.isBusy(c.id) })));
+        if (m === "GET") return json(res, 200, app.store.list().map((c) => ({ ...c, busy: app.isBusy(c.id), waiting: app.pendingApprovals(c.id).length > 0 })));
         if (m === "POST") return json(res, 201, app.store.create({ model: typeof body.model === "string" ? body.model : undefined }));
       }
       const id = seg[1];
@@ -305,6 +324,23 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 function json(res: http.ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
   res.end(JSON.stringify(body));
+}
+
+function readRaw(req: http.IncomingMessage, max: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size > max) {
+        reject(new HttpError(413, "That file is too large."));
+        chunks.length = 0;
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
 }
 
 function readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {

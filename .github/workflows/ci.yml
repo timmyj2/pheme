@@ -21,6 +21,16 @@ jobs:
       - run: npm run build
       - run: node scripts/smoke.mjs
       - run: node scripts/stress.mjs
+      - run: npx playwright install chromium
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: pheme-${{ matrix.os }}

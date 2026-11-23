@@ -74,6 +74,11 @@ export class ChatStore {
     return m;
   }
 
+  /** Forget cached per-chat counters; call after files in the data folder were replaced from outside (a restore). */
+  resetCache(): void {
+    this.seqs.clear();
+  }
+
   remove(id: string): void {
     this.removed.add(id);
     this.listeners.delete(id);

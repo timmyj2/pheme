@@ -115,3 +115,18 @@ describe("HTTP", () => {
     expect(((await (await get(`/api/search`)).json()) as { hits: unknown[] }).hits).toEqual([]);
   });
 });
+
+describe("chat list flags", () => {
+  it("marks a chat as busy and waiting while a tool needs approval", async () => {
+    const ctx = makeApp();
+    srv = await startServer({ app: ctx.app, fake: true, version: "t", token: "secret-token", assets: {} });
+    const list = async () => (await (await fetch(`http://127.0.0.1:${srv!.port}/api/chats`, { headers: { "x-pheme-token": "secret-token" } })).json()) as { id: string; busy: boolean; waiting: boolean }[];
+    const chat = ctx.app.store.create();
+    expect((await list())[0]).toMatchObject({ busy: false, waiting: false });
+    ctx.app.send(chat.id, "run ls");
+    await new Promise((r) => setTimeout(r, 300));
+    expect((await list())[0]).toMatchObject({ busy: true, waiting: true });
+    ctx.app.stop(chat.id); await ctx.app.drain();
+    expect((await list())[0]).toMatchObject({ busy: false, waiting: false });
+  });
+});

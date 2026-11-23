@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BackupSetting } from "./BackupSetting.tsx";
+import { KeybindingSettings } from "./KeybindingSettings.tsx";
+import { NotificationSetting } from "./NotificationSetting.tsx";
 import { useUnsaved } from "./unsaved.ts";
 import { ConfirmDialog } from "./Dialog.tsx";
 import { THEMES, parseTheme, themeValue, type Mode } from "./themes/presets.ts";
@@ -260,9 +263,28 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
   const theme = cur.theme;
   const modes: Mode[] = ["system", ...(theme.light ? ["light" as const] : []), ...(theme.dark ? ["dark" as const] : [])];
   const list = models ?? [];
+  // Settings search: hide the panels whose text (headings, labels, option names, help text) does not contain the words typed.
+  const [find, setFind] = useState("");
+  const [shown, setShown] = useState(-1);
+  const body = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const words = find.toLowerCase().split(/\s+/).filter(Boolean);
+    let visible = 0;
+    body.current?.querySelectorAll<HTMLElement>(":scope > .panel").forEach((el) => {
+      const text = (el.textContent ?? "").toLowerCase();
+      const hit = words.every((w) => text.includes(w));
+      el.hidden = !hit;
+      if (hit) visible++;
+    });
+    setShown((n) => (n === visible ? n : visible));
+  });
   return (
-    <section className="page">
+    <section className="page" ref={body}>
       <Head title="Settings" sub={`Pheme ${state.version} · engine: ${state.engine}${state.fake ? " (fake mode)" : ""}`} />
+      <div className="settings-find">
+        <input type="search" aria-label="Search settings" placeholder="Search settings (for example: theme, approve, memory)" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setFind(""); }} />
+        {find.trim() && shown === 0 && <p className="muted small" role="status">No settings match “{find.trim()}”.</p>}
+      </div>
       <div className="panel">
         <h3>Model</h3>
         <label className="field">Chat model
@@ -294,6 +316,9 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
         </div>
         {(!theme.light || !theme.dark) && <p className="muted small">This theme has only one {theme.dark ? "dark" : "light"} palette.</p>}
       </div>
+      <NotificationSetting />
+      <KeybindingSettings />
+      <BackupSetting />
       <div className="panel">
         <h3>Permissions</h3>
         <label className="check">
