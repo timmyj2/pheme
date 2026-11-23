@@ -274,6 +274,7 @@ export function App() {
             <ChatView
               key={activeId ?? "new"}
               chatId={activeId}
+              projectDir={chats.find((c) => c.id === activeId)?.projectDir}
               offline={offline}
               composerRef={composerRef}
               autoSend={firstMessage.current?.id === activeId ? firstMessage.current?.text : undefined}

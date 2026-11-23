@@ -1,5 +1,6 @@
 import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, SeqEvent, Settings, SkillSummary, ApprovalDecision, Job, JobSchedule, AgentProfile, AgentRun, CuratorState } from "../../server/src/protocol.ts";
 
+export type { GitStatus, ChangedFile, FileDiff } from "../../server/src/git.ts";
 export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
 export type ChatRow = ChatMeta & { busy?: boolean };
 
@@ -48,7 +49,9 @@ export const api = {
   chats: () => call<ChatRow[]>("/chats"),
   newChat: () => call<ChatMeta>("/chats", "POST", {}),
   chat: (id: string) => call<{ meta: ChatMeta; busy: boolean; events: SeqEvent[] }>(`/chats/${id}`),
-  patchChat: (id: string, patch: Partial<Pick<ChatMeta, "title" | "pinned" | "archived">>) => call<ChatMeta>(`/chats/${id}`, "PATCH", patch),
+  patchChat: (id: string, patch: Partial<Pick<ChatMeta, "title" | "pinned" | "archived">> & { projectDir?: string | null }) => call<ChatMeta>(`/chats/${id}`, "PATCH", patch),
+  gitStatus: (id: string) => call<import("../../server/src/git.ts").GitStatus>(`/chats/${id}/git`),
+  gitDiff: (id: string, path: string) => call<import("../../server/src/git.ts").FileDiff>(`/chats/${id}/git/diff?path=${encodeURIComponent(path)}`),
   deleteChat: (id: string) => call<{ ok: boolean }>(`/chats/${id}`, "DELETE"),
   send: (id: string, text: string) => call<{ ok: boolean }>(`/chats/${id}/messages`, "POST", { text }),
   stop: (id: string) => call<{ ok: boolean }>(`/chats/${id}/stop`, "POST", {}),

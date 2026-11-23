@@ -1,3 +1,5 @@
+import { gitCommit, gitDiff, gitStatus, gitUndo } from "./git.ts";
+import { HttpError } from "./http-error.ts";
 import http from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
@@ -29,12 +31,6 @@ export interface RunningServer {
 }
 
 const MAX_BODY = 1_000_000;
-
-class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-  }
-}
 
 export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const { app } = opts;
@@ -94,6 +90,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
           if (typeof body.title === "string") patch.title = body.title.slice(0, 120);
           if (typeof body.pinned === "boolean") patch.pinned = body.pinned;
           if (typeof body.archived === "boolean") patch.archived = body.archived;
+          if ("projectDir" in body) {
+            if (body.projectDir !== null && typeof body.projectDir !== "string") throw new HttpError(400, "projectDir must be a path or null.");
+            await app.setProjectDir(id, body.projectDir as string | null);
+          }
           return json(res, 200, app.store.update(id, patch));
         }
         if (m === "DELETE") {
@@ -110,6 +110,21 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
           return json(res, 409, { error: (e as Error).message });
         }
         return json(res, 202, { ok: true });
+      }
+      if (seg[2] === "git" && m === "GET" && (seg.length === 3 || (seg.length === 4 && seg[3] === "diff"))) {
+        const dir = meta.projectDir;
+        if (!dir) return json(res, 200, { repo: false, files: [], problem: "Choose a project folder for this chat to see its changes." });
+        if (seg.length === 3) return json(res, 200, await gitStatus(dir));
+        const file = url.searchParams.get("path");
+        if (!file) throw new HttpError(400, "path is required.");
+        return json(res, 200, await gitDiff(dir, file));
+      }
+      if (seg[2] === "git" && m === "POST" && seg.length === 4 && (seg[3] === "commit" || seg[3] === "undo")) {
+        const dir = meta.projectDir;
+        if (!dir) throw new HttpError(400, "Choose a project folder for this chat first.");
+        if (app.isBusy(id)) throw new HttpError(409, "A reply is running and may still be editing files. Wait for it to finish (or stop it), then commit.");
+        if (seg[3] === "undo") return json(res, 200, await gitUndo(dir, String(body.sha ?? "")));
+        return json(res, 200, await gitCommit(dir, { message: body.message as string, paths: body.paths as string[], branch: typeof body.branch === "string" ? body.branch : undefined, allowRisky: Array.isArray(body.allowRisky) ? (body.allowRisky as string[]) : [] }));
       }
       if (seg[2] === "stop" && m === "POST") {
         app.stop(id);

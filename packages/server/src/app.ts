@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { AgentStore, Semaphore } from "./agents.ts";
 import type { Engine, EngineEvent, EngineSession, PermissionAnswer, PermissionRequest } from "./engine.ts";
 import { Curator } from "./curator.ts";
+import { checkProjectDir } from "./git.ts";
+import { HttpError } from "./http-error.ts";
 import { JobStore, Scheduler } from "./jobs.ts";
 import { Loops } from "./loops.ts";
 import { MemoryStore } from "./memory.ts";
@@ -123,6 +125,17 @@ export class App {
     await this.dropSession(chatId);
   }
 
+  /** Point a chat at a project folder (or clear it with null). The next message opens a fresh session there. */
+  async setProjectDir(chatId: string, dir: string | null): Promise<ChatMeta> {
+    const meta = this.store.get(chatId);
+    if (!meta) throw new HttpError(404, "no such chat");
+    if (this.isBusy(chatId)) throw new HttpError(409, "Wait for the current reply to finish (or stop it) before changing the folder.");
+    const projectDir = dir === null ? undefined : checkProjectDir(dir);
+    const updated = this.store.update(chatId, { projectDir })!;
+    await this.dropSession(chatId);
+    return updated;
+  }
+
   isBusy(chatId: string): boolean {
     return this.turns.has(chatId);
   }
@@ -206,6 +219,7 @@ export class App {
     const session = await this.engine.createSession({
       id: chatId,
       resume,
+      workingDirectory: this.store.get(chatId)?.projectDir,
       model: this.store.get(chatId)?.model ?? s.model,
       systemMessage: this.buildSystemMessage(),
       tools: [memoryTool(this.memory), ...skillTools(this.skills), agentTool((task, profile) => this.runAgent(chatId, task, profile))],

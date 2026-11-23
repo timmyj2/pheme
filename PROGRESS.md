@@ -62,3 +62,9 @@ Hermes-style UI pass: markdown, 11 themes with contrast checks, queue-while-busy
 
 ## Test-everything round (2026-11-22)
 Browser-tested pages, keyboard/a11y, two tabs, fresh install, real Copilot (2 requests). Fixed: unsaved-edit guard, page scrollbar, job interval validation, agent name lock, sidebar tab stop/focus, unknown CLI flags, license texts. Release zip v0.1.0 re-uploaded with current build. 354 tests, CI green.
+
+## Overnight run (branch feat/git-review, NOT merged to main)
+Done and tested: per-chat project folder (server + UI), Git status/diff routes, Changes panel (grouped files, diffs, live refresh),
+server-side commit and undo (safety rules in DECISIONS.md). 395 tests, smoke and stress green.
+Not done: commit box in the UI (files, message, branch name, confirm, undo button), push and PR, queue items 5-11 in docs/NEXT.md.
+Blocked on: an approval prompt for a file-write step timed out while the owner slept; I did not retry it.

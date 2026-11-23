@@ -13,6 +13,8 @@ export interface ChatMeta {
   /** Value of `userMessages` when the memory review last ran. */
   lastMemoryReviewAt: number;
   model?: string;
+  /** Folder the engine works in for this chat (and where the Git panel looks). Absolute path. */
+  projectDir?: string;
 }
 
 export type ChatEvent =

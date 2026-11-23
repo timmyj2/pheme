@@ -59,10 +59,11 @@ export class ChatStore {
     return out.sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  update(id: string, patch: Partial<Pick<ChatMeta, "title" | "pinned" | "archived" | "userMessages" | "lastMemoryReviewAt" | "model">>): ChatMeta | undefined {
+  update(id: string, patch: Partial<Pick<ChatMeta, "title" | "pinned" | "archived" | "userMessages" | "lastMemoryReviewAt" | "model" | "projectDir">>): ChatMeta | undefined {
     const m = this.get(id);
     if (!m) return undefined;
     Object.assign(m, patch, { updatedAt: Date.now() });
+    if (m.projectDir === undefined) delete m.projectDir;
     writeJson(this.metaFile(id), m);
     return m;
   }

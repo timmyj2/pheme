@@ -126,6 +126,7 @@ export class CopilotEngine implements Engine {
       onPermissionRequest,
       streaming: true,
     };
+    if (opts.workingDirectory) config.workingDirectory = opts.workingDirectory;
     if (opts.agents?.length) {
       config.customAgents = opts.agents.map((a) => ({ name: a.name, displayName: a.name, description: a.description, prompt: a.prompt, tools: a.tools ?? null, infer: true }));
     }
