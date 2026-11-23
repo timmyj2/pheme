@@ -36,6 +36,8 @@ export interface SessionOptions {
   onPermission: (req: PermissionRequest) => Promise<PermissionAnswer>;
   /** Restrict the session to the custom tools only (used for hidden review sessions). */
   customToolsOnly?: boolean;
+  /** Folder tool calls (shell, file edits) run in. Defaults to the engine's own. */
+  workingDirectory?: string;
   /** Custom agent profiles the engine may delegate to (Copilot `customAgents`). */
   agents?: { name: string; description: string; prompt: string; tools?: string[] }[];
 }

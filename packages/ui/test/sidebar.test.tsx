@@ -1,8 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ROW_LIMIT, Sidebar, groupChats } from "../src/Sidebar.tsx";
+import { api } from "../src/api.ts";
 import type { ChatRow } from "../src/api.ts";
 
 const DAY = 86_400_000;
@@ -21,7 +22,7 @@ describe("groupChats", () => {
 function setup(chats: ChatRow[], over: Partial<React.ComponentProps<typeof Sidebar>> = {}) {
   const props = {
     chats, activeId: null, view: "chat" as const, unread: new Set<string>(), searchRef: createRef<HTMLInputElement>(),
-    onNew: vi.fn(), onOpen: vi.fn(), onView: vi.fn(), onRename: vi.fn(), onPin: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn(), ...over,
+    onNew: vi.fn(), onOpen: vi.fn(), onView: vi.fn(), onRename: vi.fn(), onPin: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn(), onExport: vi.fn(), ...over,
   };
   render(<Sidebar {...props} />);
   return props;
@@ -69,7 +70,7 @@ describe("Sidebar", () => {
     const p = setup([chat("a", "Alpha", 1)]);
     await user.click(screen.getByLabelText("Actions for Alpha"));
     const menu = screen.getByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((x) => x.textContent)).toEqual(["Rename", "Pin", "Archive", "Delete…"]);
+    expect(within(menu).getAllByRole("menuitem").map((x) => x.textContent)).toEqual(["Rename", "Pin", "Archive", "Export as Markdown", "Delete…"]);
     await user.click(within(menu).getByText("Pin"));
     expect(p.onPin).toHaveBeenCalled();
     await user.pointer({ keys: "[MouseRight]", target: screen.getByText("Alpha") });
@@ -152,5 +153,55 @@ describe("Sidebar", () => {
     await user.keyboard("{F2}Renamed{Enter}");
     expect(p.onRename).toHaveBeenCalled();
     expect(row()).toHaveFocus();
+  });
+});
+
+vi.mock("../src/api.ts", async (orig) => {
+  const actual = await orig<typeof import("../src/api.ts")>();
+  return { ...actual, api: { ...actual.api, search: vi.fn() } };
+});
+const search = api.search as unknown as ReturnType<typeof vi.fn>;
+
+describe("Sidebar: export and message search", () => {
+  beforeEach(() => search.mockReset());
+
+  it("offers Export as Markdown in the row menu", async () => {
+    const user = userEvent.setup();
+    const p = setup([chat("a", "Alpha", 1000)]);
+    await user.click(screen.getByLabelText("Actions for Alpha"));
+    await user.click(screen.getByRole("menuitem", { name: "Export as Markdown" }));
+    expect(p.onExport).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+  });
+
+  it("searches message text after typing stops, lists hits not already matched by title, and opens one", async () => {
+    const user = userEvent.setup();
+    search.mockResolvedValue({ partial: false, hits: [
+      { id: "a", title: "Alpha zebra", updatedAt: 1, snippet: "title match already listed", role: "you" },
+      { id: "b", title: "Beta", updatedAt: 1, snippet: "…the zebra crossing…", role: "pheme" },
+      { id: "c", title: "Gamma", updatedAt: 1, snippet: "a zebra here", role: "you" },
+    ] });
+    const p = setup([chat("a", "Alpha zebra", 1000), chat("b", "Beta", 2000), chat("c", "Gamma", 3000)]);
+    await user.type(screen.getByLabelText("Search chats"), "zebra");
+    expect(await screen.findByText("In messages")).toBeInTheDocument();
+    expect(search).toHaveBeenCalledTimes(1); // debounced: one request for the whole word, not one per key
+    expect(search).toHaveBeenCalledWith("zebra");
+    expect(screen.getByText(/the zebra crossing/)).toBeInTheDocument();
+    expect(screen.getByText(/You: a zebra here/)).toBeInTheDocument();
+    expect(screen.queryByText("title match already listed")).toBeNull();
+    await user.click(screen.getByText(/the zebra crossing/));
+    expect(p.onOpen).toHaveBeenCalledWith("b");
+  });
+
+  it("does not search for a single character", async () => {
+    const user = userEvent.setup();
+    search.mockResolvedValue({ hits: [], partial: false });
+    setup([chat("a", "Alpha", 1000)]);
+    await user.type(screen.getByLabelText("Search chats"), "a");
+    await new Promise((r) => setTimeout(r, 400));
+    expect(search).not.toHaveBeenCalled();
+    expect(screen.queryByText("Searching messages…")).toBeNull();
+    await user.type(screen.getByLabelText("Search chats"), "x");
+    await waitFor(() => expect(search).toHaveBeenCalledWith("ax"));
+    expect(screen.getByText("No chats match.")).toBeInTheDocument();
   });
 });

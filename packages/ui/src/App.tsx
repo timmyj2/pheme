@@ -93,6 +93,22 @@ export function App() {
 
   useEffect(() => { try { localStorage.setItem(HIDE_KEY, hidden ? "1" : "0"); } catch { /* ignore */ } }, [hidden]);
 
+  const exportChat = useCallback(async (c: ChatRow) => {
+    try {
+      const { blob, name } = await api.exportChat(c.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      toast.info(`Exported “${name}”`);
+    } catch (e) {
+      toast.error(`Could not export: ${(e as Error).message}`);
+    }
+  }, [toast]);
   const closeDrawer = useCallback(() => setDrawer(false), []);
   // Mobile drawer: Esc closes it, focus moves into it on open and back to the menu button on close.
   useEffect(() => {
@@ -252,6 +268,7 @@ export function App() {
           onPin={(c) => void patchChat(c, { pinned: !c.pinned })}
           onArchive={(c) => void patchChat(c, { archived: !c.archived })}
           onDelete={setConfirmDelete}
+          onExport={(c) => void exportChat(c)}
         />
       </div>
       {drawer && <div className="backdrop" onClick={closeDrawer} aria-hidden />}
@@ -274,6 +291,9 @@ export function App() {
             <ChatView
               key={activeId ?? "new"}
               chatId={activeId}
+              projectDir={chats.find((c) => c.id === activeId)?.projectDir}
+              model={chats.find((c) => c.id === activeId)?.model}
+              defaultModel={state.settings.model}
               offline={offline}
               composerRef={composerRef}
               autoSend={firstMessage.current?.id === activeId ? firstMessage.current?.text : undefined}

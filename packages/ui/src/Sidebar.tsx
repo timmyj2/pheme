@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Menu, type MenuItem } from "./Menu.tsx";
-import type { ChatRow } from "./api.ts";
+import { api, type ChatRow, type SearchHit } from "./api.ts";
 import type { View } from "./router.ts";
 import { ALT } from "./shortcuts.ts";
 
@@ -44,9 +44,9 @@ export function groupChats(chats: ChatRow[], now = Date.now()): Group[] {
   return buckets.filter((b) => b.chats.length);
 }
 
-function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, onDelete }: {
+function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, onDelete, onExport }: {
   c: ChatRow; active: boolean; unread: boolean; tabStop: boolean;
-  onOpen: () => void; onRename: (t: string) => void; onPin: () => void; onArchive: () => void; onDelete: () => void;
+  onOpen: () => void; onRename: (t: string) => void; onPin: () => void; onArchive: () => void; onDelete: () => void; onExport: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(c.title);
@@ -65,6 +65,7 @@ function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, 
     { label: "Rename", run: () => { setDraft(c.title); setEditing(true); } },
     { label: c.pinned ? "Unpin" : "Pin", run: onPin },
     { label: c.archived ? "Unarchive" : "Archive", run: onArchive },
+    { label: "Export as Markdown", run: onExport },
     { label: "Delete…", run: onDelete, danger: true },
   ];
   const commit = () => {
@@ -141,16 +142,31 @@ export function Sidebar(props: {
   onPin: (c: ChatRow) => void;
   onArchive: (c: ChatRow) => void;
   onDelete: (c: ChatRow) => void;
+  onExport: (c: ChatRow) => void;
 }) {
   const [q, setQ] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [limit, setLimit] = useState(ROW_LIMIT);
   const needle = q.trim().toLowerCase();
+  // Search inside message text too (the server scans the chat logs); results arrive a moment after typing stops.
+  const [msgHits, setMsgHits] = useState<SearchHit[]>([]);
+  const [msgState, setMsgState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  useEffect(() => {
+    if (needle.length < 2 || showArchived) { setMsgHits([]); setMsgState("idle"); return; }
+    let dead = false;
+    setMsgState("loading");
+    const t = setTimeout(() => {
+      api.search(needle).then((r) => { if (!dead) { setMsgHits(r.hits); setMsgState("done"); } }).catch(() => { if (!dead) { setMsgHits([]); setMsgState("error"); } });
+    }, 300);
+    return () => { dead = true; clearTimeout(t); };
+  }, [needle, showArchived]);
 
   const rows = useMemo(
     () => props.chats.filter((c) => (showArchived ? c.archived : !c.archived) && (!needle || c.title.toLowerCase().includes(needle))),
     [props.chats, showArchived, needle],
   );
+  // Chats whose title already matched are not listed twice.
+  const extraHits: SearchHit[] = needle.length >= 2 && !showArchived ? msgHits.filter((h) => !rows.some((r) => r.id === h.id)) : [];
   const groups = useMemo(() => (needle ? [{ label: `Results (${rows.length})`, chats: rows }] : groupChats(rows)), [rows, needle]);
   useEffect(() => setLimit(ROW_LIMIT), [needle, showArchived]);
 
@@ -193,13 +209,32 @@ export function Sidebar(props: {
                   onPin={() => props.onPin(c)}
                   onArchive={() => props.onArchive(c)}
                   onDelete={() => props.onDelete(c)}
+                  onExport={() => props.onExport(c)}
                 />
               ))}
             </ul>
           </section>
         ))}
+        {needle.length >= 2 && !showArchived && msgState === "loading" && <p className="muted small search-status" role="status">Searching messages…</p>}
+        {needle.length >= 2 && !showArchived && msgState === "error" && <p className="muted small search-status">Could not search messages right now.</p>}
+        {extraHits.length > 0 && (
+          <section>
+            <h2 className="group-label">In messages</h2>
+            <ul>
+              {extraHits.slice(0, 10).map((h) => (
+                <li key={h.id} className="chat-item">
+                  <button className="msg-hit" onClick={() => props.onOpen(h.id)} title={h.title}>
+                    <span className="chat-title">{h.title}</span>
+                    <span className="muted small snippet">{h.role === "you" ? "You: " : ""}{h.snippet}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {extraHits.length > 10 && <p className="muted small search-status">…and {extraHits.length - 10} more. Type more to narrow it down.</p>}
+          </section>
+        )}
         {hiddenCount > 0 && <button className="link small" onClick={() => setLimit((n) => n + ROW_LIMIT)}>Show {Math.min(ROW_LIMIT, hiddenCount)} more ({hiddenCount} hidden; search finds them all)</button>}
-        {rows.length === 0 && <div className="muted small empty-list">{needle ? "No chats match." : showArchived ? "No archived chats." : "No chats yet."}</div>}
+        {rows.length === 0 && extraHits.length === 0 && <div className="muted small empty-list">{needle ? "No chats match." : showArchived ? "No archived chats." : "No chats yet."}</div>}
       </nav>
       <button className="link small" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Back to chats" : "Show archived"}</button>
       <nav className="nav" aria-label="Pages">

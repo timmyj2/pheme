@@ -62,3 +62,11 @@ Hermes-style UI pass: markdown, 11 themes with contrast checks, queue-while-busy
 
 ## Test-everything round (2026-11-22)
 Browser-tested pages, keyboard/a11y, two tabs, fresh install, real Copilot (2 requests). Fixed: unsaved-edit guard, page scrollbar, job interval validation, agent name lock, sidebar tab stop/focus, unknown CLI flags, license texts. Release zip v0.1.0 re-uploaded with current build. 354 tests, CI green.
+
+## Git panel (branch feat/git-review, NOT merged to main)
+Done and tested (425 tests, smoke, stress, browser runs against throwaway repos): per-chat project folder; Changes panel with diffs;
+commit box (pick files, message, new branch on main, secret confirm, undo); push and pull request with confirm steps, CI status on an
+open PR, compare-link fallback without gh.
+Not tested against real GitHub (would create a real PR): `gh pr create` path was exercised with a fake gh only.
+Also done on this branch: per-chat model picker, export chat to Markdown, search inside message text.
+Next (docs/NEXT.md items 7-11): desktop notifications, backup/restore, lazy-load markdown code, Playwright smoke test in CI, settings search and keybindings. Context-usage readout was skipped: the Copilot SDK events I have not verified expose token counts.
