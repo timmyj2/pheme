@@ -4,6 +4,7 @@ import { ChatView } from "./Chat.tsx";
 import type { ComposerHandle } from "./Composer.tsx";
 import { ConfirmDialog } from "./Dialog.tsx";
 import { clearUnsaved, hasUnsaved } from "./unsaved.ts";
+import { NOTIFY_CHANGED, notifyEnabled, useNotifications } from "./notify.ts";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { JobsPage } from "./Jobs.tsx";
 import { MemoryPage, SettingsPage, SkillsPage } from "./Pages.tsx";
@@ -59,7 +60,8 @@ export function App() {
 
   useEffect(() => {
     refresh();
-    const t = setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 4000);
+    // A hidden tab keeps polling only when notifications are on (browsers slow hidden timers to about once a minute).
+    const t = setInterval(() => { if (document.visibilityState === "visible" || notifyEnabled()) refresh(); }, 4000);
     document.addEventListener("visibilitychange", refresh);
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", refresh); };
   }, [refresh]);
@@ -128,6 +130,14 @@ export function App() {
     setTimeout(() => composerRef.current?.focus(), 0);
   }, [go]);
   const openChat = useCallback((id: string) => (id ? go({ view: "chat", chatId: id }) : newChat()), [go, newChat]);
+  const [notifyOn, setNotifyOn] = useState(notifyEnabled);
+  useEffect(() => {
+    const sync = () => setNotifyOn(notifyEnabled());
+    window.addEventListener(NOTIFY_CHANGED, sync);
+    window.addEventListener("storage", sync); // another tab changed it
+    return () => { window.removeEventListener(NOTIFY_CHANGED, sync); window.removeEventListener("storage", sync); };
+  }, []);
+  useNotifications(chats, chatsLoaded, activeId, notifyOn, openChat);
 
   const createAndSend = useCallback(async (text: string) => {
     try {

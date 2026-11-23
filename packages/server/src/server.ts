@@ -81,7 +81,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     // --- chats
     if (seg[0] === "chats") {
       if (seg.length === 1) {
-        if (m === "GET") return json(res, 200, app.store.list().map((c) => ({ ...c, busy: app.isBusy(c.id) })));
+        if (m === "GET") return json(res, 200, app.store.list().map((c) => ({ ...c, busy: app.isBusy(c.id), waiting: app.pendingApprovals(c.id).length > 0 })));
         if (m === "POST") return json(res, 201, app.store.create({ model: typeof body.model === "string" ? body.model : undefined }));
       }
       const id = seg[1];

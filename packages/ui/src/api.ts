@@ -2,7 +2,7 @@ import type { BootstrapState, ChatEvent, ChatMeta, MemoryState, ModelOption, Seq
 
 export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo } from "../../server/src/git.ts";
 export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
-export type ChatRow = ChatMeta & { busy?: boolean };
+export type ChatRow = ChatMeta & { busy?: boolean; /** A tool is waiting for the user's approval. */ waiting?: boolean };
 
 const KEY = "pheme-token";
 
