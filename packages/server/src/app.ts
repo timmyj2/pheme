@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AgentStore, Semaphore } from "./agents.ts";
 import { PromptStore } from "./prompts.ts";
-import { AttachmentStore, readForEngine, type AttachmentRef } from "./attachments.ts";
+import { AttachmentStore, buildPrompt, imagesForEngine, type AttachmentRef } from "./attachments.ts";
 import type { Engine, EngineEvent, EngineSession, PermissionAnswer, PermissionRequest } from "./engine.ts";
 import { Curator } from "./curator.ts";
 import { checkProjectDir } from "./git.ts";
@@ -214,14 +214,14 @@ export class App {
     try {
       const session = await this.sessionFor(chatId, !firstTime, turn);
       await session.send(
-        text,
+        buildPrompt(text, attached),
         (e: EngineEvent) => {
           if (e.type === "tool_start") toolSteps++;
           if (e.type === "subagent") this.recordCopilotAgent(chatId, e);
           else store.append(chatId, e);
         },
         turn.abort.signal,
-        attached.length ? attached.map(readForEngine) : undefined,
+        attached.some((a) => a.ref.kind === "image") ? imagesForEngine(attached) : undefined,
       );
     } catch (e) {
       store.append(chatId, { type: "error", message: (e as Error).message });

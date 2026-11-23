@@ -2,6 +2,7 @@ import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
 const PORT = 7741, T = "s2-token-0123456789abcdefghijk";
 const data = fs.mkdtempSync(path.join(os.tmpdir(), "s2-data-"));
+const backupFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "s2-bk-")), "big.pheme-backup");
 const srv = spawn("node", [path.resolve(import.meta.dirname, "../dist/pheme.mjs"), "--fake", "--no-open", "--port", String(PORT), "--data-dir", data], { env: { ...process.env, PHEME_TOKEN: T }, stdio: "ignore" });
 await new Promise((r) => setTimeout(r, 1500));
 if (!(await fetch(`http://127.0.0.1:${PORT}/`).then((r) => r.ok).catch(() => false))) { console.log("server did not start on the expected port"); process.exit(2); }
@@ -31,10 +32,10 @@ const par = await time("30 parallel searches", async () => (await Promise.all(Ar
 check("parallel searches: only 200 or 429, no 5xx", par.every((c) => c === 200 || c === 429), `(${par.filter((c) => c === 200).length} ok, ${par.filter((c) => c === 429).length} busy)`);
 await time("list chats WHILE a search runs", async () => { await Promise.all([J("/search?q=qqqqzzzz"), J("/search?q=zzzzzzzzz")]); const a = performance.now(); await J("/chats"); return Math.round(performance.now() - a) + " ms"; });
 await time("export 6000-event chat", async () => { const r = await call(`/chats/${big}/export`); const t = await r.text(); return `${r.status} ${t.length} chars`; });
-await time("backup 1501 chats", async () => { const r = await call("/backup"); const b = Buffer.from(await r.arrayBuffer()); fs.writeFileSync("/tmp/s2/big.pheme-backup", b); return `${r.status} ${(b.length / 1e6).toFixed(2)} MB`; });
-const prev = await time("preview restore of it", async () => { const r = await fetch(`http://127.0.0.1:${PORT}/api/restore/preview`, { method: "POST", headers: { "x-pheme-token": T }, body: fs.readFileSync("/tmp/s2/big.pheme-backup") }); return (await r.json()); });
+await time("backup 1501 chats", async () => { const r = await call("/backup"); const b = Buffer.from(await r.arrayBuffer()); fs.writeFileSync(backupFile, b); return `${r.status} ${(b.length / 1e6).toFixed(2)} MB`; });
+const prev = await time("preview restore of it", async () => { const r = await fetch(`http://127.0.0.1:${PORT}/api/restore/preview`, { method: "POST", headers: { "x-pheme-token": T }, body: fs.readFileSync(backupFile) }); return (await r.json()); });
 check("preview counts 1501 chats", prev.chats === 1501, JSON.stringify({ chats: prev.chats, files: prev.files }));
-await time("restore (all exist -> skipped) with safety copy", async () => { const r = await fetch(`http://127.0.0.1:${PORT}/api/restore`, { method: "POST", headers: { "x-pheme-token": T }, body: fs.readFileSync("/tmp/s2/big.pheme-backup") }); return JSON.stringify(await r.json()); });
+await time("restore (all exist -> skipped) with safety copy", async () => { const r = await fetch(`http://127.0.0.1:${PORT}/api/restore`, { method: "POST", headers: { "x-pheme-token": T }, body: fs.readFileSync(backupFile) }); return JSON.stringify(await r.json()); });
 check("safety copy exists", fs.readdirSync(path.join(data, "backups")).length === 1);
 
 // ---- git at scale

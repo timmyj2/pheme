@@ -75,12 +75,12 @@ describe("Copilot event mapping", () => {
     expect(b.filter((e) => e.type === "usage")).toHaveLength(0);
   });
 
-  it("hands attachments to the SDK as blobs (images) and files (text), and sends none when there are none", async () => {
+  it("hands images to the SDK as blobs, and sends no attachment list when there are none", async () => {
     const { engine, sentLog } = stubEngine((emit) => emit({ type: "session.idle" }));
     const s = await engine.createSession(opts);
     await s.send("plain", () => {});
-    await s.send("with", () => {}, undefined, [{ kind: "image", name: "a.png", mime: "image/png", data: "QUJD" }, { kind: "file", name: "n.md", path: "/data/x.md" }]);
+    await s.send("with", () => {}, undefined, [{ kind: "image", name: "a.png", mime: "image/png", data: "QUJD" }]);
     expect(sentLog[0]).toEqual({ prompt: "plain" });
-    expect(sentLog[1]).toEqual({ prompt: "with", attachments: [{ type: "blob", data: "QUJD", mimeType: "image/png", displayName: "a.png" }, { type: "file", path: "/data/x.md", displayName: "n.md" }] });
+    expect(sentLog[1]).toEqual({ prompt: "with", attachments: [{ type: "blob", data: "QUJD", mimeType: "image/png", displayName: "a.png" }] });
   });
 });

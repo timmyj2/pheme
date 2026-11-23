@@ -189,7 +189,7 @@ export class CopilotEngine implements Engine {
             off();
             resolve();
           });
-          const sdkAttachments = (attachments ?? []).map((a) => (a.kind === "image" ? { type: "blob" as const, data: a.data, mimeType: a.mime, displayName: a.name } : { type: "file" as const, path: a.path, displayName: a.name }));
+          const sdkAttachments = (attachments ?? []).map((a) => ({ type: "blob" as const, data: a.data, mimeType: a.mime, displayName: a.name }));
           session.send(sdkAttachments.length ? { prompt, attachments: sdkAttachments } : { prompt }).catch((e: Error) => {
             off();
             reject(e);
