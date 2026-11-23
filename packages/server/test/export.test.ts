@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
-import { chatToMarkdown, exportFileName, searchMessages } from "../src/export.ts";
+import { chatToMarkdown, exportFileName, searchLimited, searchMessages } from "../src/export.ts";
 import type { ChatMeta, SeqEvent } from "../src/protocol.ts";
 import { startServer, type RunningServer } from "../src/server.ts";
 import { makeApp } from "./helpers.ts";
@@ -61,35 +61,35 @@ describe("searchMessages", () => {
     app.store.append(h.id, { type: "user", text: "zebra in a hidden chat" });
     return app;
   }
-  it("finds chats by message text, case-insensitively, one hit per chat, never hidden chats or tool output", () => {
+  it("finds chats by message text, case-insensitively, one hit per chat, never hidden chats or tool output", async () => {
     const app = seed();
-    const { hits } = searchMessages(app.store, "ZEBRA", { logPath: (id) => app.store.logPath(id) });
+    const { hits } = await searchMessages(app.store, "ZEBRA", { logPath: (id) => app.store.logPath(id) });
     expect(hits.map((h) => h.title).sort()).toEqual(["Alpha", "Beta"]);
     const a = hits.find((h) => h.title === "Alpha")!;
     expect(a.role).toBe("you");
     expect(a.snippet.toLowerCase()).toContain("zebra");
     expect(hits.find((h) => h.title === "Beta")!.snippet.length).toBeLessThan(200);
   });
-  it("ignores too-short or silly queries, regex characters, and unknown text", () => {
+  it("ignores too-short or silly queries, regex characters, and unknown text", async () => {
     const app = seed();
-    const s = (q: string) => searchMessages(app.store, q, { logPath: (id) => app.store.logPath(id) }).hits.length;
-    expect(s("")).toBe(0); expect(s("z")).toBe(0); expect(s("q".repeat(300))).toBe(0);
-    expect(s(".*")).toBe(0); expect(s("(")).toBe(0); expect(s("nothing like this")).toBe(0);
+    const s = async (q: string) => (await searchMessages(app.store, q, { logPath: (id) => app.store.logPath(id) })).hits.length;
+    expect(await s("")).toBe(0); expect(await s("z")).toBe(0); expect(await s("q".repeat(300))).toBe(0);
+    expect(await s(".*")).toBe(0); expect(await s("(")).toBe(0); expect(await s("nothing like this")).toBe(0);
   });
-  it("copes with a corrupt log line and a missing log file", () => {
+  it("copes with a corrupt log line and a missing log file", async () => {
     const app = seed();
     const c = app.store.create({ title: "Corrupt" });
     fs.appendFileSync(app.store.logPath(c.id), "{not json zebra\n");
     app.store.append(c.id, { type: "user", text: "a real zebra line" });
-    const hits = searchMessages(app.store, "zebra", { logPath: (id) => app.store.logPath(id) }).hits;
+    const hits = (await searchMessages(app.store, "zebra", { logPath: (id) => app.store.logPath(id) })).hits;
     expect(hits.some((h) => h.title === "Corrupt")).toBe(true);
     const gone = app.store.create({ title: "NoLog" });
     fs.rmSync(app.store.logPath(gone.id), { force: true });
-    expect(() => searchMessages(app.store, "zebra", { logPath: (id) => app.store.logPath(id) })).not.toThrow();
+    await expect(searchMessages(app.store, "zebra", { logPath: (id) => app.store.logPath(id) })).resolves.toBeTruthy();
   });
-  it("stops at its time budget and reports a partial result", () => {
+  it("stops at its time budget and reports a partial result", async () => {
     const app = seed();
-    const r = searchMessages(app.store, "zebra", { budgetMs: -1, logPath: (id) => app.store.logPath(id) });
+    const r = await searchMessages(app.store, "zebra", { budgetMs: -1, logPath: (id) => app.store.logPath(id) });
     expect(r).toEqual({ hits: [], partial: true });
   });
 });
@@ -128,5 +128,28 @@ describe("chat list flags", () => {
     expect((await list())[0]).toMatchObject({ busy: true, waiting: true });
     ctx.app.stop(chat.id); await ctx.app.drain();
     expect((await list())[0]).toMatchObject({ busy: false, waiting: false });
+  });
+});
+
+describe("search under load", () => {
+  const many = (n: number) => {
+    const { app } = makeApp();
+    for (let i = 0; i < n; i++) { const c = app.store.create({ title: `t${i}` }); app.store.append(c.id, { type: "user", text: `message ${i} about zebra` }); }
+    return app;
+  };
+  it("answers identical queries together, and says 'busy' instead of piling up work", async () => {
+    const app = many(60);
+    const opts = { logPath: (id: string) => app.store.logPath(id) };
+    const same = await Promise.all(Array.from({ length: 5 }, () => searchLimited(app.store, "zebra", opts)));
+    expect(same.every((r) => r !== "busy")).toBe(true);
+    const burst = await Promise.all(Array.from({ length: 30 }, (_, i) => searchLimited(app.store, `query${i}`, opts)));
+    expect(burst.filter((r) => r === "busy").length).toBeGreaterThan(0); // 2 running + 6 waiting; the rest are refused
+    expect(burst.filter((r) => r !== "busy").length).toBeGreaterThanOrEqual(8);
+  });
+  it("stops scanning when the page has stopped waiting", async () => {
+    const app = many(60);
+    let calls = 0;
+    const r = await searchMessages(app.store, "zebra", { logPath: (id) => app.store.logPath(id), cancelled: () => ++calls > 1 });
+    expect(r.partial).toBe(true);
   });
 });

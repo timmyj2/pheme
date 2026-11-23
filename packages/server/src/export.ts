@@ -67,14 +67,20 @@ const MAX_FILE_BYTES = 8_000_000;
 const MAX_HITS = 40;
 
 /** Find chats whose messages contain the text. Reads the logs directly with a size cap and a time budget. */
-export function searchMessages(store: ChatStore, query: string, opts: { budgetMs?: number; logPath: (id: string) => string }): { hits: SearchHit[]; partial: boolean } {
+export async function searchMessages(store: ChatStore, query: string, opts: { budgetMs?: number; logPath: (id: string) => string; cancelled?: () => boolean }): Promise<{ hits: SearchHit[]; partial: boolean }> {
   const q = query.trim().toLowerCase();
   if (q.length < 2 || q.length > 200) return { hits: [], partial: false };
   const deadline = Date.now() + (opts.budgetMs ?? 1500);
   const hits: SearchHit[] = [];
   let partial = false;
+  let scanned = 0;
   for (const meta of store.list()) {
     if (Date.now() > deadline) { partial = true; break; }
+    // Let other requests (typing, polling, sending) run between chats: the scan is synchronous file reading.
+    if (++scanned % 8 === 0) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      if (opts.cancelled?.()) return { hits, partial: true }; // the page stopped waiting (it typed another letter)
+    }
     let text: string;
     try {
       const f = opts.logPath(meta.id);
@@ -105,4 +111,30 @@ export function searchMessages(store: ChatStore, query: string, opts: { budgetMs
     if (hits.length >= MAX_HITS) { partial = true; break; }
   }
   return { hits, partial };
+}
+
+const MAX_SEARCHES = 2;
+const MAX_QUEUED = 6;
+let running = 0;
+const queue: (() => void)[] = [];
+const inflight = new Map<string, Promise<{ hits: SearchHit[]; partial: boolean }>>();
+
+/** At most two searches scan at once, a short queue waits, the rest are told to retry; identical queries share one scan. */
+export async function searchLimited(store: ChatStore, query: string, opts: { logPath: (id: string) => string; cancelled?: () => boolean }): Promise<{ hits: SearchHit[]; partial: boolean } | "busy"> {
+  const key = query.trim().toLowerCase();
+  const same = inflight.get(key);
+  if (same) return same;
+  if (running >= MAX_SEARCHES) {
+    if (queue.length >= MAX_QUEUED) return "busy";
+    await new Promise<void>((resolve) => queue.push(resolve));
+    if (opts.cancelled?.()) { queue.shift()?.(); return { hits: [], partial: true }; }
+  }
+  running++;
+  const p = searchMessages(store, query, opts).finally(() => {
+    running--;
+    inflight.delete(key);
+    queue.shift()?.();
+  });
+  inflight.set(key, p);
+  return p;
 }

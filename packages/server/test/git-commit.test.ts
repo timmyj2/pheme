@@ -250,6 +250,44 @@ describe("a failed commit leaves no trace", () => {
   });
 });
 
+describe("commits that overlap", () => {
+  it("two commits at once on one repo run one after the other; both succeed, history is linear, nothing is lost", async () => {
+    const d = repo("feat/work");
+    w(d, "one.txt", "1\n"); w(d, "two.txt", "2\n"); w(d, "three.txt", "3\n");
+    const results = await Promise.allSettled([
+      gitCommit(d, { message: "first", paths: ["one.txt"] }),
+      gitCommit(d, { message: "second", paths: ["two.txt"] }),
+      gitCommit(d, { message: "third", paths: ["three.txt"] }),
+    ]);
+    expect(results.map((r) => r.status)).toEqual(["fulfilled", "fulfilled", "fulfilled"]);
+    expect(git(d, "log", "--format=%s", "-3").split("\n").sort()).toEqual(["first", "second", "third"]);
+    expect(git(d, "status", "--porcelain")).toBe("");
+    expect(fs.existsSync(path.join(d, ".git", "index.lock"))).toBe(false);
+  });
+
+  it("a stale index.lock gives a plain, actionable message (409) and leaves the repo as it was", async () => {
+    const d = repo("feat/work");
+    w(d, "a.txt", "changed\n");
+    fs.writeFileSync(path.join(d, ".git", "index.lock"), "");
+    const before = git(d, "rev-parse", "HEAD");
+    const err = await gitCommit(d, { message: "m", paths: ["a.txt"] }).catch((e) => e);
+    expect(err.status).toBe(409);
+    expect(err.message).toMatch(/Another Git operation is running/);
+    expect(err.message).toMatch(/index\.lock/);
+    fs.rmSync(path.join(d, ".git", "index.lock"));
+    expect(git(d, "rev-parse", "HEAD")).toBe(before);
+    expect(fs.readFileSync(path.join(d, "a.txt"), "utf8")).toBe("changed\n");
+  });
+
+  it("many status calls at once are all answered, and share work instead of starting a process each", async () => {
+    const d = repo("feat/work");
+    w(d, "a.txt", "changed\n");
+    const all = await Promise.all(Array.from({ length: 60 }, () => gitStatus(d)));
+    expect(all.every((s) => s.files.length === 1)).toBe(true);
+    expect(new Set(all).size).toBeLessThan(60); // identical in-flight calls were merged
+  });
+});
+
 describe("gitUndo", () => {
   it("soft-resets the last commit and keeps all changes", async () => {
     const d = repo();

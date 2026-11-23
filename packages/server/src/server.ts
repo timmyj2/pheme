@@ -1,5 +1,5 @@
 import { applyBackup, backupFileName, createBackup, previewBackup } from "./backup.ts";
-import { chatToMarkdown, exportFileName, searchMessages } from "./export.ts";
+import { chatToMarkdown, exportFileName, searchLimited } from "./export.ts";
 import { gitCommit, gitCreatePr, gitDiff, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
 import { HttpError } from "./http-error.ts";
 import http from "node:http";
@@ -93,7 +93,11 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       return json(res, 200, app.settings.get());
     }
     if (seg[0] === "search" && m === "GET") {
-      return json(res, 200, searchMessages(app.store, url.searchParams.get("q") ?? "", { logPath: (id) => app.store.logPath(id) }));
+      let gone = false;
+      res.on("close", () => { gone = true; });
+      const found = await searchLimited(app.store, url.searchParams.get("q") ?? "", { logPath: (id) => app.store.logPath(id), cancelled: () => gone });
+      if (found === "busy") throw new HttpError(429, "Searching is busy. Try again in a moment.");
+      return json(res, 200, found);
     }
     if (seg[0] === "models" && m === "GET") return json(res, 200, await app.engine.listModels().catch(() => []));
 
