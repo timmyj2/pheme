@@ -35,7 +35,32 @@ export interface GitResult {
  * Run `git` with a fixed argument list (never through a shell), a timeout and an output cap.
  * Prompts are disabled so a missing credential fails instead of hanging.
  */
-export function runGit(cwd: string, args: string[], opts: { input?: string; allowFail?: boolean; timeoutMs?: number } = {}): Promise<GitResult> {
+const MAX_CONCURRENT_GIT = 6;
+let activeGit = 0;
+const gitWaiters: (() => void)[] = [];
+/** Wait for one of a few slots, so a burst of requests cannot start dozens of git processes at once. */
+async function gitSlot(): Promise<() => void> {
+  if (activeGit >= MAX_CONCURRENT_GIT) await new Promise<void>((resolve) => gitWaiters.push(resolve));
+  activeGit++;
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    activeGit--;
+    gitWaiters.shift()?.();
+  };
+}
+
+export async function runGit(cwd: string, args: string[], opts: { input?: string; allowFail?: boolean; timeoutMs?: number } = {}): Promise<GitResult> {
+  const release = await gitSlot();
+  try {
+    return await runGitNow(cwd, args, opts);
+  } finally {
+    release();
+  }
+}
+
+function runGitNow(cwd: string, args: string[], opts: { input?: string; allowFail?: boolean; timeoutMs?: number } = {}): Promise<GitResult> {
   return new Promise((resolve) => {
     const child = execFile(
       "git",
@@ -162,7 +187,17 @@ export function parseNumstat(out: string): Map<string, { a: number; d: number; b
   return map;
 }
 
-export async function gitStatus(cwd: string): Promise<GitStatus> {
+const statusInflight = new Map<string, Promise<GitStatus>>();
+/** Identical status requests that arrive while one is running share its answer (the panel polls; several tabs may ask at once). */
+export function gitStatus(cwd: string): Promise<GitStatus> {
+  const running = statusInflight.get(cwd);
+  if (running) return running;
+  const p = gitStatusNow(cwd).finally(() => statusInflight.delete(cwd));
+  statusInflight.set(cwd, p);
+  return p;
+}
+
+async function gitStatusNow(cwd: string): Promise<GitStatus> {
   // A folder that was deleted or moved (or came from a restored backup made elsewhere) must not look like "git is missing".
   if (!fs.existsSync(cwd)) return { repo: false, files: [], problem: `This folder no longer exists: ${cwd}. Choose a folder again.` };
   const top = await runGit(cwd, ["rev-parse", "--show-toplevel"]);
@@ -279,7 +314,33 @@ export function draftMessage(files: Pick<ChangedFile, "path" | "staged" | "unsta
   return `${verb} ${shown}${names.length > 3 ? ` and ${names.length - 3} more` : ""}`;
 }
 
-export async function gitCommit(cwd: string, req: CommitRequest): Promise<CommitResult> {
+const repoLocks = new Map<string, Promise<unknown>>();
+/** Run git-changing operations on one repository one at a time. Two clicks, two tabs or two chats on the same repo queue up. */
+async function withRepoLock<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
+  const key = (await runGit(cwd, ["rev-parse", "--show-toplevel"])).stdout.trim() || cwd;
+  const before = repoLocks.get(key) ?? Promise.resolve();
+  const mine = before.catch(() => {}).then(fn);
+  const tail = mine.catch(() => {});
+  repoLocks.set(key, tail);
+  try {
+    return await mine;
+  } finally {
+    if (repoLocks.get(key) === tail) repoLocks.delete(key);
+  }
+}
+
+/** Turn git's lock-file complaint into something a person can act on. */
+function lockMessage(why: string): string | null {
+  return /index\.lock|Unable to create .*\.lock|another git process/i.test(why)
+    ? "Another Git operation is running in this folder (another app, a second tab, or a crashed earlier one). Wait a moment and try again. If it keeps happening, close other Git tools and delete the file .git/index.lock."
+    : null;
+}
+
+export function gitCommit(cwd: string, req: CommitRequest): Promise<CommitResult> {
+  return withRepoLock(cwd, () => gitCommitNow(cwd, req));
+}
+
+async function gitCommitNow(cwd: string, req: CommitRequest): Promise<CommitResult> {
   const message = typeof req.message === "string" ? req.message.replace(/\r\n/g, "\n").trim() : "";
   if (!message) throw new HttpError(400, "Write a commit message first.");
   if (message.length > 10_000) throw new HttpError(400, "That commit message is too long (10,000 characters at most).");
@@ -336,16 +397,18 @@ export async function gitCommit(cwd: string, req: CommitRequest): Promise<Commit
   const unstage = status.files.filter((f) => f.staged && !wanted.has(f.path)).flatMap((f) => (f.from ? [f.path, f.from] : [f.path]));
   if (unstage.length) {
     const r = await runGit(root, status.hasCommits ? ["reset", "-q", "HEAD", "--", ...unstage] : ["rm", "--cached", "-r", "-q", "--", ...unstage]);
-    if (!r.ok) { await rollback(); throw new HttpError(500, r.stderr || "Could not set aside the files you did not tick."); }
+    if (!r.ok) { await rollback(); throw new HttpError(lockMessage(r.stderr) ? 409 : 500, lockMessage(r.stderr) ?? (r.stderr || "Could not set aside the files you did not tick.")); }
   }
   const add = await runGit(root, ["add", "-A", "--", ...toAdd]);
-  if (!add.ok) { await rollback(); throw new HttpError(500, add.stderr || "Could not stage the files."); }
+  if (!add.ok) { await rollback(); throw new HttpError(lockMessage(add.stderr) ? 409 : 500, lockMessage(add.stderr) ?? (add.stderr || "Could not stage the files.")); }
 
   // Message on stdin: no quoting problems, no length limit from the command line.
   const c = await runGit(root, ["commit", "-q", "-F", "-"], { input: message + "\n", timeoutMs: COMMIT_TIMEOUT_MS });
   if (!c.ok) {
     await rollback();
     const why = (c.stderr || c.stdout).trim();
+    const locked = lockMessage(why);
+    if (locked) throw new HttpError(409, locked);
     if (/tell me who you are|Please tell me|empty ident|unable to auto-detect|useConfigOnly/i.test(why)) throw new HttpError(409, 'Git does not know who you are yet. In a terminal run:  git config --global user.name "Your Name"  and  git config --global user.email "you@example.com"  then try again.');
     if (/nothing (added )?to commit|no changes added/i.test(why)) throw new HttpError(409, "Nothing to commit: the chosen files have no changes.");
     throw new HttpError(409, why || "git commit failed.");
@@ -359,7 +422,11 @@ export async function gitCommit(cwd: string, req: CommitRequest): Promise<Commit
  * Undo the last commit, keeping every change in the working tree and index (`reset --soft`).
  * Only allowed when HEAD is still the commit the caller made and it has not been pushed.
  */
-export async function gitUndo(cwd: string, sha: string): Promise<{ undone: string }> {
+export function gitUndo(cwd: string, sha: string): Promise<{ undone: string }> {
+  return withRepoLock(cwd, () => gitUndoNow(cwd, sha));
+}
+
+async function gitUndoNow(cwd: string, sha: string): Promise<{ undone: string }> {
   if (!/^[0-9a-f]{7,64}$/i.test(sha ?? "")) throw new HttpError(400, "Bad commit id.");
   const root = (await runGit(cwd, ["rev-parse", "--show-toplevel"])).stdout.trim();
   if (!root) throw new HttpError(400, "This folder is not a Git repository.");
@@ -371,7 +438,7 @@ export async function gitUndo(cwd: string, sha: string): Promise<{ undone: strin
   const remote = await runGit(root, ["branch", "-r", "--contains", "HEAD"]);
   if (remote.stdout.trim()) throw new HttpError(409, "This commit has already been pushed, so it cannot be undone from here.");
   const r = await runGit(root, ["reset", "--soft", "HEAD~1"]);
-  if (!r.ok) throw new HttpError(500, r.stderr || "Could not undo the commit.");
+  if (!r.ok) throw new HttpError(lockMessage(r.stderr) ? 409 : 500, lockMessage(r.stderr) ?? (r.stderr || "Could not undo the commit."));
   return { undone: head.slice(0, 7) };
 }
 
@@ -492,7 +559,11 @@ export async function gitRemoteInfo(cwd: string): Promise<RemoteInfo> {
 }
 
 /** Push the current branch to its remote with an upstream. Never forces; refuses main/master/trunk and a detached HEAD. */
-export async function gitPush(cwd: string): Promise<{ branch: string; remote: string; output: string }> {
+export function gitPush(cwd: string): Promise<{ branch: string; remote: string; output: string }> {
+  return withRepoLock(cwd, () => gitPushNow(cwd));
+}
+
+async function gitPushNow(cwd: string): Promise<{ branch: string; remote: string; output: string }> {
   const st = await gitStatus(cwd);
   if (!st.repo || !st.root) throw new HttpError(400, st.problem ?? "This folder is not a Git repository.");
   if (st.detached || !st.branch) throw new HttpError(409, "HEAD is detached. Switch to a branch first.");
