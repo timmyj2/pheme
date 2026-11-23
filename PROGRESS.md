@@ -84,3 +84,11 @@ Not done: context-usage meter (unverified SDK support). Not tested against real 
 6. Installable app: manifest, PNG icons, remembered access key, no service worker.
 Stress found and fixed along the way: parallel commits (500), search bursts, stash left untracked files (literal pathspecs), NUL in a branch name, PR detail without a remote (502), `.env` slipping past the attachment check, attachments cached by the browser, world-readable attachment folders.
 Still not verified: real GitHub PR creation and checks (fake gh only), real Copilot image/file attachments (the SDK mapping is unit-tested; a real send costs quota), Windows UI on a real work PC (CI only), the install prompt on a real desktop (Chrome's installability check passes).
+
+## v0.3.0 (2026-11-23)
+Adds the six-item goal above (PR panel, branches and stash, attachments, prompt library, context meter, installable app) plus the text-attachment fix: a real-Copilot test showed images work but text files sent by path never reached the model, so text now goes inside the message.
+Verified: `npm run verify -- --e2e` (626 unit tests, build, smoke, stress 20/20, scale stress, 13 browser tests). Real Copilot: images and chat yes; text-file fix covered by fake-engine tests only.
+Open, in priority order:
+1. **Visual match to the Hermes app.** Parity so far came from Hermes source and docs, never a side-by-side. The Changes/branch panel is cramped, controls look like browser defaults, PR badges lack pill styling. Needs real Hermes screenshots (none found in Notion titles; pages not yet searched for embedded images). Plan: capture Pheme in the same states, list differences, fix biggest first.
+2. Not verified: real GitHub PR creation/checks (fake gh only); Windows UI on a real PC (CI only); text attachments on real Copilot.
+3. Unconfirmed: scale-stress "1501 chats vs 1502" (probably script off-by-one); 56 SSE connections after rapid chat switching (single probe).

@@ -43,10 +43,8 @@ export interface SessionOptions {
   agents?: { name: string; description: string; prompt: string; tools?: string[] }[];
 }
 
-/** Something the user attached to a message: an image (sent inline) or a text file (sent by path). */
-export type EngineAttachment =
-  | { kind: "image"; name: string; mime: string; /** base64 */ data: string }
-  | { kind: "file"; name: string; path: string };
+/** An image attached to a message (sent inline). Text files are placed in the prompt itself, not sent as attachments. */
+export type EngineAttachment = { kind: "image"; name: string; mime: string; /** base64 */ data: string };
 
 export interface EngineSession {
   /** Run one turn; resolves when the engine is idle. Events are delivered through onEvent. */

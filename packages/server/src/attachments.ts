@@ -16,6 +16,8 @@ export interface AttachmentRef {
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_TEXT_BYTES = 512 * 1024;
 export const MAX_PER_MESSAGE = 5;
+/** All text files in one message are placed in the prompt, so together they stay within one file's limit. */
+export const MAX_TEXT_PER_MESSAGE = MAX_TEXT_BYTES;
 const MAX_PER_CHAT_BYTES = 50 * 1024 * 1024;
 const UNSENT_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -155,6 +157,8 @@ export class AttachmentStore {
       if (!f) throw new HttpError(404, "An attachment is missing. Attach it again.");
       out.push(f);
     }
+    const textBytes = out.filter((f) => f.ref.kind === "text").reduce((n, f) => n + f.ref.size, 0);
+    if (textBytes > MAX_TEXT_PER_MESSAGE) throw new HttpError(413, `The text files in one message can total ${MAX_TEXT_PER_MESSAGE / 1024} KB; these are ${Math.ceil(textBytes / 1024)} KB. Attach fewer, or the relevant parts.`);
     return out;
   }
 
@@ -198,8 +202,28 @@ export class AttachmentStore {
   }
 }
 
-/** Bytes to give the engine for an image (inline data) or the path of a text file. */
-export function readForEngine(f: { ref: AttachmentRef; path: string }): { kind: "image"; name: string; mime: string; data: string } | { kind: "file"; name: string; path: string } {
-  if (f.ref.kind === "image") return { kind: "image", name: f.ref.name, mime: f.ref.mime, data: fs.readFileSync(f.path).toString("base64") };
-  return { kind: "file", name: f.ref.name, path: f.path };
+/** A code fence longer than any run of backticks inside the text, so the file cannot break out of its block. */
+function fenceFor(content: string): string {
+  const longest = Math.max(0, ...(content.match(/`+/g) ?? []).map((r) => r.length));
+  return "`".repeat(Math.max(3, longest + 1));
+}
+
+/**
+ * The message the model receives: what the user wrote, then each text file's contents in a labelled block.
+ * (Text goes in the message itself: handing the SDK a file path did not reach the model in real use.)
+ */
+export function buildPrompt(text: string, files: { ref: AttachmentRef; path: string }[]): string {
+  const blocks: string[] = [];
+  for (const f of files) {
+    if (f.ref.kind !== "text") continue;
+    const content = fs.readFileSync(f.path, "utf8").replace(/^\uFEFF/, "");
+    const fence = fenceFor(content);
+    blocks.push(`Attached file "${f.ref.name.replace(/["\r\n]/g, "")}":\n${fence}\n${content.replace(/\n$/, "")}\n${fence}`);
+  }
+  return blocks.length ? `${text}\n\n${blocks.join("\n\n")}` : text;
+}
+
+/** What goes to the engine as real attachments: images only (inline data). */
+export function imagesForEngine(files: { ref: AttachmentRef; path: string }[]): { kind: "image"; name: string; mime: string; data: string }[] {
+  return files.filter((f) => f.ref.kind === "image").map((f) => ({ kind: "image" as const, name: f.ref.name, mime: f.ref.mime, data: fs.readFileSync(f.path).toString("base64") }));
 }
