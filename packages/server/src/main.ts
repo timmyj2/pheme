@@ -9,7 +9,7 @@ import { acquireLock, parsePort } from "./lock.ts";
 import { dataDir } from "./paths.ts";
 import { startServer } from "./server.ts";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 const HELP = `Pheme ${VERSION}
 

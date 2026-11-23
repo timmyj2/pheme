@@ -70,3 +70,7 @@ open PR, compare-link fallback without gh.
 Not tested against real GitHub (would create a real PR): `gh pr create` path was exercised with a fake gh only.
 Also done on this branch: per-chat model picker, export chat to Markdown, search inside message text.
 Next (docs/NEXT.md items 7-11): desktop notifications, backup/restore, lazy-load markdown code, Playwright smoke test in CI, settings search and keybindings. Context-usage readout was skipped: the Copilot SDK events I have not verified expose token counts.
+
+## v0.2.0 (branch feat/polish)
+Added since v0.1.0: Git panel (project folder, changes, commit, undo, push, PR), per-chat model, export, message search, notifications, backup/restore, keybindings, settings search, lazy-loaded markdown, Playwright e2e in CI, CI-built releases.
+Not done: context-usage meter (unverified SDK support). Not tested against real GitHub: PR creation. Windows: CI only.

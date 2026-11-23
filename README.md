@@ -17,9 +17,9 @@ chat with a session list, skills and memory that improve themselves, sub-agents,
    npm i -g @github/copilot@1.0.112
    ```
 3. **Sign in to Copilot.** Type `copilot` and press Enter. When it starts, type `/login` and follow the steps in your browser. Then close it (press Ctrl+C twice).
-4. **Download Pheme.** Open https://github.com/timmyj2/pheme/releases/latest, scroll to **Assets**, and click `pheme-v0.1.0.zip`.
+4. **Download Pheme.** Open https://github.com/timmyj2/pheme/releases/latest, scroll to **Assets**, and click `pheme-v0.2.0.zip`.
 5. **Unzip it.** Right-click the zip, choose **Extract All**, and pick a folder you'll remember, for example `C:\Users\<you>\pheme`. If Windows blocks the files, right-click the zip first, choose **Properties**, tick **Unblock**, click OK, then extract.
-6. **Check everything works.** Open the unzipped `pheme-v0.1.0` folder, click its address bar, type `cmd` and press Enter. Then type `start-pheme.cmd doctor` and press Enter. Every line should say `PASS` (a `WARN` about models is fine). If a line says `FAIL`, it tells you what to fix.
+6. **Check everything works.** Open the unzipped `pheme-v0.2.0` folder, click its address bar, type `cmd` and press Enter. Then type `start-pheme.cmd doctor` and press Enter. Every line should say `PASS` (a `WARN` about models is fine). If a line says `FAIL`, it tells you what to fix.
 
 **Every day**
 
@@ -48,7 +48,10 @@ Options: `--port <n>`, `--no-open`, `--data-dir <path>`, `--fake`.
 - **Skill curator:** every 7 days (while Pheme is open) overlapping skills are merged and long-unused ones archived. Nothing is deleted; archives live in `skills/.archive`.
 - **Agents:** the model can start sub-agents in their own sessions (up to 3 at once) and shows each as a card. Saved agent profiles are also handed to Copilot as custom agents.
 - **Scheduled jobs:** daily, every-N-minutes or one-time prompts. Jobs run only while Pheme is open; a missed job runs once at start. A job can run commands or edit files only if you allowed that when you created it.
-- **Appearance:** 11 themes with light/dark/system modes. **Ctrl+K** opens the command palette.
+- **Appearance:** 11 themes with light/dark/system modes. **Ctrl+K** opens the command palette. Shortcuts can be changed in Settings.
+- **Projects and Git:** give a chat a project folder; Copilot works there. The **Changes** panel shows changed files and diffs, and lets you commit (you pick the files and confirm; it never commits on `main` without a new branch, and asks before committing anything that looks like a secret), undo the last commit, push, and open a pull request with the GitHub CLI (`gh`). It never force-pushes. Without `gh`, it offers a link to open the pull request on GitHub.
+- **Per-chat model**, **export a chat to Markdown**, and **search inside message text**.
+- **Desktop notifications** (reply ready, approval needed), **backup and restore** of all your data, and **settings search**, all in Settings.
 - Background reviews use the cheapest model available (changeable in Settings), and Settings shows a usage counter. One switch turns all learning loops off.
 
 ## Develop
@@ -58,6 +61,7 @@ npm install
 npm run typecheck && npm run lint && npm test
 npm run build          # dist/pheme.mjs
 npm run smoke          # runs the built file alone in an empty folder, fake mode
+npm run e2e            # browser tests (Playwright); set PW_CHANNEL=chrome to use an installed Chrome
 node dist/pheme.mjs --fake
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "pheme",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -12,17 +12,19 @@
   },
   "scripts": {
     "typecheck": "tsc -p packages/server && tsc -p packages/ui",
-    "lint": "eslint packages scripts",
+    "lint": "eslint packages scripts e2e playwright.config.ts",
     "test": "vitest run",
     "build:ui": "npm run build -w @pheme/ui",
     "build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke.mjs",
     "stress": "node scripts/stress.mjs",
-    "dev:fake": "node --experimental-strip-types packages/server/src/main.ts --fake"
+    "dev:fake": "node --experimental-strip-types packages/server/src/main.ts --fake",
+    "e2e": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@github/copilot-sdk": "^1.0.34",
+    "@playwright/test": "^1.65.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.13",
