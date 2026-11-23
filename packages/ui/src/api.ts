@@ -52,6 +52,8 @@ export const api = {
   patchChat: (id: string, patch: Partial<Pick<ChatMeta, "title" | "pinned" | "archived">> & { projectDir?: string | null }) => call<ChatMeta>(`/chats/${id}`, "PATCH", patch),
   gitStatus: (id: string) => call<import("../../server/src/git.ts").GitStatus>(`/chats/${id}/git`),
   gitDiff: (id: string, path: string) => call<import("../../server/src/git.ts").FileDiff>(`/chats/${id}/git/diff?path=${encodeURIComponent(path)}`),
+  gitCommit: (id: string, body: { message: string; paths: string[]; branch?: string; allowRisky?: string[] }) => call<{ sha: string; short: string; branch: string; summary: string; files: number }>(`/chats/${id}/git/commit`, "POST", body),
+  gitUndo: (id: string, sha: string) => call<{ undone: string }>(`/chats/${id}/git/undo`, "POST", { sha }),
   deleteChat: (id: string) => call<{ ok: boolean }>(`/chats/${id}`, "DELETE"),
   send: (id: string, text: string) => call<{ ok: boolean }>(`/chats/${id}/messages`, "POST", { text }),
   stop: (id: string) => call<{ ok: boolean }>(`/chats/${id}/stop`, "POST", {}),

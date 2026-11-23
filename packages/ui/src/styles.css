@@ -146,7 +146,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .change-group ul { list-style: none; margin: 0; padding: 0; }
 .change-row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; color: var(--dt-foreground); padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .change-row:hover { background: var(--dt-muted); }
-.change-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.change-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .change-counts { font-family: var(--dt-font-mono); font-size: 12px; white-space: nowrap; }
 .plus { color: var(--dt-success-text, #3fb950); } .minus { color: var(--dt-destructive-text); }
 .st-badge { width: 18px; height: 18px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: var(--dt-muted); flex: none; }
@@ -162,3 +162,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .dialog-form h2 { margin: 0; font-size: 16px; }
 .dialog-form input { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--dt-border); background: var(--dt-background); color: var(--dt-foreground); font-family: var(--dt-font-mono); }
 @media (max-width: 760px) { .changes-panel { position: absolute; inset: 0; width: auto; z-index: 5; } .chat { position: relative; } .project-folder { max-width: 60%; } }
+
+.commit-box { border-top: 1px solid var(--dt-border); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; max-height: 55%; overflow: auto; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.pick-list { list-style: none; margin: 4px 0 0; padding: 0; max-height: 120px; overflow: auto; }
+.pick-list .check { padding: 2px 0; }
+.risk { color: var(--dt-destructive-text); font-size: 11px; white-space: nowrap; }
+.commit-msg { resize: vertical; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--dt-border); background: var(--dt-background); color: var(--dt-foreground); font: inherit; font-size: 13px; }
+.commit-confirm { display: flex; flex-direction: column; gap: 8px; }
+.commit-confirm pre { margin: 0; white-space: pre-wrap; }
+.commit-done { display: flex; align-items: center; gap: 8px; justify-content: space-between; font-size: 12px; padding: 6px 8px; border-radius: 6px; background: var(--dt-muted); }
+.field.small { font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+.field.small input { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--dt-border); background: var(--dt-background); color: var(--dt-foreground); font-family: var(--dt-font-mono); }

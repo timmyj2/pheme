@@ -105,7 +105,7 @@ export function ChatView({ chatId, projectDir: dirProp, offline, composerRef, au
         onRemoveQueued={chat.removeQueued}
       />
       </div>
-      {chatId && projectDir && panelOpen && <ChangesPanel chatId={chatId} status={git.status} error={git.error} loading={git.loading} onRefresh={() => void git.refresh()} onClose={togglePanel} />}
+      {chatId && projectDir && panelOpen && <ChangesPanel chatId={chatId} status={git.status} error={git.error} loading={git.loading} onRefresh={() => void git.refresh()} onClose={togglePanel} busy={chat.busy} />}
       </div>
     </section>
   );

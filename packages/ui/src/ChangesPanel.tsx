@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CommitBox } from "./CommitBox.tsx";
 import { api, type ChangedFile, type FileDiff, type GitStatus } from "./api.ts";
 
 const LABEL: Record<string, string> = { modified: "M", added: "A", deleted: "D", renamed: "R", copied: "C", untracked: "U", conflicted: "!", typechange: "T" };
@@ -60,9 +61,11 @@ interface Props {
   loading: boolean;
   onRefresh: () => void;
   onClose: () => void;
+  /** A reply is running: committing is paused so files are not changed underneath it. */
+  busy?: boolean;
 }
 
-export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClose }: Props) {
+export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClose, busy = false }: Props) {
   const staged = status?.files.filter((f) => f.staged && f.unstaged !== "conflicted") ?? [];
   const unstaged = status?.files.filter((f) => f.unstaged && f.unstaged !== "untracked" && f.unstaged !== "conflicted") ?? [];
   const untracked = status?.files.filter((f) => f.unstaged === "untracked") ?? [];
@@ -97,8 +100,9 @@ export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClos
         {group("Staged", staged)}
         {group("Unstaged", unstaged)}
         {group("Untracked", untracked)}
-        {!!status?.moreFiles && <p className="muted small">…and {status.moreFiles} more files not shown.</p>}
+        {!!status?.moreFiles && <p className="muted small">…and {status.moreFiles} more files not shown. Commit them from a terminal, or in smaller groups.</p>}
       </div>
+      {status?.repo && !status.problem && <CommitBox key={chatId} chatId={chatId} status={status} busy={busy} onDone={onRefresh} />}
     </aside>
   );
 }
