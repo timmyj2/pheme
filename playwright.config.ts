@@ -27,7 +27,8 @@ export default defineConfig({
   webServer: {
     command: `node dist/pheme.mjs --fake --no-open --port ${PORT} --data-dir "${dataDir}"`,
     url: `http://127.0.0.1:${PORT}/`,
-    env: { PHEME_TOKEN: TOKEN },
+    // CI machines have no Git identity; give the server one so the commit test does not depend on the machine.
+    env: { PHEME_TOKEN: TOKEN, GIT_AUTHOR_NAME: "E2E", GIT_AUTHOR_EMAIL: "e2e@example.com", GIT_COMMITTER_NAME: "E2E", GIT_COMMITTER_EMAIL: "e2e@example.com" },
     reuseExistingServer: false,
     timeout: 30_000,
   },

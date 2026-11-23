@@ -55,3 +55,4 @@ One line each: **decision** — why. The owner reviews these.
 - Keybindings: six rebindable actions (palette, new chat, search, sidebar, prev, next); need Ctrl/Cmd or Alt; browser-reserved combos and Alt+1..9 refused; saved in localStorage; a corrupt or clashing save falls back to defaults per action.
 - Playwright e2e (9 tests, fake engine, throwaway data dir and repo) runs in CI on Windows and macOS with Playwright's Chromium; locally PW_CHANNEL=chrome (Playwright's Chromium does not support macOS 13).
 - Releases: pushing a v* tag runs .github/workflows/release.yml, which re-runs checks, verifies the tag equals package.json's version, builds, zips and publishes. Version bumped to 0.2.0.
+- A failed commit (hook, missing Git identity) now rolls back completely: new branch deleted, original branch/detached HEAD restored, index restored exactly from a saved tree. Found by the first Windows e2e run, where the runner had no Git identity.

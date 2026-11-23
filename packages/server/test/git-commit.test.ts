@@ -201,6 +201,55 @@ describe("gitCommit", () => {
   });
 });
 
+describe("a failed commit leaves no trace", () => {
+  const state = (d: string) => ({ branch: git(d, "rev-parse", "--abbrev-ref", "HEAD"), staged: git(d, "diff", "--cached", "--name-status"), status: git(d, "status", "--porcelain"), branches: git(d, "branch", "--list"), commits: git(d, "rev-list", "--count", "HEAD") });
+
+  it.runIf(process.platform !== "win32")("on main: a failing hook removes the new branch, returns to main and restores the exact index", async () => {
+    const d = repo("main");
+    w(d, "a.txt", "changed\n"); w(d, "pre.txt", "staged by the user\n"); w(d, "new.txt", "n\n");
+    git(d, "add", "pre.txt"); // the user had this staged on purpose
+    fs.writeFileSync(path.join(d, ".git", "hooks", "pre-commit"), '#!/bin/sh\necho "hook says no" >&2\nexit 1\n', { mode: 0o755 });
+    const before = state(d);
+    await expect(gitCommit(d, { message: "m", paths: ["a.txt", "new.txt"], branch: "feat/will-fail" })).rejects.toThrow(/hook says no/);
+    expect(state(d)).toEqual(before); // same branch, same staged set, same files, no leftover branch
+    expect(git(d, "branch", "--list", "feat/will-fail")).toBe("");
+    expect(fs.readFileSync(path.join(d, "a.txt"), "utf8")).toBe("changed\n");
+  });
+
+  it("on main: a missing Git identity gives the plain message and also leaves nothing behind", async () => {
+    const d = repo("main");
+    w(d, "a.txt", "changed\n");
+    const empty = path.join(cfgDir, "no-identity");
+    fs.writeFileSync(empty, "[commit]\n\tgpgsign = false\n[user]\n\tuseConfigOnly = true\n");
+    const keep = { cfg: process.env.GIT_CONFIG_GLOBAL, home: process.env.HOME };
+    const names = ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "EMAIL"];
+    const old = names.map((n) => process.env[n]);
+    names.forEach((n) => delete process.env[n]);
+    process.env.GIT_CONFIG_GLOBAL = empty; process.env.HOME = cfgDir;
+    const before = state(d);
+    try {
+      await expect(gitCommit(d, { message: "m", paths: ["a.txt"], branch: "feat/x" })).rejects.toThrow(/does not know who you are/);
+    } finally {
+      process.env.GIT_CONFIG_GLOBAL = keep.cfg; process.env.HOME = keep.home;
+      names.forEach((n, i) => { if (old[i] !== undefined) process.env[n] = old[i]; });
+    }
+    expect(state(d)).toEqual(before);
+  });
+
+  it("a detached HEAD returns to the same commit after a failure", async () => {
+    if (process.platform === "win32") return;
+    const d = repo("main");
+    git(d, "checkout", "-q", "--detach");
+    const sha = git(d, "rev-parse", "HEAD");
+    w(d, "a.txt", "x\n");
+    fs.writeFileSync(path.join(d, ".git", "hooks", "pre-commit"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    await expect(gitCommit(d, { message: "m", paths: ["a.txt"], branch: "from-detached" })).rejects.toBeTruthy();
+    expect(git(d, "rev-parse", "HEAD")).toBe(sha);
+    expect(git(d, "rev-parse", "--abbrev-ref", "HEAD")).toBe("HEAD"); // still detached
+    expect(git(d, "branch", "--list", "from-detached")).toBe("");
+  });
+});
+
 describe("gitUndo", () => {
   it("soft-resets the last commit and keeps all changes", async () => {
     const d = repo();
