@@ -197,3 +197,5 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .msg-hit:hover { background: var(--dt-muted); }
 .msg-hit .snippet { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .search-status { padding: 4px 10px; }
+
+.md-plain { white-space: pre-wrap; overflow-wrap: anywhere; }

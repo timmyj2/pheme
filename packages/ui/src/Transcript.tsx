@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentCard } from "./AgentCard.tsx";
-import { Markdown } from "./Markdown.tsx";
+import { LazyMarkdown as Markdown } from "./LazyMarkdown.tsx";
 import type { ApprovalDecision, SeqEvent } from "./api.ts";
 import { APPROVAL_LABEL, buildBlocks, toolDuration, toolSummary, type Block, type ToolItem } from "./blocks.ts";
 import type { Pending } from "./useChat.ts";
