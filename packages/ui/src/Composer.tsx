@@ -218,43 +218,47 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           </div>
         </div>
       )}
-      {files.length > 0 && (
-        <ul className="att-draft" aria-label="Files to send">
-          {files.map((f, i) => (
-            <li key={`${f.name}-${f.size}-${i}`}>
-              {isImage(f) ? <Thumb file={f} /> : <span aria-hidden="true">📎</span>}
-              <span className="att-name">{f.name}</span>
-              <span className="muted small">{sizeLabel(f.size)}</span>
-              <button className="icon-btn" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))}>×</button>
-            </li>
-          ))}
-        </ul>
-      )}
       <div className={`composer${tooLong ? " too-long" : ""}`}>
         <input ref={picker} type="file" multiple hidden accept={ACCEPT} aria-hidden="true" tabIndex={-1} onChange={(e) => { addFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
-        <button className="icon-btn attach-btn" aria-label="Insert a saved prompt" aria-expanded={promptsOpen} title="Saved prompts (or type /)" onClick={() => { setPromptsOpen((o) => !o); setSavingPrompt(false); setPromptFilter(""); }}>📋</button>
-        <button className="icon-btn attach-btn" aria-label="Attach files" title="Attach images or text files (or drop or paste them)" disabled={offline} onClick={() => picker.current?.click()}>📎</button>
-        <textarea
-          ref={ta}
-          value={text}
-          rows={1}
-          aria-label="Message"
-          aria-controls={slashMode ? "prompt-listbox" : undefined}
-          aria-activedescendant={slashMode && promptItems[active] ? `prompt-opt-${promptItems[active].id}` : undefined}
-          placeholder={offline ? "Reconnecting to Pheme…" : busy ? "Pheme is replying. Type to queue a follow-up…" : placeholder}
-          onChange={(e) => { histIdx.current = -1; update(e.target.value); }}
-          onKeyDown={onKeyDown}
-          onPaste={(e) => {
-            const pasted = [...(e.clipboardData?.files ?? [])];
-            if (pasted.length) { e.preventDefault(); addFiles(pasted, true); } // text pastes are left alone
-          }}
-          spellCheck
-        />
-        {busy && !text.trim() ? (
-          <button className="btn danger" onClick={onStop} aria-label="Stop the reply">Stop</button>
-        ) : (
-          <button className="btn primary" onClick={submit} disabled={!canSend} aria-label={busy ? "Queue message" : "Send message"}>{busy ? "Queue" : "Send"}</button>
+        {files.length > 0 && (
+          <ul className="att-draft" aria-label="Files to send">
+            {files.map((f, i) => (
+              <li key={`${f.name}-${f.size}-${i}`}>
+                {isImage(f) ? <Thumb file={f} /> : <span aria-hidden="true">📎</span>}
+                <span className="att-meta">
+                  <span className="att-name">{f.name}</span>
+                  <span className="muted small">{sizeLabel(f.size)}</span>
+                </span>
+                <button className="icon-btn" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))}>×</button>
+              </li>
+            ))}
+          </ul>
         )}
+        <div className="composer-row">
+          <button className="icon-btn attach-btn" aria-label="Insert a saved prompt" aria-expanded={promptsOpen} title="Saved prompts (or type /)" onClick={() => { setPromptsOpen((o) => !o); setSavingPrompt(false); setPromptFilter(""); }}>📋</button>
+          <button className="icon-btn attach-btn" aria-label="Attach files" title="Attach images or text files (or drop or paste them)" disabled={offline} onClick={() => picker.current?.click()}>+</button>
+          <textarea
+            ref={ta}
+            value={text}
+            rows={1}
+            aria-label="Message"
+            aria-controls={slashMode ? "prompt-listbox" : undefined}
+            aria-activedescendant={slashMode && promptItems[active] ? `prompt-opt-${promptItems[active].id}` : undefined}
+            placeholder={offline ? "Reconnecting to Pheme…" : busy ? "Pheme is replying. Type to queue a follow-up…" : placeholder}
+            onChange={(e) => { histIdx.current = -1; update(e.target.value); }}
+            onKeyDown={onKeyDown}
+            onPaste={(e) => {
+              const pasted = [...(e.clipboardData?.files ?? [])];
+              if (pasted.length) { e.preventDefault(); addFiles(pasted, true); }
+            }}
+            spellCheck
+          />
+          {busy && !text.trim() ? (
+            <button className="btn danger" onClick={onStop} aria-label="Stop the reply">Stop</button>
+          ) : (
+            <button className={`btn primary${busy ? "" : " send-btn"}`} onClick={submit} disabled={!canSend} aria-label={busy ? "Queue message" : "Send message"}>{busy ? "Queue" : <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5V3.5M8 3.5 4.5 7M8 3.5 11.5 7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
+          )}
+        </div>
       </div>
       {fileNote && <div className="composer-note over" role="alert">{fileNote}</div>}
       {waitingForReply && <div className="composer-note muted" role="status">Attachments are sent once the current reply finishes.</div>}

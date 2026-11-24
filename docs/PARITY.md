@@ -1,7 +1,30 @@
-# Pheme vs Hermes desktop: feature audit
+# Pheme vs Hermes desktop
+
+## Visual comparison (2026-11-23)
+
+Compared against three screenshots of the running Hermes desktop app, then Pheme in the same states (fake engine, throwaway data, system Chrome, 1440×900). Screenshots are the source of truth. After shots: `docs/visual/`.
+
+**Matches more closely now**
+- Composer is one rounded box with a gold focus ring, attachment cards inside (name and size), and a circular send button. New chat is a row, not a blue block.
+- Inputs and selects are styled (dark fill, thin border, custom chevron). Primary actions use the theme accent. On the default theme that accent is the screenshot gold (`#f7bb2d`), with dark text.
+- PR status words are filled pills (Open, Review required, Blocked), not plain text. The old rules pointed at CSS variables that were never set.
+- Section labels (PINNED, BRANCHES, and the rest) use the accent, small caps.
+- With the branch list open, file names stay on screen. The list used to shrink to nothing because it was allowed to flex down to zero height.
+- Light theme and the 390px drawer still work. A fresh narrow load does not overflow.
+
+**Does not match, and why**
+- No session tabs, Bots tab, file-browser panel, status bar, profile pills, or reasoning menu. Those are features Pheme does not have. Not added.
+- No wallpaper. That would mean copying an asset.
+- Settings stays a scrolling form in the chat shell, not a two-column settings app. Controls are restyled; the navigation is not.
+- The branch list still scrolls inside a cap, so only a few names show at once. The file list is no longer squeezed out.
+- Other themes keep their own accent. Only the default theme is the screenshot gold.
+
+The feature table below is the 2026-11-22 source-folder audit. It is not this visual pass, and several "Missing" rows have since been built.
+
+## Feature audit (2026-11-22)
 
 Source compared: `~/.hermes/hermes-agent/apps/desktop/src/app` (folder and file names plus a few files read in full)
-against `packages/ui/src` in this repo. Status as of 2026-11-22.
+against `packages/ui/src` in this repo.
 
 Caveat: Hermes behaviour below is inferred from file and folder names, not from running the app. Treat "Missing"
 rows as candidates to confirm, not as a spec.

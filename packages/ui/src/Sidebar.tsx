@@ -183,7 +183,7 @@ export function Sidebar(props: {
   return (
     <aside className="sidebar" aria-label="Sidebar">
       <Brand />
-      <button className="btn primary new-chat" onClick={props.onNew} title={`New chat (${formatCombo(keys.new)})`}>New chat</button>
+      <button className="nav-row new-chat" onClick={props.onNew} title={`New chat (${formatCombo(keys.new)})`}><span className="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg></span>New chat</button>
       <input
         ref={props.searchRef}
         className="search"
