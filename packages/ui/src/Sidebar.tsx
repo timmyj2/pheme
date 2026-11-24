@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Menu, type MenuItem } from "./Menu.tsx";
-import { api, type ChatRow, type SearchHit } from "./api.ts";
+import { api, type AgentProfile, type ChatRow, type SearchHit } from "./api.ts";
 import type { View } from "./router.ts";
 import { formatCombo } from "./keybindings.ts";
 import { useBindings } from "./useBindings.ts";
@@ -209,11 +209,59 @@ export function Sidebar(props: {
   const tabStopId = (shown.find((c) => c.id === props.activeId && props.view === "chat") ?? shown[0])?.id;
   const hiddenCount = rows.length - shownGroups.reduce((n, g) => n + g.chats.length, 0);
 
-  const navLabel: Record<string, string> = { skills: "Skills", memory: "Memory", agents: "Agents", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" };
+  const navLabel: Record<string, string> = { skills: "Skills", memory: "Memory", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" };
+  const [rail, setRail] = useState<"sessions" | "agents">(props.view === "agents" ? "agents" : "sessions");
+  const [agents, setAgents] = useState<AgentProfile[]>([]);
+  const wantSearch = useRef(false);
+  useEffect(() => { if (props.view === "agents") setRail("agents"); }, [props.view]);
+  useEffect(() => {
+    const show = () => { wantSearch.current = true; setRail("sessions"); };
+    window.addEventListener("pheme-show-sessions", show);
+    return () => window.removeEventListener("pheme-show-sessions", show);
+  }, []);
+  useEffect(() => {
+    if (rail !== "sessions" || !wantSearch.current) return;
+    wantSearch.current = false;
+    props.searchRef.current?.focus();
+  }, [rail, props.searchRef]);
+  useEffect(() => {
+    if (rail !== "agents") return;
+    api.agentProfiles().then(setAgents).catch(() => {});
+  }, [rail]);
   return (
     <aside className="sidebar" aria-label="Sidebar">
       <Brand />
+      <div className="rail">
+        <button aria-pressed={rail === "sessions"} className={rail === "sessions" ? "active" : ""} onClick={() => setRail("sessions")}>Sessions</button>
+        <button aria-pressed={rail === "agents"} className={rail === "agents" ? "active" : ""} onClick={() => setRail("agents")}>Agents</button>
+      </div>
       <button className="nav-row new-chat" onClick={props.onNew} title={`New chat (${formatCombo(keys.new)})`}><span className="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg></span>New chat</button>
+      <nav className="nav" aria-label="Pages">
+        {(["skills", "memory", "prompts", "jobs", "settings"] as const).map((v) => (
+          <button key={v} className={props.view === v ? "active" : ""} aria-current={props.view === v ? "page" : undefined} onClick={() => props.onView(v)}><NavIcon name={v} />{navLabel[v]}</button>
+        ))}
+      </nav>
+      <div id="side-folder" className="side-folder" />
+      {rail === "agents" ? (
+        <nav className="chat-list" aria-label="Agents">
+          <h2 className="group-label">Agents</h2>
+          <ul>
+            {agents.map((a) => (
+              <li key={a.name} className="chat-item">
+                <button className="chat-row" onClick={() => props.onView("agents")}>
+                  <span className="chat-main">
+                    <span className="chat-title">{a.name}</span>
+                    <span className="chat-sub">{a.description || "Saved agent"}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {agents.length === 0 && <p className="muted small empty-list">No agents yet.</p>}
+          <button className="link small" onClick={() => props.onView("agents")}>Open the agents page</button>
+        </nav>
+      ) : (
+      <>
       <input
         ref={props.searchRef}
         className="search"
@@ -269,11 +317,8 @@ export function Sidebar(props: {
         {rows.length === 0 && extraHits.length === 0 && <div className="muted small empty-list">{needle ? "No chats match." : showArchived ? "No archived chats." : "No chats yet."}</div>}
       </nav>
       <button className="link small" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Back to chats" : "Show archived"}</button>
-      <nav className="nav" aria-label="Pages">
-        {(["skills", "memory", "agents", "prompts", "jobs", "settings"] as const).map((v) => (
-          <button key={v} className={props.view === v ? "active" : ""} aria-current={props.view === v ? "page" : undefined} onClick={() => props.onView(v)}><NavIcon name={v} />{navLabel[v]}</button>
-        ))}
-      </nav>
+      </>
+      )}
     </aside>
   );
 }

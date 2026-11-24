@@ -22,6 +22,24 @@ import { THEMES, applyTheme, parseTheme, themeValue } from "./themes/presets.ts"
 import { useToast } from "./toast.tsx";
 import { useRoute, type View } from "./router.ts";
 
+const TEXT_STEPS = [80, 90, 100, 110, 125];
+export function applyTextScale(percent?: number) {
+  let raw = percent;
+  if (raw == null) {
+    try { raw = Number(localStorage.getItem("pheme-text-scale") || "100"); } catch { raw = 100; }
+  }
+  const n = TEXT_STEPS.includes(raw) ? raw : 100;
+  document.documentElement.style.setProperty("--chat-text-scale", String(n / 100));
+}
+export function bumpTextScale(dir: -1 | 1) {
+  let cur = 100;
+  try { cur = Number(localStorage.getItem("pheme-text-scale") || "100"); } catch { /* blocked storage: stay at the default */ }
+  const i = Math.max(0, TEXT_STEPS.indexOf(cur));
+  const next = TEXT_STEPS[Math.max(0, Math.min(TEXT_STEPS.length - 1, i + dir))] ?? 100;
+  try { localStorage.setItem("pheme-text-scale", String(next)); } catch { /* private mode: this tab still changes */ }
+  applyTextScale(next);
+}
+
 const NARROW = "(max-width: 820px)";
 const HIDE_KEY = "pheme-sidebar-hidden";
 
@@ -51,6 +69,14 @@ export function App() {
   const [skillNames, setSkillNames] = useState<string[]>([]);
   const [activeBusy, setActiveBusy] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(NARROW).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW);
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  const sidebarOpen = narrow ? drawer : !hidden;
   const composerRef = useRef<ComposerHandle>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const firstMessage = useRef<{ id: string; text: string; files: File[] } | null>(null);
@@ -67,7 +93,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    try { document.documentElement.classList.toggle("wallpaper", localStorage.getItem("pheme-wallpaper") !== "0"); } catch { document.documentElement.classList.add("wallpaper"); }
+    try { document.documentElement.classList.toggle("wallpaper", localStorage.getItem("pheme-wallpaper") === "1"); } catch { /* leave it off */ }
+    applyTextScale();
   }, []);
 
   useEffect(() => {
@@ -203,10 +230,22 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (matches(e, keys.palette)) { e.preventDefault(); setPalette((p) => !p); return; }
-      if (palette || help || confirmDelete) return;
+      if (palette || help || confirmDelete || document.querySelector(".overlay")) return;
       if (matches(e, keys.sidebar)) { e.preventDefault(); if (window.matchMedia(NARROW).matches) setDrawer((d) => !d); else setHidden((h) => !h); return; }
       if (matches(e, keys.new)) { e.preventDefault(); newChat(); return; }
-      if (matches(e, keys.search)) { e.preventDefault(); setHidden(false); setDrawer(true); setTimeout(() => searchRef.current?.focus(), 0); return; }
+      if (matches(e, keys.search)) {
+        e.preventDefault();
+        setHidden(false);
+        if (window.matchMedia(NARROW).matches) setDrawer(true);
+        window.dispatchEvent(new Event("pheme-show-sessions"));
+        const focusSearch = (left: number) => {
+          const el = searchRef.current;
+          if (el) { el.focus(); return; }
+          if (left > 0) setTimeout(() => focusSearch(left - 1), 40);
+        };
+        setTimeout(() => focusSearch(12), 0);
+        return;
+      }
       if (matches(e, keys.prev) || matches(e, keys.next)) {
         e.preventDefault();
         const down = matches(e, keys.next);
@@ -316,7 +355,8 @@ export function App() {
       {drawer && <div className="backdrop" onClick={closeDrawer} aria-hidden />}
       <main className="main" id="main" tabIndex={-1}>
         <header className="topbar">
-          <button className="icon-btn menu-btn" aria-label={hidden || drawer ? "Show sidebar" : "Hide sidebar"} aria-expanded={!hidden || drawer} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (window.matchMedia(NARROW).matches) setDrawer((d) => !d); else setHidden((h) => !h); }}>☰</button>
+          <button className="icon-btn menu-btn" aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarOpen} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (narrow) setDrawer((d) => !d); else setHidden((h) => !h); }}>☰</button>
+          <div id="top-folder" className="top-folder" />
           <h1 className="sr-only">{pageTitle}</h1>
           <div className="tab-strip" role="tablist" aria-label="Open chats">
             {view === "chat" && tabs.length > 0 ? tabs.map((c) => (
@@ -344,6 +384,7 @@ export function App() {
               model={chats.find((c) => c.id === activeId)?.model}
               defaultModel={state.settings.model}
               offline={offline}
+              folderInTop={!sidebarOpen}
               composerRef={composerRef}
               autoSend={firstMessage.current?.id === activeId ? firstMessage.current?.text : undefined}
               autoFiles={firstMessage.current?.id === activeId ? firstMessage.current?.files : undefined}
@@ -367,6 +408,10 @@ export function App() {
         <span className={offline ? "over" : ""}>{offline ? "Can't reach Pheme" : "Ready"}</span>
         <span className="spacer" />
         <span>{state.fake ? "Fake engine" : state.engine}</span>
+        <span className="text-size">
+          <button type="button" aria-label="Smaller text" title="Smaller text" onClick={() => bumpTextScale(-1)}>A−</button>
+          <button type="button" aria-label="Larger text" title="Larger text" onClick={() => bumpTextScale(1)}>A+</button>
+        </span>
         <span>v{state.version}</span>
       </footer>
       {palette && <Palette commands={commands} onClose={() => setPalette(false)} />}

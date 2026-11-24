@@ -86,7 +86,7 @@ describe("ChangesPanel", () => {
 });
 
 describe("ProjectBar", () => {
-  const base = { status: null, busy: false, panelOpen: false, filesOpen: false, onTogglePanel: vi.fn(), onToggleFiles: vi.fn() };
+  const base = { status: null, busy: false, panelOpen: false, onTogglePanel: vi.fn() };
 
   it("asks for a folder when none is set, validates server errors inline, and closes on success", async () => {
     const user = userEvent.setup();
