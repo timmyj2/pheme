@@ -102,6 +102,24 @@ button.tab { cursor: pointer; }
 .skeleton i:nth-child(3) { width: 65%; }
 .load-earlier { align-self: center; }
 .thinking { display: flex; gap: 4px; padding: 6px 0; }
+.loader { width: 36px; height: 36px; flex: none; }
+.loader-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+.loader-grid i { display: block; border-radius: 1px; background: var(--dt-primary); opacity: 0.18; animation: loader-march 1.4s linear infinite; }
+.loader-light { border-radius: 50%; background: radial-gradient(circle at 32% 30%, #fff, var(--dt-primary) 42%, color-mix(in srgb, var(--dt-primary) 35%, #1a1030) 78%); box-shadow: 0 0 14px color-mix(in srgb, var(--dt-primary) 55%, transparent); animation: loader-glow 1.6s ease-in-out infinite; }
+.loader-light i { display: block; width: 100%; height: 100%; border-radius: 50%; }
+.loader-mist { position: relative; }
+.loader-mist i { position: absolute; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: var(--dt-primary); opacity: 0.35; animation: loader-mist 1.8s ease-in-out infinite; }
+.loader-row { display: flex; gap: 8px; align-items: center; }
+.loader-pick { display: flex; gap: 8px; flex-wrap: wrap; }
+.loader-pick button { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 108px; padding: 8px; border-radius: 10px; border: 1px solid var(--dt-border); background: var(--dt-card); cursor: pointer; }
+.loader-pick button[aria-pressed="true"] { border-color: var(--dt-primary); box-shadow: 0 0 0 1px var(--dt-primary); }
+.loader-pick .loader { width: 28px; height: 28px; }
+@keyframes loader-march { 0%, 70%, 100% { opacity: 0.16; } 35% { opacity: 1; } }
+@keyframes loader-glow { 0%, 100% { transform: scale(0.92); filter: brightness(0.9); } 50% { transform: scale(1); filter: brightness(1.25); } }
+@keyframes loader-mist { 0%, 100% { opacity: 0.2; transform: scale(0.6); } 50% { opacity: 0.95; transform: scale(1.3); } }
+@media (prefers-reduced-motion: reduce) {
+  .loader-grid i, .loader-light, .loader-mist i { animation: none; opacity: 0.75; }
+}
 .thinking span { width: 6px; height: 6px; border-radius: 50%; background: var(--dt-muted-foreground); animation: bounce 1s infinite ease-in-out; }
 .thinking span:nth-child(2) { animation-delay: 0.15s; }
 .thinking span:nth-child(3) { animation-delay: 0.3s; }

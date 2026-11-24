@@ -4,6 +4,7 @@ import { KeybindingSettings } from "./KeybindingSettings.tsx";
 import { NotificationSetting } from "./NotificationSetting.tsx";
 import { useUnsaved } from "./unsaved.ts";
 import { ConfirmDialog } from "./Dialog.tsx";
+import { Loader, LOADER_LABEL, setLoaderKind, useLoaderKind } from "./Loader.tsx";
 import { THEMES, parseTheme, themeValue, type Mode } from "./themes/presets.ts";
 import { api, type BootstrapState, type CuratorState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
 import { useToast } from "./toast.tsx";
@@ -249,6 +250,7 @@ export function NumberField({ label, value, range, onCommit }: { label: string; 
 
 export function SettingsPage({ state, onChange }: { state: BootstrapState; onChange: (s: Settings) => void }) {
   const toast = useToast();
+  const loader = useLoaderKind();
   const { data: models } = useLoad<ModelOption[]>(api.models);
   const s = state.settings;
   const set = async (patch: Partial<Settings>) => {
@@ -329,6 +331,17 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
           <input type="checkbox" defaultChecked={typeof localStorage !== "undefined" && localStorage.getItem("pheme-wallpaper") === "1"} onChange={(e) => { try { localStorage.setItem("pheme-wallpaper", e.target.checked ? "1" : "0"); } catch { /* private mode: this tab still shows it */ } document.documentElement.classList.toggle("wallpaper", e.target.checked); }} />
           Soft background behind the chat (off unless you turn it on)
         </label>
+        <div className="field">Loading indicator
+          <div className="loader-pick" role="group" aria-label="Loading indicator">
+            {(["grid", "light", "mist"] as const).map((k) => (
+              <button key={k} type="button" aria-pressed={loader === k} onClick={() => setLoaderKind(k)}>
+                <Loader kind={k} quiet />
+                <span className="small">{LOADER_LABEL[k]}</span>
+              </button>
+            ))}
+          </div>
+          <p className="muted small">Shown in the chat while a reply is running.</p>
+        </div>
         <label className="field">Text size
           <select aria-label="Text size" defaultValue={typeof localStorage === "undefined" ? "100" : (localStorage.getItem("pheme-text-scale") || "100")} onChange={(e) => { const n = Number(e.target.value); try { localStorage.setItem("pheme-text-scale", String(n)); } catch { /* private mode */ } document.documentElement.style.setProperty("--chat-text-scale", String(n / 100)); }}>
             <option value="80">Smaller</option>
