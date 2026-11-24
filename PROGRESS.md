@@ -89,6 +89,6 @@ Still not verified: real GitHub PR creation and checks (fake gh only), real Copi
 Adds the six-item goal above (PR panel, branches and stash, attachments, prompt library, context meter, installable app) plus the text-attachment fix: a real-Copilot test showed images work but text files sent by path never reached the model, so text now goes inside the message.
 Verified: `npm run verify -- --e2e` (626 unit tests, build, smoke, stress 20/20, scale stress, 13 browser tests). Real Copilot: images and chat yes; text-file fix covered by fake-engine tests only.
 Open, in priority order:
-1. **Visual match to the Hermes app.** Parity so far came from Hermes source and docs, never a side-by-side. The Changes/branch panel is cramped, controls look like browser defaults, PR badges lack pill styling. Needs real Hermes screenshots (none found in Notion titles; pages not yet searched for embedded images). Plan: capture Pheme in the same states, list differences, fix biggest first.
+1. ~~Visual match to the Hermes app.~~ First side-by-side pass is on `feat/visual-pass` (see docs/PARITY.md). Compared against three desktop screenshots, not Hermes source. Still not a match: no session tabs, file browser, or status bar (those are features Pheme does not have). Not tagged.
 2. Not verified: real GitHub PR creation/checks (fake gh only); Windows UI on a real PC (CI only); text attachments on real Copilot.
 3. Unconfirmed: scale-stress "1501 chats vs 1502" (probably script off-by-one); 56 SSE connections after rapid chat switching (single probe).

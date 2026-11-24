@@ -64,7 +64,7 @@ export function PrDetails({ chatId, number }: { chatId: string; number: number }
       <div className="pr-badges">
         <span className={`pr-badge ${pr.state}`}>{pr.state === "open" ? (pr.draft ? "Draft" : "Open") : pr.state === "merged" ? "Merged" : "Closed"}</span>
         <span className={`pr-badge review-${pr.review}`}>{reviewText(pr.review)}</span>
-        <span className={`pr-badge merge-${pr.state === "open" && pr.mergeable === "conflicting" ? "bad" : "info"}`}>{mergeText(pr)}</span>
+        <span className={`pr-badge merge-${pr.state === "open" && pr.mergeable === "conflicting" ? "bad" : "info"}${pr.mergeState ? ` merge-${pr.mergeState}` : ""}`}>{mergeText(pr)}</span>
       </div>
       <p className="muted small">{pr.head} → {pr.base} · {pr.changedFiles} file{pr.changedFiles === 1 ? "" : "s"} · <span className="add">+{pr.additions}</span> <span className="del">−{pr.deletions}</span></p>
       {pr.checks.length === 0 ? <p className="muted small">No checks have reported yet.</p> : (
