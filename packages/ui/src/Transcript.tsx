@@ -1,6 +1,7 @@
 import { Attachments } from "./AttachmentView.tsx";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentCard } from "./AgentCard.tsx";
+import { Loader, useLoaderKind } from "./Loader.tsx";
 import { LazyMarkdown as Markdown } from "./LazyMarkdown.tsx";
 import type { ApprovalDecision, SeqEvent } from "./api.ts";
 import { APPROVAL_LABEL, buildBlocks, toolDuration, toolSummary, type Block, type ToolItem } from "./blocks.ts";
@@ -121,6 +122,7 @@ export function Transcript(props: Props) {
   const [atBottom, setAtBottom] = useState(true);
   const [missed, setMissed] = useState(false);
   const [shown, setShown] = useState(WINDOW);
+  const loader = useLoaderKind();
   const grewBy = useRef<number | null>(null);
 
   const visible = useMemo(() => events.slice(-shown), [events, shown]);
@@ -237,7 +239,7 @@ export function Transcript(props: Props) {
             </div>
           ))}
           {streaming && <div className="assistant streaming" aria-busy="true"><Markdown text={streaming} /></div>}
-          {busy && !streaming && <div className="thinking" role="status" aria-label="Pheme is working"><span /><span /><span /></div>}
+          {busy && <Loader kind={loader} />}
         </div>
       </div>
       {!atBottom && (
