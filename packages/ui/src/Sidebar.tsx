@@ -24,6 +24,32 @@ export interface Group {
 
 const startOfDay = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
+/** Short age for a session row: 12m, 3h, 2d. */
+export function relTime(ts: number, now = Date.now()): string {
+  const s = Math.max(0, Math.floor((now - ts) / 1000));
+  if (s < 60) return "now";
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
+}
+
+/** Line icons for the page rows. Drawn here, not taken from another app. */
+function NavIcon({ name }: { name: string }) {
+  const d: Record<string, string> = {
+    skills: "M3 3.5h7.5v9H3zM10.5 5H13v7.5H6",
+    memory: "M8 3.2a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM3.5 13.2c.6-2 2.3-3 4.5-3s3.9 1 4.5 3",
+    agents: "M5 4.2a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zM11 5a1.4 1.4 0 1 1 0 2.8A1.4 1.4 0 0 1 11 5zM2.8 12.5c.4-1.6 1.6-2.4 3.4-2.4s3 .8 3.4 2.4M9.2 10.4c1.4.1 2.4.8 2.8 2.1",
+    prompts: "M4 3.5h8v9H4zM6 6.5h4M6 9h3",
+    jobs: "M8 3.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zM8 5.5V8l2 1.2",
+    settings: "M3 5.5h10M3 8h10M3 10.5h10M6 4.5v2M10 7v2M7 9.5v2",
+  };
+  return (
+    <svg className="nav-ico" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d={d[name] ?? ""} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Pinned first, then by recency: Today, Yesterday, Previous 7 days, Older. Empty groups are dropped. */
 export function groupChats(chats: ChatRow[], now = Date.now()): Group[] {
   const today = startOfDay(now);
@@ -119,7 +145,11 @@ function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, 
           }}
         >
           {c.busy ? <span className="spin" role="img" aria-label="working" /> : unread ? <span className="dot" role="img" aria-label="new activity" /> : null}
-          <span className="chat-title">{c.title}</span>
+          <span className="chat-main">
+            <span className="chat-title">{c.title}</span>
+            <span className="chat-sub">{c.model || "auto"} · {c.userMessages}</span>
+          </span>
+          <span className="chat-time">{relTime(c.updatedAt)}</span>
         </button>
       )}
       {!editing && (
@@ -241,7 +271,7 @@ export function Sidebar(props: {
       <button className="link small" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Back to chats" : "Show archived"}</button>
       <nav className="nav" aria-label="Pages">
         {(["skills", "memory", "agents", "prompts", "jobs", "settings"] as const).map((v) => (
-          <button key={v} className={props.view === v ? "active" : ""} aria-current={props.view === v ? "page" : undefined} onClick={() => props.onView(v)}>{navLabel[v]}</button>
+          <button key={v} className={props.view === v ? "active" : ""} aria-current={props.view === v ? "page" : undefined} onClick={() => props.onView(v)}><NavIcon name={v} />{navLabel[v]}</button>
         ))}
       </nav>
     </aside>
