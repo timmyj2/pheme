@@ -74,6 +74,19 @@ export class ChatStore {
     return m;
   }
 
+  /** Remember a dragged tab order without treating the drag as a new message (updatedAt stays put). */
+  setTabOrder(ids: string[]): number {
+    let n = 0;
+    ids.forEach((id, i) => {
+      const m = this.get(id);
+      if (!m) return;
+      m.tabOrder = i;
+      writeJson(this.metaFile(id), m);
+      n++;
+    });
+    return n;
+  }
+
   /** Forget cached per-chat counters; call after files in the data folder were replaced from outside (a restore). */
   resetCache(): void {
     this.seqs.clear();

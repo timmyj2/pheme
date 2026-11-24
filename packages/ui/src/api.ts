@@ -5,6 +5,7 @@ import type { AttachmentRef } from "../../server/src/attachments.ts";
 export type { Prompt } from "../../server/src/prompts.ts";
 export type { AttachmentRef } from "../../server/src/attachments.ts";
 export type { BranchList, BranchInfo, StashEntry } from "../../server/src/gitbranch.ts";
+export type { DirList } from "../../server/src/files.ts";
 export type { GitStatus, ChangedFile, FileDiff, RemoteInfo, PrInfo, PrDetail, PrCheck } from "../../server/src/git.ts";
 export type { CuratorState, AgentProfile, AgentRun, Job, JobSchedule, ChatEvent, ChatMeta, SeqEvent, Settings, BootstrapState, MemoryState, SkillSummary, ModelOption, ApprovalDecision };
 export type ChatRow = ChatMeta & { busy?: boolean; /** A tool is waiting for the user's approval. */ waiting?: boolean };
@@ -165,4 +166,6 @@ export const api = {
   curator: () => call<CuratorState>("/curator"),
   runCurator: () => call<{ ok: boolean }>("/curator/run", "POST", {}),
   eventsUrl: (id: string, after: number) => `/api/chats/${id}/events?after=${after}&token=${encodeURIComponent(token())}`,
+  files: (id: string, rel = "") => call<import("../../server/src/files.ts").DirList>(`/chats/${id}/files?path=${encodeURIComponent(rel)}`),
+  reorderChats: (ids: string[]) => call<{ ok: boolean; updated: number }>("/chats/reorder", "POST", { ids }),
 };

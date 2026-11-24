@@ -26,4 +26,6 @@ Light theme, the 390px drawer, focus rings, and the skip link still work. No new
 
 ## Not this pass
 
-Session drag-reorder, a file tree of the home folder, profile pills, a two-column settings app with providers and billing, or a copied background image.
+Bots page, profile pills, a two-column settings app with providers and billing, or a copied background image.
+
+The owner then asked for the features this list had held back. Added on `feat/shell-features`: a read-only file list (names only, cannot leave the project folder or the home folder), drag-to-reorder on the tab strip, and an original CSS gradient behind the chat (off in Settings). None of these copy Hermes assets.

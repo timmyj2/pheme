@@ -181,6 +181,32 @@ for (const [p, b] of [[`/chats/${chat}/git/commit`, { message: 5, paths: "x" }],
   check("deleting twice -> 404", again.s === 404);
 }
 
+// ---- files (names only) and tab order
+{
+  const fresh = (await J("/chats", { method: "POST", body: "{}" })).j.id;
+  const home = await time("list home folder", async () => (await J(`/chats/${fresh}/files`)).j);
+  check("files lists a folder by name, never a full path", home.label && Array.isArray(home.entries) && !JSON.stringify(home).includes(os.homedir()));
+  check("files refuses ..", (await J(`/chats/${fresh}/files?path=${encodeURIComponent("../")}`)).s === 400);
+  check("files 400 on a missing folder", (await J(`/chats/${fresh}/files?path=no-such-folder-pheme`)).s === 400);
+  const huge = fs.mkdtempSync(path.join(os.tmpdir(), "s2-files-"));
+  for (let i = 0; i < 400; i++) fs.writeFileSync(path.join(huge, `f${String(i).padStart(3, "0")}.txt`), "x");
+  check("point files at a folder", (await J(`/chats/${fresh}`, { method: "PATCH", body: JSON.stringify({ projectDir: huge }) })).s === 200);
+  const capped = await time("list 400 names", async () => (await J(`/chats/${fresh}/files`)).j);
+  check("folder listing caps at 300 and counts the rest", capped.entries?.length === 300 && capped.more === 100, `(${capped.entries?.length}+${capped.more})`);
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "s2-out-"));
+  fs.writeFileSync(path.join(outside, "secret.txt"), "nope");
+  let linked = true;
+  try { fs.symlinkSync(outside, path.join(huge, "escape")); } catch { linked = false; }
+  if (linked) check("a symlink out of the folder is refused", (await J(`/chats/${fresh}/files?path=escape`)).s === 400);
+  else console.log("SKIP  symlink (this OS refused to make one)");
+  const re = await J("/chats/reorder", { method: "POST", body: JSON.stringify({ ids: [big, fresh, "missing-id"] }) });
+  check("reorder keeps the tabs that exist", re.s === 200 && re.j.updated === 2, JSON.stringify(re.j));
+  const listed = (await J("/chats")).j;
+  check("tab order survived a list", listed.find((c) => c.id === big)?.tabOrder === 0 && listed.find((c) => c.id === fresh)?.tabOrder === 1);
+  check("reorder rejects a bad body", (await J("/chats/reorder", { method: "POST", body: JSON.stringify({ ids: "nope" }) })).s === 400);
+  check("reorder rejects 201 ids", (await J("/chats/reorder", { method: "POST", body: JSON.stringify({ ids: Array.from({ length: 201 }, (_, i) => `x${i}`) }) })).s === 400);
+}
+
 srv.kill();
 await new Promise((r) => setTimeout(r, 500));
 {

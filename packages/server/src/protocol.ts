@@ -14,6 +14,8 @@ export interface ChatMeta {
   /** Value of `userMessages` when the memory review last ran. */
   lastMemoryReviewAt: number;
   model?: string;
+  /** Manual tab-strip order. Absent means "sort by recency". Does not change which day a chat belongs to. */
+  tabOrder?: number;
   /** Folder the engine works in for this chat (and where the Git panel looks). Absolute path. */
   projectDir?: string;
 }

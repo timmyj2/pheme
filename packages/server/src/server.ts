@@ -2,10 +2,12 @@ import fs from "node:fs";
 import { applyBackup, backupFileName, createBackup, previewBackup } from "./backup.ts";
 import { chatToMarkdown, exportFileName, searchLimited } from "./export.ts";
 import { MAX_IMAGE_BYTES, MAX_PER_MESSAGE } from "./attachments.ts";
+import { listDir } from "./files.ts";
 import { gitBranches, gitStashApply, gitStashDrop, gitStashList, gitStashPush, gitSwitch } from "./gitbranch.ts";
 import { gitCommit, gitCreatePr, gitDiff, gitPrDetail, gitPush, gitRemoteInfo, gitStatus, gitUndo } from "./git.ts";
 import { HttpError } from "./http-error.ts";
 import http from "node:http";
+import os from "node:os";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import type { App } from "./app.ts";
@@ -136,6 +138,11 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         if (m === "GET") return json(res, 200, app.store.list().map((c) => ({ ...c, busy: app.isBusy(c.id), waiting: app.pendingApprovals(c.id).length > 0 })));
         if (m === "POST") return json(res, 201, app.store.create({ model: typeof body.model === "string" ? body.model : undefined }));
       }
+      if (seg[1] === "reorder" && m === "POST" && seg.length === 2) {
+        const ids = body.ids;
+        if (!Array.isArray(ids) || ids.length > 200 || ids.some((x) => typeof x !== "string" || x.length > 80 || x.includes("\0"))) throw new HttpError(400, "ids must be a list of chat ids.");
+        return json(res, 200, { ok: true, updated: app.store.setTabOrder(ids) });
+      }
       const id = seg[1];
       const meta = app.store.get(id);
       if (!meta) return json(res, 404, { error: "no such chat" });
@@ -173,6 +180,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
           return json(res, 409, { error: (e as Error).message });
         }
         return json(res, 202, { ok: true });
+      }
+      if (seg[2] === "files" && m === "GET") {
+        const root = meta.projectDir || os.homedir();
+        return json(res, 200, listDir(root, url.searchParams.get("path") ?? ""));
       }
       if (seg[2] === "git" && m === "GET" && (seg.length === 3 || (seg.length === 4 && seg[3] === "diff"))) {
         const dir = meta.projectDir;

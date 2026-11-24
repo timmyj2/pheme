@@ -325,6 +325,10 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
           </label>
         </div>
         {(!theme.light || !theme.dark) && <p className="muted small">This theme has only one {theme.dark ? "dark" : "light"} palette.</p>}
+        <label className="check">
+          <input type="checkbox" defaultChecked={typeof localStorage === "undefined" || localStorage.getItem("pheme-wallpaper") !== "0"} onChange={(e) => { try { localStorage.setItem("pheme-wallpaper", e.target.checked ? "1" : "0"); } catch { /* private mode: this tab still shows it */ } document.documentElement.classList.toggle("wallpaper", e.target.checked); }} />
+          Soft background behind the chat (an original gradient, not a picture)
+        </label>
       </div>
       <NotificationSetting />
       <KeybindingSettings />

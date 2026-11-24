@@ -150,6 +150,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .change-row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; color: var(--dt-foreground); padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .change-row:hover { background: var(--dt-muted); }
 .change-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.file-list { list-style: none; margin: 0; padding: 0; }
+.file-row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; color: var(--dt-foreground); padding: 5px 6px; border-radius: 6px; font-size: 13px; font: inherit; }
+button.file-row { cursor: pointer; }
+button.file-row:hover { background: var(--dt-muted); }
+.file-plain { color: var(--dt-muted-foreground); }
+.tab[draggable="true"] { cursor: grab; }
+html.wallpaper .main {
+  background:
+    radial-gradient(1100px 640px at 78% 8%, color-mix(in srgb, var(--dt-primary) 14%, transparent), transparent 62%),
+    radial-gradient(800px 520px at 8% 92%, color-mix(in srgb, var(--dt-primary) 8%, transparent), transparent 58%),
+    var(--dt-background);
+}
 .change-counts { font-family: var(--dt-font-mono); font-size: 12px; white-space: nowrap; }
 .plus { color: var(--dt-success-text, #3fb950); } .minus { color: var(--dt-destructive-text); }
 .st-badge { width: 18px; height: 18px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: var(--dt-muted); flex: none; }

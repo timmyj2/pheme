@@ -13,9 +13,11 @@ Compared against three screenshots of the running Hermes desktop app, then Pheme
 - Light theme and the 390px drawer still work. A fresh narrow load does not overflow.
 
 **Does not match, and why**
-- No session tabs, Bots tab, file-browser panel, status bar, profile pills, or reasoning menu. Those are features Pheme does not have. Not added.
-- No wallpaper. That would mean copying an asset.
-- Settings stays a scrolling form in the chat shell, not a two-column settings app. Controls are restyled; the navigation is not.
+- No Bots tab, profile pills, or reasoning menu. Those are features Pheme does not have.
+- The file list shows names only (no icons drawn like the reference, no file preview). It cannot leave the project folder, or the home folder when none is set.
+- The background is an original gold-tinted gradient, not the reference picture. It turns off in Settings.
+- Settings has a section list beside the existing panels. It is not a full two-column settings app (no providers, billing, or gateways).
+- Tab drag reorders the strip. It does not split the window.
 - The branch list still scrolls inside a cap, so only a few names show at once. The file list is no longer squeezed out.
 - Other themes keep their own accent. Only the default theme is the screenshot gold.
 
