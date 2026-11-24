@@ -42,6 +42,6 @@ Rule for every push: `npm run lint && npm run typecheck && npm test` first (CI l
 Status of the six: all built and tested on branch feat/git-workflow (see PROGRESS.md). Ideas not started: attachments in backups, queueing a message with attachments, prompt import/export, a "resolve conflicts" helper in the Git panel, an install button inside Settings.
 
 ## Next (after v0.3.0)
-1. Visual pass against real Hermes screenshots — first pass on `feat/visual-pass` (docs/PARITY.md). Not a full match; no new features.
+1. Visual goal is `docs/VISUAL-GOAL.md`: the frame from the three desktop screenshots, not a recolor. Shell pass is on `feat/visual-shell`.
 2. Re-test text attachments on real Copilot (one short request).
 3. Check the SSE connection count after rapid chat switching.

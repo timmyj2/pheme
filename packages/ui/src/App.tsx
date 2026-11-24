@@ -272,10 +272,13 @@ export function App() {
   const offline = conn.status === "offline";
   const pageTitle = view === "chat" ? (activeChat?.title ?? "New chat") : { skills: "Skills", memory: "Memory", agents: "Agents", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" }[view];
   const shellClass = `shell${hidden ? " sidebar-hidden" : ""}${drawer ? " drawer-open" : ""}`;
+  const tabs = [...chats].filter((c) => !c.archived && !c.hidden).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5);
+  if (activeChat && !tabs.some((c) => c.id === activeChat.id)) tabs.unshift(activeChat);
 
   return (
     <div className={shellClass}>
       <a className="skip-link" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
+      <div className="workspace">
       <div className="sidebar-wrap">
         <Sidebar
           chats={chats}
@@ -297,9 +300,16 @@ export function App() {
       <main className="main" id="main" tabIndex={-1}>
         <header className="topbar">
           <button className="icon-btn menu-btn" aria-label={hidden || drawer ? "Show sidebar" : "Hide sidebar"} aria-expanded={!hidden || drawer} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (window.matchMedia(NARROW).matches) setDrawer((d) => !d); else setHidden((h) => !h); }}>☰</button>
-          <h1 className="topbar-title" title={pageTitle}>{pageTitle}</h1>
-          <span className="spacer" />
-          {state.fake && <span className="pill" title="Using the built-in fake engine">fake engine</span>}
+          <h1 className="sr-only">{pageTitle}</h1>
+          <div className="tab-strip" role="tablist" aria-label="Open chats">
+            {view === "chat" && tabs.length > 0 ? tabs.map((c) => (
+              <button key={c.id} role="tab" aria-selected={c.id === activeId} className={`tab${c.id === activeId ? " active" : ""}`} title={c.title} onClick={() => openChat(c.id)}>
+                {(c.busy || c.id === activeId && activeBusy) && <span className="tab-dot" aria-hidden="true" />}
+                <span className="tab-title">{c.title}</span>
+              </button>
+            )) : <span className="tab active" role="tab" aria-selected="true">{pageTitle}</span>}
+          </div>
+          {state.fake && <span className="pill" title="Using the built-in fake engine">fake</span>}
           <button className="icon-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={() => setHelp(true)}>⌨</button>
         </header>
         {offline && (
@@ -335,6 +345,13 @@ export function App() {
           {view === "settings" && <SettingsPage state={state} onChange={(settings) => conn.setState({ ...state, settings })} />}
         </ErrorBoundary>
       </main>
+      </div>
+      <footer className="status-bar">
+        <span className={offline ? "over" : ""}>{offline ? "Can't reach Pheme" : "Ready"}</span>
+        <span className="spacer" />
+        <span>{state.fake ? "Fake engine" : state.engine}</span>
+        <span>v{state.version}</span>
+      </footer>
       {palette && <Palette commands={commands} onClose={() => setPalette(false)} />}
       {help && <ShortcutsHelp onClose={() => setHelp(false)} />}
       {leaving && <ConfirmDialog title="Discard unsaved changes?" body="You have edits that are not saved. Leaving this page will discard them." confirmLabel="Discard" danger onConfirm={() => { const go = leaving; setLeaving(null); clearUnsaved(); go(); }} onClose={() => setLeaving(null)} />}

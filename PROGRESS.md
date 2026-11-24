@@ -89,6 +89,6 @@ Still not verified: real GitHub PR creation and checks (fake gh only), real Copi
 Adds the six-item goal above (PR panel, branches and stash, attachments, prompt library, context meter, installable app) plus the text-attachment fix: a real-Copilot test showed images work but text files sent by path never reached the model, so text now goes inside the message.
 Verified: `npm run verify -- --e2e` (626 unit tests, build, smoke, stress 20/20, scale stress, 13 browser tests). Real Copilot: images and chat yes; text-file fix covered by fake-engine tests only.
 Open, in priority order:
-1. ~~Visual match to the Hermes app.~~ First side-by-side pass is on `feat/visual-pass` (see docs/PARITY.md). Compared against three desktop screenshots, not Hermes source. Still not a match: no session tabs, file browser, or status bar (those are features Pheme does not have). Not tagged.
+1. Visual goal is `docs/VISUAL-GOAL.md`. The chrome pass (`#6`) was a recolor. The shell pass adds the tab strip, status bar, two-line session rows, model control inside the composer, and a settings section list. Still not a spitting image: no file-browser panel, no session drag, no wallpaper.
 2. Not verified: real GitHub PR creation/checks (fake gh only); Windows UI on a real PC (CI only); text attachments on real Copilot.
 3. Unconfirmed: scale-stress "1501 chats vs 1502" (probably script off-by-one); 56 SSE connections after rapid chat switching (single probe).

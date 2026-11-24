@@ -266,7 +266,7 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
   // Settings search: hide the panels whose text (headings, labels, option names, help text) does not contain the words typed.
   const [find, setFind] = useState("");
   const [shown, setShown] = useState(-1);
-  const body = useRef<HTMLElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const words = find.toLowerCase().split(/\s+/).filter(Boolean);
     let visible = 0;
@@ -279,12 +279,22 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
     setShown((n) => (n === visible ? n : visible));
   });
   return (
-    <section className="page" ref={body}>
+    <section className="page settings-page">
       <Head title="Settings" sub={`Pheme ${state.version} · engine: ${state.engine}${state.fake ? " (fake mode)" : ""}`} />
       <div className="settings-find">
         <input type="search" aria-label="Search settings" placeholder="Search settings (for example: theme, approve, memory)" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setFind(""); }} />
         {find.trim() && shown === 0 && <p className="muted small" role="status">No settings match “{find.trim()}”.</p>}
       </div>
+      <div className="settings-split">
+        <nav className="settings-nav" aria-label="Settings sections">
+          {["Model", "Appearance", "Notifications", "Keyboard shortcuts", "Backup and restore", "Permissions", "Learning loops"].map((name) => (
+            <button key={name} type="button" onClick={() => {
+              const hit = [...(body.current?.querySelectorAll("h3") ?? [])].find((h) => h.textContent === name);
+              hit?.scrollIntoView({ block: "start" });
+            }}>{name}</button>
+          ))}
+        </nav>
+        <div className="settings-body" ref={body}>
       <div className="panel">
         <h3>Model</h3>
         <label className="field">Chat model
@@ -343,6 +353,8 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
         {num("curatorStaleDays", "Archive skills unused for this many days")}
         {num("memoryLimit", "Memory limit (characters)")}
         {num("userLimit", "User profile limit (characters)")}
+      </div>
+        </div>
       </div>
     </section>
   );

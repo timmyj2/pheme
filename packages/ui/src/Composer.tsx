@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { ACCEPT, checkFiles, DEFAULT_TEXT, isImage, nameForPasted, sizeLabel } from "./attach.ts";
 import { firstPlaceholder, PromptList, promptsFor, SaveAsPrompt, usePrompts } from "./PromptPicker.tsx";
 import { loadDraft, loadHistory, pushHistory, saveDraft } from "./drafts.ts";
@@ -30,9 +30,11 @@ interface Props {
   onSend: (text: string, files: File[]) => void;
   onStop: () => void;
   onRemoveQueued: (i: number) => void;
+  /** Sits in the box, to the left of Send. Used for the model control. */
+  extra?: ReactNode;
 }
 
-export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, projectDir, onSend, onStop, onRemoveQueued }, ref) {
+export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, projectDir, onSend, onStop, onRemoveQueued, extra }, ref) {
   const [text, setText] = useState(() => loadDraft(chatId));
   const latest = useRef(text); // the current text, readable from cleanup code after the textarea is gone
   latest.current = text;
@@ -253,6 +255,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
             }}
             spellCheck
           />
+          {extra && <div className="composer-extra">{extra}</div>}
           {busy && !text.trim() ? (
             <button className="btn danger" onClick={onStop} aria-label="Stop the reply">Stop</button>
           ) : (

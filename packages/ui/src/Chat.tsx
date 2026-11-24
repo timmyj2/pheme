@@ -94,7 +94,6 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
       {chatId && (
         <div className="chat-toolbar">
           <ProjectBar dir={projectDir} status={git.status} busy={chat.busy} panelOpen={panelOpen} onTogglePanel={togglePanel} onSetDir={setDir} />
-          <ModelPicker value={model} defaultModel={defaultModel} disabled={chat.busy || offline} onChange={setModel} />
         </div>
       )}
       <div className="chat-split">
@@ -127,6 +126,7 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
         onSend={send}
         onStop={() => void stop()}
         onRemoveQueued={chat.removeQueued}
+        extra={chatId ? <ModelPicker value={model} defaultModel={defaultModel} disabled={chat.busy || offline} onChange={setModel} /> : undefined}
       />
       </div>
       {chatId && projectDir && panelOpen && <ChangesPanel chatId={chatId} status={git.status} error={git.error} loading={git.loading} onRefresh={() => void git.refresh()} onClose={togglePanel} busy={chat.busy} />}
