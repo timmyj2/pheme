@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { api } from "./api.ts";
 import { ChangesPanel } from "./ChangesPanel.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { FilesPanel } from "./FilesPanel.tsx";
 import { ProjectBar } from "./ProjectBar.tsx";
 import { useGit } from "./useGit.ts";
 import { Composer, type ComposerHandle } from "./Composer.tsx";
@@ -48,8 +49,10 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
     setModelOverride({ model: meta.model });
     onChanged();
   };
+  const [filesOpen, setFilesOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(() => localStorage.getItem("pheme-changes-open") === "1");
-  const togglePanel = () => setPanelOpen((o) => { localStorage.setItem("pheme-changes-open", o ? "0" : "1"); return !o; });
+  const togglePanel = () => setPanelOpen((o) => { const next = !o; localStorage.setItem("pheme-changes-open", next ? "1" : "0"); if (next) setFilesOpen(false); return next; });
+  const toggleFiles = () => setFilesOpen((o) => { const next = !o; if (next) { setPanelOpen(false); try { localStorage.setItem("pheme-changes-open", "0"); } catch { /* private mode */ } } return next; });
   const git = useGit(chatId, projectDir, panelOpen, chat.busy);
   const setDir = async (dir: string | null) => {
     if (!chatId) return;
@@ -93,7 +96,7 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
     <section className="chat">
       {chatId && (
         <div className="chat-toolbar">
-          <ProjectBar dir={projectDir} status={git.status} busy={chat.busy} panelOpen={panelOpen} onTogglePanel={togglePanel} onSetDir={setDir} />
+          <ProjectBar dir={projectDir} status={git.status} busy={chat.busy} panelOpen={panelOpen} filesOpen={filesOpen} onTogglePanel={togglePanel} onToggleFiles={toggleFiles} onSetDir={setDir} />
         </div>
       )}
       <div className="chat-split">
@@ -130,6 +133,7 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
       />
       </div>
       {chatId && projectDir && panelOpen && <ChangesPanel chatId={chatId} status={git.status} error={git.error} loading={git.loading} onRefresh={() => void git.refresh()} onClose={togglePanel} busy={chat.busy} />}
+      {chatId && filesOpen && <FilesPanel chatId={chatId} onClose={toggleFiles} />}
       </div>
     </section>
   );

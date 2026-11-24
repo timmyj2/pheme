@@ -50,6 +50,7 @@ export function App() {
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(HIDE_KEY) === "1"; } catch { return false; } });
   const [skillNames, setSkillNames] = useState<string[]>([]);
   const [activeBusy, setActiveBusy] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
   const composerRef = useRef<ComposerHandle>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const firstMessage = useRef<{ id: string; text: string; files: File[] } | null>(null);
@@ -63,6 +64,10 @@ export function App() {
       setChats(list);
       setChatsLoaded(true);
     }).catch(() => { /* the connection banner reports an unreachable server */ });
+  }, []);
+
+  useEffect(() => {
+    try { document.documentElement.classList.toggle("wallpaper", localStorage.getItem("pheme-wallpaper") !== "0"); } catch { document.documentElement.classList.add("wallpaper"); }
   }, []);
 
   useEffect(() => {
@@ -272,8 +277,20 @@ export function App() {
   const offline = conn.status === "offline";
   const pageTitle = view === "chat" ? (activeChat?.title ?? "New chat") : { skills: "Skills", memory: "Memory", agents: "Agents", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" }[view];
   const shellClass = `shell${hidden ? " sidebar-hidden" : ""}${drawer ? " drawer-open" : ""}`;
-  const tabs = [...chats].filter((c) => !c.archived && !c.hidden).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5);
+  const tabs = [...chats].filter((c) => !c.archived && !c.hidden).sort((a, b) => (a.tabOrder ?? 1e9) - (b.tabOrder ?? 1e9) || b.updatedAt - a.updatedAt).slice(0, 6);
   if (activeChat && !tabs.some((c) => c.id === activeChat.id)) tabs.unshift(activeChat);
+  const dropTab = (targetId: string) => {
+    if (!dragId || dragId === targetId) return;
+    const ids = tabs.map((t) => t.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, dragId);
+    setChats((prev) => prev.map((c) => { const i = ids.indexOf(c.id); return i < 0 ? c : { ...c, tabOrder: i }; }));
+    setDragId(null);
+    void api.reorderChats(ids).then(refresh).catch((e: Error) => toast.error(e.message));
+  };
 
   return (
     <div className={shellClass}>
@@ -303,7 +320,7 @@ export function App() {
           <h1 className="sr-only">{pageTitle}</h1>
           <div className="tab-strip" role="tablist" aria-label="Open chats">
             {view === "chat" && tabs.length > 0 ? tabs.map((c) => (
-              <button key={c.id} role="tab" aria-selected={c.id === activeId} className={`tab${c.id === activeId ? " active" : ""}`} title={c.title} onClick={() => openChat(c.id)}>
+              <button key={c.id} role="tab" aria-selected={c.id === activeId} draggable className={`tab${c.id === activeId ? " active" : ""}`} title={c.title} onClick={() => openChat(c.id)} onDragStart={() => setDragId(c.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropTab(c.id)}>
                 {(c.busy || c.id === activeId && activeBusy) && <span className="tab-dot" aria-hidden="true" />}
                 <span className="tab-title">{c.title}</span>
               </button>
