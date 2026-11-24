@@ -1,9 +1,10 @@
 import { ContextMeter } from "./ContextMeter.tsx";
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { api } from "./api.ts";
 import { ChangesPanel } from "./ChangesPanel.tsx";
+import { Dialog } from "./Dialog.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
-import { FilesPanel } from "./FilesPanel.tsx";
 import { ProjectBar } from "./ProjectBar.tsx";
 import { useGit } from "./useGit.ts";
 import { Composer, type ComposerHandle } from "./Composer.tsx";
@@ -30,9 +31,11 @@ interface Props {
   onChanged: () => void;
   onOpenChat: (id: string) => void;
   onBusy: (busy: boolean) => void;
+  /** When the sidebar is hidden, the folder control moves into the top bar so it stays reachable. */
+  folderInTop?: boolean;
 }
 
-export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaultModel, offline, composerRef, autoSend, autoFiles, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
+export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaultModel, offline, folderInTop, composerRef, autoSend, autoFiles, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
   const toast = useToast();
   const chat = useChat(chatId, { onChange: onChanged, onError: (m) => toast.error(m), onRestore: (text, files) => { composerRef.current?.insert(text); composerRef.current?.addFiles(files); } });
   const sentAuto = useRef(false);
@@ -49,10 +52,10 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
     setModelOverride({ model: meta.model });
     onChanged();
   };
-  const [filesOpen, setFilesOpen] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(() => localStorage.getItem("pheme-changes-open") === "1");
-  const togglePanel = () => setPanelOpen((o) => { const next = !o; localStorage.setItem("pheme-changes-open", next ? "1" : "0"); if (next) setFilesOpen(false); return next; });
-  const toggleFiles = () => setFilesOpen((o) => { const next = !o; if (next) { setPanelOpen(false); try { localStorage.setItem("pheme-changes-open", "0"); } catch { /* private mode */ } } return next; });
+  const [panelOpen, setPanelOpen] = useState(() => { try { return localStorage.getItem("pheme-changes-open") === "1"; } catch { return false; } });
+  const [folderSlot, setFolderSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => { setFolderSlot(document.getElementById(folderInTop ? "top-folder" : "side-folder")); }, [chatId, folderInTop]);
+  const togglePanel = () => setPanelOpen((o) => { const next = !o; try { localStorage.setItem("pheme-changes-open", next ? "1" : "0"); } catch { /* private mode */ } return next; });
   const git = useGit(chatId, projectDir, panelOpen, chat.busy);
   const setDir = async (dir: string | null) => {
     if (!chatId) return;
@@ -91,13 +94,11 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
       </section>
     );
   }
-
   return (
     <section className="chat">
-      {chatId && (
-        <div className="chat-toolbar">
-          <ProjectBar dir={projectDir} status={git.status} busy={chat.busy} panelOpen={panelOpen} filesOpen={filesOpen} onTogglePanel={togglePanel} onToggleFiles={toggleFiles} onSetDir={setDir} />
-        </div>
+      {chatId && folderSlot && createPortal(
+        <ProjectBar compact={folderInTop} dir={projectDir} status={git.status} busy={chat.busy} panelOpen={panelOpen} onTogglePanel={togglePanel} onSetDir={setDir} />,
+        folderSlot,
       )}
       <div className="chat-split">
       <div className="chat-col">
@@ -132,8 +133,11 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
         extra={chatId ? <ModelPicker value={model} defaultModel={defaultModel} disabled={chat.busy || offline} onChange={setModel} /> : undefined}
       />
       </div>
-      {chatId && projectDir && panelOpen && <ChangesPanel chatId={chatId} status={git.status} error={git.error} loading={git.loading} onRefresh={() => void git.refresh()} onClose={togglePanel} busy={chat.busy} />}
-      {chatId && filesOpen && <FilesPanel chatId={chatId} onClose={toggleFiles} />}
+      {chatId && projectDir && panelOpen && (
+        <Dialog label="Changes" className="changes-dialog" onClose={togglePanel}>
+          <ChangesPanel chatId={chatId} status={git.status} error={git.error} loading={git.loading} onRefresh={() => void git.refresh()} onClose={togglePanel} busy={chat.busy} />
+        </Dialog>
+      )}
       </div>
     </section>
   );

@@ -326,8 +326,17 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
         </div>
         {(!theme.light || !theme.dark) && <p className="muted small">This theme has only one {theme.dark ? "dark" : "light"} palette.</p>}
         <label className="check">
-          <input type="checkbox" defaultChecked={typeof localStorage === "undefined" || localStorage.getItem("pheme-wallpaper") !== "0"} onChange={(e) => { try { localStorage.setItem("pheme-wallpaper", e.target.checked ? "1" : "0"); } catch { /* private mode: this tab still shows it */ } document.documentElement.classList.toggle("wallpaper", e.target.checked); }} />
-          Soft background behind the chat (an original gradient, not a picture)
+          <input type="checkbox" defaultChecked={typeof localStorage !== "undefined" && localStorage.getItem("pheme-wallpaper") === "1"} onChange={(e) => { try { localStorage.setItem("pheme-wallpaper", e.target.checked ? "1" : "0"); } catch { /* private mode: this tab still shows it */ } document.documentElement.classList.toggle("wallpaper", e.target.checked); }} />
+          Soft background behind the chat (off unless you turn it on)
+        </label>
+        <label className="field">Text size
+          <select aria-label="Text size" defaultValue={typeof localStorage === "undefined" ? "100" : (localStorage.getItem("pheme-text-scale") || "100")} onChange={(e) => { const n = Number(e.target.value); try { localStorage.setItem("pheme-text-scale", String(n)); } catch { /* private mode */ } document.documentElement.style.setProperty("--chat-text-scale", String(n / 100)); }}>
+            <option value="80">Smaller</option>
+            <option value="90">Small</option>
+            <option value="100">Default</option>
+            <option value="110">Large</option>
+            <option value="125">Larger</option>
+          </select>
         </label>
       </div>
       <NotificationSetting />

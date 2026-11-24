@@ -7,14 +7,14 @@ interface Props {
   status: GitStatus | null;
   busy: boolean;
   panelOpen: boolean;
-  filesOpen: boolean;
   onTogglePanel: () => void;
-  onToggleFiles: () => void;
   onSetDir: (dir: string | null) => Promise<void>;
+  /** Icon only. Used in the top bar, where a wrapping label covers the chat. */
+  compact?: boolean;
 }
 
 /** The folder this chat works in, with the branch and a Changes toggle. */
-export function ProjectBar({ dir, status, busy, panelOpen, filesOpen, onTogglePanel, onToggleFiles, onSetDir }: Props) {
+export function ProjectBar({ dir, status, busy, panelOpen, onTogglePanel, onSetDir, compact }: Props) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [err, setErr] = useState("");
@@ -35,28 +35,28 @@ export function ProjectBar({ dir, status, busy, panelOpen, filesOpen, onTogglePa
     }
   };
 
+  const box = compact ? { width: 28, height: 28, minWidth: 28, minHeight: 0, maxWidth: 28, maxHeight: 28, padding: 0, margin: 0, overflow: "hidden", flex: "0 0 28px" } as const : undefined;
   return (
-    <div className="project-bar">
+    <div className="project-bar" style={box}>
       {dir ? (
         <>
-          <button className="project-folder" title={`${dir}\nClick to change`} onClick={() => { setValue(dir); setErr(""); setEditing(true); }} aria-label={`Project folder ${dir}. Change`}>
-            <span aria-hidden>📁</span> <span className="project-name">{folderName}</span>
+          <button className="project-folder" style={box} title={`${dir}\nClick to change`} onClick={() => { setValue(dir); setErr(""); setEditing(true); }} aria-label={`Project folder ${dir}. Change`}>
+            <span aria-hidden>📁</span> {!compact && <span className="project-name">{folderName}</span>}
           </button>
-          {status?.repo && status.branch && <span className="project-branch" title={status.upstream ? `Tracking ${status.upstream}` : "No upstream branch"}>⎇ {status.branch}{status.ahead ? ` ↑${status.ahead}` : ""}{status.behind ? ` ↓${status.behind}` : ""}</span>}
-          {status?.repo && status.detached && <span className="project-branch warn">detached HEAD</span>}
-          <span className="spacer" />
-          <button className={`btn small${filesOpen ? " active" : ""}`} aria-pressed={filesOpen} onClick={onToggleFiles} title="Show the folders in this project">Files</button>
-          <button className={`btn small${panelOpen ? " active" : ""}`} aria-pressed={panelOpen} onClick={onTogglePanel} title="Show changed files and diffs">
-            Changes{count ? <span className="count-badge">{count}</span> : null}
-          </button>
+          {!compact && status?.repo && status.branch && <span className="project-branch" title={status.upstream ? `Tracking ${status.upstream}` : "No upstream branch"}>⎇ {status.branch}{status.ahead ? ` ↑${status.ahead}` : ""}{status.behind ? ` ↓${status.behind}` : ""}</span>}
+          {!compact && status?.repo && status.detached && <span className="project-branch warn">detached HEAD</span>}
+          {!compact && <span className="spacer" />}
+          {!compact && (
+            <button className={`btn small${panelOpen ? " active" : ""}`} aria-pressed={panelOpen} onClick={onTogglePanel} title="Show changed files and diffs">
+              Changes{count ? <span className="count-badge">{count}</span> : null}
+            </button>
+          )}
         </>
       ) : (
         <>
-        <button className="project-folder empty" onClick={() => { setValue(""); setErr(""); setEditing(true); }}>
-          <span aria-hidden>📁</span> Choose a project folder
+        <button className="project-folder empty" style={box} aria-label="Choose a project folder" onClick={() => { setValue(""); setErr(""); setEditing(true); }}>
+          <span aria-hidden>📁</span> {!compact && <span className="folder-label">Choose a project folder</span>}
         </button>
-        <span className="spacer" />
-        <button className={`btn small${filesOpen ? " active" : ""}`} aria-pressed={filesOpen} onClick={onToggleFiles} title="Show folders on this computer">Files</button>
         </>
       )}
       {editing && (

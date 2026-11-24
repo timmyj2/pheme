@@ -89,6 +89,6 @@ Still not verified: real GitHub PR creation and checks (fake gh only), real Copi
 Adds the six-item goal above (PR panel, branches and stash, attachments, prompt library, context meter, installable app) plus the text-attachment fix: a real-Copilot test showed images work but text files sent by path never reached the model, so text now goes inside the message.
 Verified: `npm run verify -- --e2e` (626 unit tests, build, smoke, stress 20/20, scale stress, 13 browser tests). Real Copilot: images and chat yes; text-file fix covered by fake-engine tests only.
 Open, in priority order:
-1. Visual frame (tab strip, status bar, session rows, settings section list) is on `feat/shell-features`, plus a read-only file list, tab drag-reorder, and an original gradient background. Still not a spitting image: no Bots page, no profile pills, no copied wallpaper, no providers/billing settings.
+1. Visual frame is closer to the light desktop screenshots: Sessions | Agents in the left rail, no right-hand file panel, folder control in the rail (a 28px icon in the top bar when the rail is hidden), text size control. Still not a copy: no Capabilities, Messaging, Artifacts, Quota, or Profiles, and chats are grouped by day, not by project.
 2. Not verified: real GitHub PR creation/checks (fake gh only); Windows UI on a real PC (CI only); text attachments on real Copilot.
 3. Unconfirmed: scale-stress "1501 chats vs 1502" (probably script off-by-one); 56 SSE connections after rapid chat switching (single probe).
