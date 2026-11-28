@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmDialog, Dialog } from "../src/Dialog.tsx";
+import { TID } from "../src/testids.ts";
 
 function Harness({ onConfirm }: { onConfirm: () => void }) {
   const [open, setOpen] = useState(false);
@@ -39,7 +40,7 @@ describe("Dialog", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
     await user.click(screen.getByText("open"));
-    await user.click(document.querySelector(".overlay")!);
+    await user.click(screen.getByTestId(TID.dialogOverlay));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
   });

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CommitBox, suggestBranch, suggestMessage } from "../src/CommitBox.tsx";
 import { api, type ChangedFile, type GitStatus } from "../src/api.ts";
 import { ToastProvider } from "../src/toast.tsx";
+import { TID } from "../src/testids.ts";
 
 vi.mock("../src/api.ts", async (orig) => {
   const actual = await orig<typeof import("../src/api.ts")>();
@@ -44,7 +45,7 @@ describe("CommitBox", () => {
     expect(gitCommit).not.toHaveBeenCalled(); // nothing happens until the confirm click
     await user.click(screen.getByRole("button", { name: "Commit" }));
     expect(gitCommit).toHaveBeenCalledWith("c1", { message: "Update a.ts", paths: ["a.ts"], branch: undefined, allowRisky: [] });
-    await waitFor(() => expect(document.querySelector(".commit-done")).toHaveTextContent("abc1234 on feat/x: Update a.ts"));
+    await waitFor(() => expect(screen.queryByTestId(TID.commitDone)).toHaveTextContent("abc1234 on feat/x: Update a.ts"));
     expect(onDone).toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Undo" }));
     expect(gitUndo).toHaveBeenCalledWith("c1", "abc1234def");

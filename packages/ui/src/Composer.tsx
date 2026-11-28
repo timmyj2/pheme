@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import { ACCEPT, checkFiles, DEFAULT_TEXT, isImage, nameForPasted, sizeLabel } from "./attach.ts";
 import { firstPlaceholder, PromptList, promptsFor, SaveAsPrompt, usePrompts } from "./PromptPicker.tsx";
 import { loadDraft, loadHistory, pushHistory, saveDraft } from "./drafts.ts";
+import { TID } from "./testids.ts";
 
 /** The server rejects bodies over 1,000,000 bytes; stay safely under that. */
 export const MAX_CHARS = 250_000;
@@ -187,6 +188,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
   return (
     <div
       className={`composer-wrap${dragging ? " dragging" : ""}`}
+      data-testid={TID.composerWrap}
+      data-dragging={dragging ? "true" : undefined}
       onDragOver={(e) => { if (e.dataTransfer?.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
       onDrop={(e) => { if (e.dataTransfer?.files.length) { e.preventDefault(); setDragging(false); addFiles([...e.dataTransfer.files]); } }}
@@ -241,6 +244,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           <button className="icon-btn attach-btn" aria-label="Attach files" title="Attach images or text files (or drop or paste them)" disabled={offline} onClick={() => picker.current?.click()}>+</button>
           <textarea
             ref={ta}
+            data-testid={TID.composerInput}
             value={text}
             rows={1}
             aria-label="Message"
@@ -257,9 +261,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           />
           {extra && <div className="composer-extra">{extra}</div>}
           {busy && !text.trim() ? (
-            <button className="btn danger" onClick={onStop} aria-label="Stop the reply">Stop</button>
+            <button className="btn danger" data-testid={TID.stopButton} onClick={onStop} aria-label="Stop the reply">Stop</button>
           ) : (
-            <button className={`btn primary${busy ? "" : " send-btn"}`} onClick={submit} disabled={!canSend} aria-label={busy ? "Queue message" : "Send message"}>{busy ? "Queue" : <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5V3.5M8 3.5 4.5 7M8 3.5 11.5 7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
+            <button className={`btn primary${busy ? "" : " send-btn"}`} data-testid={TID.sendButton} onClick={submit} disabled={!canSend} aria-label={busy ? "Queue message" : "Send message"}>{busy ? "Queue" : <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5V3.5M8 3.5 4.5 7M8 3.5 11.5 7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
           )}
         </div>
       </div>

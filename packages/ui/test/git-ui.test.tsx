@@ -5,6 +5,7 @@ import { ChangesPanel, DiffView } from "../src/ChangesPanel.tsx";
 import { ProjectBar } from "../src/ProjectBar.tsx";
 import { api, type ChangedFile, type GitStatus } from "../src/api.ts";
 import { useGit } from "../src/useGit.ts";
+import { TID } from "../src/testids.ts";
 
 vi.mock("../src/api.ts", async (orig) => {
   const actual = await orig<typeof import("../src/api.ts")>();
@@ -20,9 +21,9 @@ beforeEach(() => { gitStatus.mockReset(); gitDiff.mockReset(); });
 describe("DiffView", () => {
   it("colours added/removed/hunk lines and never renders file content as HTML", () => {
     const { container } = render(<DiffView diff={'@@ -1 +1 @@\n-old\n+<img src=x onerror="alert(1)">\n ctx'} />);
-    expect(container.querySelector(".dl.hunk")).toBeTruthy();
-    expect(container.querySelector(".dl.del")?.textContent).toContain("old");
-    expect(container.querySelector(".dl.add")?.textContent).toContain("<img src=x");
+    expect(container.querySelector(`[data-testid="${TID.diffLine}"][data-kind="hunk"]`)).toBeTruthy();
+    expect(container.querySelector(`[data-testid="${TID.diffLine}"][data-kind="del"]`)?.textContent).toContain("old");
+    expect(container.querySelector(`[data-testid="${TID.diffLine}"][data-kind="add"]`)?.textContent).toContain("<img src=x");
     expect(container.querySelector("img")).toBeNull();
   });
 });

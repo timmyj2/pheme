@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { ConfirmDialog } from "./Dialog.tsx";
 import { api, type BackupPreview } from "./api.ts";
 import { useToast } from "./toast.tsx";
+import { TID } from "./testids.ts";
 
 const mb = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1000))} KB`);
 
@@ -70,7 +71,7 @@ export function BackupSetting() {
 
   const p = picked?.preview;
   return (
-    <div className="panel">
+    <div className="panel" data-testid={TID.settingsPanel}>
       <h3>Backup and restore</h3>
       <p className="muted small">One file with your chats, skills, memory, agents, jobs and settings. Keep it somewhere safe, or use it to move Pheme to another computer. It does not include your Copilot sign-in.</p>
       <div className="row">

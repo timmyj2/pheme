@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type ChangedFile, type GitStatus } from "./api.ts";
 import { useToast } from "./toast.tsx";
+import { TID } from "./testids.ts";
 
 /** First-guess commit message and branch name; mirrors the server helpers so the box is filled in with no round trip. */
 export function suggestMessage(files: ChangedFile[]): string {
@@ -147,7 +148,7 @@ export function CommitBox({ chatId, status, busy, onDone }: Props) {
         </>
       )}
       {last && (
-        <div className="commit-done" role="status">
+        <div className="commit-done" data-testid={TID.commitDone} role="status">
           <span>✓ <code>{last.short}</code> on {last.branch}: {last.summary}</span>
           <button className="btn small" disabled={working || busy} onClick={() => void undo()} title="Go back to before this commit; your changes stay">Undo</button>
         </div>

@@ -8,6 +8,7 @@ import { Loader, LOADER_LABEL, setLoaderKind, useLoaderKind } from "./Loader.tsx
 import { THEMES, parseTheme, themeValue, type Mode } from "./themes/presets.ts";
 import { api, type BootstrapState, type CuratorState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
 import { useToast } from "./toast.tsx";
+import { TID } from "./testids.ts";
 
 export function Head({ title, sub }: { title: string; sub?: string }) {
   return (
@@ -272,7 +273,7 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
   useEffect(() => {
     const words = find.toLowerCase().split(/\s+/).filter(Boolean);
     let visible = 0;
-    body.current?.querySelectorAll<HTMLElement>(":scope > .panel").forEach((el) => {
+    body.current?.querySelectorAll<HTMLElement>(`:scope > [data-testid="${TID.settingsPanel}"]`).forEach((el) => {
       const text = (el.textContent ?? "").toLowerCase();
       const hit = words.every((w) => text.includes(w));
       el.hidden = !hit;
@@ -297,7 +298,7 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
           ))}
         </nav>
         <div className="settings-body" ref={body}>
-      <div className="panel">
+      <div className="panel" data-testid={TID.settingsPanel}>
         <h3>Model</h3>
         <label className="field">Chat model
           <select value={s.model} onChange={(e) => void set({ model: e.target.value })}>
@@ -312,7 +313,7 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
         </label>
         <p className="muted small">Usage so far: {state.usage.turns} chat turns, {state.usage.reviews} background reviews, {state.usage.toolSteps} tool steps.</p>
       </div>
-      <div className="panel">
+      <div className="panel" data-testid={TID.settingsPanel}>
         <h3>Appearance</h3>
         <div className="row">
           <label className="field">Theme
@@ -355,7 +356,7 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
       <NotificationSetting />
       <KeybindingSettings />
       <BackupSetting />
-      <div className="panel">
+      <div className="panel" data-testid={TID.settingsPanel}>
         <h3>Permissions</h3>
         <label className="check">
           <input type="checkbox" checked={s.autoApproveAll} onChange={(e) => void set({ autoApproveAll: e.target.checked })} />
@@ -363,7 +364,7 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
         </label>
         {s.autoApproveAll && <p className="over small">Pheme will run commands and edit files without showing an approval card.</p>}
       </div>
-      <div className="panel">
+      <div className="panel" data-testid={TID.settingsPanel}>
         <h3>Learning loops</h3>
         <label className="check">
           <input type="checkbox" checked={s.loopsEnabled} onChange={(e) => void set({ loopsEnabled: e.target.checked })} />

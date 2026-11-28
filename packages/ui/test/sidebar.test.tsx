@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ROW_LIMIT, Sidebar, groupChats } from "../src/Sidebar.tsx";
 import { api } from "../src/api.ts";
 import type { ChatRow } from "../src/api.ts";
+import { TID } from "../src/testids.ts";
 
 const DAY = 86_400_000;
 const NOW = new Date(2026, 10, 22, 15, 0, 0).getTime();
@@ -105,9 +106,9 @@ describe("Sidebar", () => {
     const user = userEvent.setup();
     const many = Array.from({ length: ROW_LIMIT * 2 + 10 }, (_, i) => chat(`c${i}`, `Chat ${i}`, i));
     setup(many);
-    expect(document.querySelectorAll(".chat-item")).toHaveLength(ROW_LIMIT);
+    expect(screen.getAllByTestId(TID.sessionRow)).toHaveLength(ROW_LIMIT);
     await user.click(screen.getByText(/Show \d+ more/));
-    expect(document.querySelectorAll(".chat-item")).toHaveLength(ROW_LIMIT * 2);
+    expect(screen.getAllByTestId(TID.sessionRow)).toHaveLength(ROW_LIMIT * 2);
   });
   it("archived chats live behind a toggle", async () => {
     const user = userEvent.setup();
@@ -121,7 +122,7 @@ describe("Sidebar", () => {
   it("is a single Tab stop (the open chat, else the first), with arrows/Home/End moving across groups", async () => {
     const user = userEvent.setup();
     setup([chat("a", "Alpha", 1000), chat("b", "Beta", DAY), chat("c", "Gamma", 30 * DAY)], { activeId: "b" });
-    const rows = screen.getAllByRole("button").filter((b) => b.classList.contains("chat-row"));
+    const rows = screen.getAllByTestId(TID.sessionButton);
     expect(rows.map((r) => r.tabIndex)).toEqual([-1, 0, -1]); // open chat "Beta" is the tab stop
     screen.getAllByLabelText(/^Actions for/).forEach((b) => expect(b.tabIndex).toBe(-1));
     rows[1].focus();
@@ -137,14 +138,14 @@ describe("Sidebar", () => {
 
   it("falls back to the first row as the Tab stop when no chat is open", () => {
     setup([chat("a", "Alpha", 1000), chat("b", "Beta", 2000)]);
-    const rows = screen.getAllByRole("button").filter((b) => b.classList.contains("chat-row"));
+    const rows = screen.getAllByTestId(TID.sessionButton);
     expect(rows.map((r) => r.tabIndex)).toEqual([0, -1]);
   });
 
   it("returns focus to the row after a rename is committed or cancelled with the keyboard", async () => {
     const user = userEvent.setup();
     const p = setup([chat("a", "Alpha", 1000)]);
-    const row = () => screen.getAllByRole("button").find((b) => b.classList.contains("chat-row"))!;
+    const row = () => screen.getAllByTestId(TID.sessionButton)[0];
     row().focus();
     await user.keyboard("{F2}");
     expect(screen.getByLabelText("Chat title")).toHaveFocus();

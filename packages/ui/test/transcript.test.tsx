@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Transcript } from "../src/Transcript.tsx";
 import type { SeqEvent } from "../src/api.ts";
+import { TID } from "../src/testids.ts";
 
 let n = 0;
 const ev = (e: object): SeqEvent => ({ ...e, seq: ++n, ts: Date.now() }) as SeqEvent;
@@ -98,18 +99,18 @@ describe("Transcript", () => {
     const events: SeqEvent[] = [];
     for (let i = 0; i < 700; i++) events.push(ev({ type: "user", text: `m${i}` }));
     render(<Transcript {...props({ events })} />);
-    expect(document.querySelectorAll(".bubble.user")).toHaveLength(400);
+    expect(screen.getAllByTestId(TID.userBlock)).toHaveLength(400);
     expect(screen.getByText("m699")).toBeInTheDocument();
     expect(screen.queryByText("m0")).toBeNull();
     await user.click(screen.getByText(/Show 300 earlier/));
-    expect(document.querySelectorAll(".bubble.user")).toHaveLength(700);
+    expect(screen.getAllByTestId(TID.userBlock)).toHaveLength(700);
   });
 
   it("follows new content at the bottom, but leaves a reader who scrolled up alone", () => {
     n = 0;
     const m = { scrollHeight: 2000, clientHeight: 500, scrollTop: 1500 };
-    const { rerender, container } = render(<Transcript {...props({ events: [ev({ type: "message", text: "one" })] })} />);
-    const scroller = container.querySelector(".transcript") as HTMLElement;
+    const { rerender } = render(<Transcript {...props({ events: [ev({ type: "message", text: "one" })] })} />);
+    const scroller = screen.getByTestId(TID.transcript);
     metrics(scroller, m);
     // at the bottom: new content pulls the view down
     m.scrollHeight = 2400;
@@ -132,8 +133,8 @@ describe("Transcript", () => {
     n = 0;
     const m = { scrollHeight: 2000, clientHeight: 500, scrollTop: 1500 };
     const base = [ev({ type: "message", text: "one" })];
-    const { rerender, container } = render(<Transcript {...props({ events: base })} />);
-    const scroller = container.querySelector(".transcript") as HTMLElement;
+    const { rerender } = render(<Transcript {...props({ events: base })} />);
+    const scroller = screen.getByTestId(TID.transcript);
     metrics(scroller, m);
     m.scrollTop = 200;
     fireEvent.scroll(scroller);

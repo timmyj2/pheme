@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { TID } from "./testids.ts";
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
@@ -34,7 +35,7 @@ export function Dialog({ label, onClose, children, className = "" }: { label: st
     }
   };
   return createPortal(
-    <div className="overlay" onMouseDown={onClose}>
+    <div className="overlay" data-testid={TID.dialogOverlay} onMouseDown={onClose}>
       <div ref={box} className={`dialog ${className}`} role="dialog" aria-modal="true" aria-label={label} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
         {children}
       </div>

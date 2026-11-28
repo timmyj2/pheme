@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BINDING_IDS, BINDING_LABELS, DEFAULT_BINDINGS, comboFromEvent, formatCombo, saveBindings, stringifyCombo, validateBinding, type BindingId } from "./keybindings.ts";
 import { useBindings } from "./useBindings.ts";
+import { TID } from "./testids.ts";
 
 /** Settings panel for changing keyboard shortcuts. Click a shortcut, press the new keys, Esc to cancel. */
 export function KeybindingSettings() {
@@ -31,7 +32,7 @@ export function KeybindingSettings() {
 
   const changed = BINDING_IDS.some((id) => keys[id] !== DEFAULT_BINDINGS[id]);
   return (
-    <div className="panel">
+    <div className="panel" data-testid={TID.settingsPanel}>
       <h3>Keyboard shortcuts</h3>
       <p className="muted small">Click a shortcut, then press the keys you want. Press Esc to cancel. Shortcuts need Ctrl/Cmd or Alt so typing is never interrupted. Saved in this browser.</p>
       <ul className="key-list">

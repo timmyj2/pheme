@@ -21,6 +21,7 @@ import { useBindings } from "./useBindings.ts";
 import { THEMES, applyTheme, parseTheme, themeValue } from "./themes/presets.ts";
 import { useToast } from "./toast.tsx";
 import { useRoute, type View } from "./router.ts";
+import { TID } from "./testids.ts";
 
 const TEXT_STEPS = [80, 90, 100, 110, 125];
 export function applyTextScale(percent?: number) {
@@ -160,7 +161,7 @@ export function App() {
     return () => {
       window.removeEventListener("keydown", onKey);
       clearTimeout(t);
-      if (!document.activeElement || document.activeElement === document.body || document.querySelector(".sidebar-wrap")?.contains(document.activeElement)) (document.querySelector(".menu-btn") as HTMLElement | null)?.focus();
+      if (!document.activeElement || document.activeElement === document.body || document.querySelector(`[data-testid="${TID.sidebarWrap}"]`)?.contains(document.activeElement)) (document.querySelector(`[data-testid="${TID.menuButton}"]`) as HTMLElement | null)?.focus();
     };
   }, [drawer]);
   const go = useCallback((r: Parameters<typeof navigate>[0]) => { navigate(r); setDrawer(false); }, [navigate]);
@@ -332,10 +333,10 @@ export function App() {
   };
 
   return (
-    <div className={shellClass}>
+    <div className={shellClass} data-testid={TID.shell} data-drawer-open={drawer ? "true" : undefined} data-sidebar-hidden={hidden ? "true" : undefined}>
       <a className="skip-link" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
       <div className="workspace">
-      <div className="sidebar-wrap">
+      <div className="sidebar-wrap" data-testid={TID.sidebarWrap}>
         <Sidebar
           chats={chats}
           activeId={activeId}
@@ -355,16 +356,16 @@ export function App() {
       {drawer && <div className="backdrop" onClick={closeDrawer} aria-hidden />}
       <main className="main" id="main" tabIndex={-1}>
         <header className="topbar">
-          <button className="icon-btn menu-btn" aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarOpen} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (narrow) setDrawer((d) => !d); else setHidden((h) => !h); }}>☰</button>
+          <button className="icon-btn menu-btn" data-testid={TID.menuButton} aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarOpen} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (narrow) setDrawer((d) => !d); else setHidden((h) => !h); }}>☰</button>
           <div id="top-folder" className="top-folder" />
           <h1 className="sr-only">{pageTitle}</h1>
-          <div className="tab-strip" role="tablist" aria-label="Open chats">
+          <div className="tab-strip" data-testid={TID.tabStrip} role="tablist" aria-label="Open chats">
             {view === "chat" && tabs.length > 0 ? tabs.map((c) => (
-              <button key={c.id} role="tab" aria-selected={c.id === activeId} draggable className={`tab${c.id === activeId ? " active" : ""}`} title={c.title} onClick={() => openChat(c.id)} onDragStart={() => setDragId(c.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropTab(c.id)}>
+              <button key={c.id} data-testid={TID.tab} data-active={c.id === activeId ? "true" : undefined} role="tab" aria-selected={c.id === activeId} draggable className={`tab${c.id === activeId ? " active" : ""}`} title={c.title} onClick={() => openChat(c.id)} onDragStart={() => setDragId(c.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropTab(c.id)}>
                 {(c.busy || c.id === activeId && activeBusy) && <span className="tab-dot" aria-hidden="true" />}
                 <span className="tab-title">{c.title}</span>
               </button>
-            )) : <span className="tab active" role="tab" aria-selected="true">{pageTitle}</span>}
+            )) : <span className="tab active" data-testid={TID.tab} data-active="true" role="tab" aria-selected="true">{pageTitle}</span>}
           </div>
           {state.fake && <span className="pill" title="Using the built-in fake engine">fake</span>}
           <button className="icon-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={() => setHelp(true)}>⌨</button>

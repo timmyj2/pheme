@@ -6,6 +6,7 @@ import { LazyMarkdown as Markdown } from "./LazyMarkdown.tsx";
 import type { ApprovalDecision, SeqEvent } from "./api.ts";
 import { APPROVAL_LABEL, buildBlocks, toolDuration, toolSummary, type Block, type ToolItem } from "./blocks.ts";
 import type { Pending } from "./useChat.ts";
+import { TID } from "./testids.ts";
 
 /** Long chats render only the most recent events; older ones load on request. */
 const WINDOW = 400;
@@ -38,7 +39,7 @@ const Row = memo(function ToolRow({ t }: { t: ToolItem }) {
   const [open, setOpen] = useState(false);
   const state = t.ok === undefined ? "running" : t.ok ? "ok" : "failed";
   return (
-    <div className="tool-row" data-state={state}>
+    <div className="tool-row" data-testid={TID.toolRow} data-state={state}>
       <button className="tool-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <span className="tool-dot" aria-hidden />
         <span className="tool-name">{t.name}</span>
@@ -54,10 +55,10 @@ const ToolGroup = memo(function ToolGroup({ items }: { items: ToolItem[] }) {
   const running = items.some((i) => i.ok === undefined);
   const failed = items.filter((i) => i.ok === false).length;
   const [open, setOpen] = useState(false);
-  if (items.length <= 3) return <div className="tool-group">{items.map((t) => <Row key={t.id} t={t} />)}</div>;
+  if (items.length <= 3) return <div className="tool-group" data-testid={TID.toolGroup}>{items.map((t) => <Row key={t.id} t={t} />)}</div>;
   const expanded = open;
   return (
-    <div className="tool-group">
+    <div className="tool-group" data-testid={TID.toolGroup}>
       <button className="tool-summary" onClick={() => setOpen(!open)} aria-expanded={expanded}>
         <span className="chev" aria-hidden>{expanded ? "▾" : "▸"}</span>
         {items.length} tool calls
@@ -71,16 +72,16 @@ const ToolGroup = memo(function ToolGroup({ items }: { items: ToolItem[] }) {
 
 function Approval({ b, live, onAnswer }: { b: Extract<Block, { kind: "approval" }>; live: boolean; onAnswer: (id: string, d: ApprovalDecision) => void }) {
   if (b.decision || !live) {
-    return <div className="approval-done muted small">{b.decision ? APPROVAL_LABEL[b.decision] : "Approval expired"} · {b.title}: <code>{b.detail.slice(0, 140)}</code></div>;
+    return <div className="approval-done muted small" data-testid={TID.approvalDone}>{b.decision ? APPROVAL_LABEL[b.decision] : "Approval expired"} · {b.title}: <code>{b.detail.slice(0, 140)}</code></div>;
   }
   return (
-    <div className="approval" role="alertdialog" aria-label={b.title}>
+    <div className="approval" data-testid={TID.approval} role="alertdialog" aria-label={b.title}>
       <div className="approval-title">{b.title}</div>
       <pre className="approval-detail">{b.detail}</pre>
       <div className="approval-actions">
-        <button className="btn primary" onClick={() => onAnswer(b.id, "once")}>Allow once</button>
-        <button className="btn" onClick={() => onAnswer(b.id, "chat")}>Allow for this chat</button>
-        <button className="btn danger" onClick={() => onAnswer(b.id, "deny")}>Deny</button>
+        <button className="btn primary" data-testid={TID.approvalAllowOnce} onClick={() => onAnswer(b.id, "once")}>Allow once</button>
+        <button className="btn" data-testid={TID.approvalAllowChat} onClick={() => onAnswer(b.id, "chat")}>Allow for this chat</button>
+        <button className="btn danger" data-testid={TID.approvalDeny} onClick={() => onAnswer(b.id, "deny")}>Deny</button>
       </div>
     </div>
   );
@@ -186,7 +187,7 @@ export function Transcript(props: Props) {
 
   return (
     <div className="transcript-wrap">
-      <div className="transcript" ref={scroller} onScroll={onScroll} role="log" aria-label="Conversation" aria-live="off" tabIndex={-1}>
+      <div className="transcript" data-testid={TID.transcript} ref={scroller} onScroll={onScroll} role="log" aria-label="Conversation" aria-live="off" tabIndex={-1}>
         <div className="transcript-inner" ref={inner}>
           {!loaded && <div className="skeleton" aria-label="Loading chat"><i /><i /><i /></div>}
           {empty && (
@@ -202,16 +203,16 @@ export function Transcript(props: Props) {
             switch (b.kind) {
               case "user":
                 return (
-                  <div key={b.key} className="msg user-msg">
-                    <div className="bubble user">{b.text}</div>
+                  <div key={b.key} className="msg user-msg" data-testid={TID.userMessage}>
+                    <div className="bubble user" data-testid={TID.userBlock}>{b.text}</div>
                     {b.attachments && <Attachments chatId={props.chatId ?? null} items={b.attachments} />}
                     <Actions ts={b.ts} onCopy={() => props.onCopy(b.text)} />
                   </div>
                 );
               case "assistant":
                 return (
-                  <div key={b.key} className="msg assistant-msg">
-                    <div className="assistant"><Markdown text={b.text} /></div>
+                  <div key={b.key} className="msg assistant-msg" data-testid={TID.assistantMessage}>
+                    <div className="assistant" data-testid={TID.assistantBlock}><Markdown text={b.text} /></div>
                     <Actions ts={b.ts} onCopy={() => props.onCopy(b.text)} onRetry={!busy && i === lastAssistant && lastUser ? () => props.onRetry(lastUser) : undefined} />
                   </div>
                 );
@@ -226,8 +227,8 @@ export function Transcript(props: Props) {
             }
           })}
           {pending.map((p) => (
-            <div key={`p${p.id}`} className={`msg user-msg pending${p.failed ? " failed" : ""}`}>
-              <div className="bubble user">{p.text}</div>
+            <div key={`p${p.id}`} className={`msg user-msg pending${p.failed ? " failed" : ""}`} data-testid={TID.userMessage}>
+              <div className="bubble user" data-testid={TID.userBlock}>{p.text}</div>
               {p.files?.length ? <ul className="att-list" aria-label="Attachments being sent">{p.files.map((n, i) => <li key={i}><span className="att-chip">📎 {n}</span></li>)}</ul> : null}
               {p.failed ? (
                 <div className="msg-actions show">
@@ -238,7 +239,7 @@ export function Transcript(props: Props) {
               ) : <div className="msg-actions show muted small">Sending…</div>}
             </div>
           ))}
-          {streaming && <div className="assistant streaming" aria-busy="true"><Markdown text={streaming} /></div>}
+          {streaming && <div className="assistant streaming" data-testid={TID.assistantBlock} aria-busy="true"><Markdown text={streaming} /></div>}
           {busy && <Loader kind={loader} />}
         </div>
       </div>

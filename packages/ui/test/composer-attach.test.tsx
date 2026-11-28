@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Composer, type ComposerHandle } from "../src/Composer.tsx";
+import { TID } from "../src/testids.ts";
 
 const base = { chatId: "c1", busy: false, offline: false, queue: [] as string[], hasMessages: false, onSend: vi.fn(), onStop: vi.fn(), onRemoveQueued: vi.fn() };
 const box = () => screen.getByLabelText("Message") as HTMLTextAreaElement;
@@ -57,15 +58,15 @@ describe("Composer attachments", () => {
     expect(screen.getAllByRole("listitem").length).toBe(before);
   });
   it("dropping files attaches them; dropping other things (text) does nothing special", async () => {
-    const { container } = render(<Composer {...base} />);
-    const wrap = container.querySelector(".composer-wrap")!;
+    render(<Composer {...base} />);
+    const wrap = screen.getByTestId(TID.composerWrap);
     fireEvent.dragOver(wrap, { dataTransfer: { types: ["Files"] } });
-    expect(wrap).toHaveClass("dragging");
+    expect(wrap).toHaveAttribute("data-dragging", "true");
     fireEvent.drop(wrap, { dataTransfer: { types: ["Files"], files: [f("dropped.json")] } });
     expect(await screen.findByText("dropped.json")).toBeInTheDocument();
-    expect(wrap).not.toHaveClass("dragging");
+    expect(wrap).not.toHaveAttribute("data-dragging");
     fireEvent.dragOver(wrap, { dataTransfer: { types: ["text/plain"] } });
-    expect(wrap).not.toHaveClass("dragging");
+    expect(wrap).not.toHaveAttribute("data-dragging");
   });
   it("while a reply runs, attachments wait (Send is off and says why) but plain text can still be queued", async () => {
     const user = userEvent.setup();

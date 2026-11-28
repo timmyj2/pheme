@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SettingsPage } from "../src/Pages.tsx";
 import { ToastProvider } from "../src/toast.tsx";
 import type { BootstrapState } from "../src/api.ts";
+import { TID } from "../src/testids.ts";
 
 vi.mock("../src/api.ts", async (orig) => {
   const actual = await orig<typeof import("../src/api.ts")>();
@@ -11,7 +12,7 @@ vi.mock("../src/api.ts", async (orig) => {
 });
 const state = { engine: "fake", fake: true, version: "t", usage: { turns: 0, reviews: 0, toolSteps: 0 }, settings: { model: "auto", reviewModel: "", theme: "dark", autoApproveAll: false, loopsEnabled: true, curatorEnabled: true, curatorEveryDays: 7, curatorStaleDays: 90, skillReviewMinToolSteps: 10, memoryReviewEveryUserMessages: 10, memoryLimit: 2200, userLimit: 1375 } } as unknown as BootstrapState;
 const ui = () => <ToastProvider><SettingsPage state={state} onChange={() => {}} /></ToastProvider>;
-const visibleHeadings = () => [...document.querySelectorAll<HTMLElement>(".panel:not([hidden]) h3")].map((h) => h.textContent);
+const visibleHeadings = () => screen.getAllByTestId(TID.settingsPanel).filter((p) => !p.hidden).map((p) => p.querySelector("h3")?.textContent);
 
 describe("Settings search", () => {
   it("shows every panel with no query, then narrows by any word in a panel, and says when nothing matches", async () => {

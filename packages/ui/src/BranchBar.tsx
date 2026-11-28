@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type BranchList, type GitStatus, type StashEntry } from "./api.ts";
 import { useToast } from "./toast.tsx";
+import { TID } from "./testids.ts";
 
 interface Props {
   chatId: string;
@@ -77,7 +78,7 @@ export function BranchBar({ chatId, status, busy, onChanged }: Props) {
 
   return (
     <div className="branch-bar">
-      <button className="branch-pill" aria-expanded={open} aria-controls="branch-panel" onClick={() => setOpen((o) => !o)}>
+      <button className="branch-pill" data-testid={TID.branchPill} aria-expanded={open} aria-controls="branch-panel" onClick={() => setOpen((o) => !o)}>
         <span aria-hidden="true">⎇</span> {status.detached ? "detached HEAD" : status.branch ?? "no branch"}
         <span className="muted small"> · branches and stash {open ? "▴" : "▾"}</span>
       </button>
@@ -122,7 +123,7 @@ export function BranchBar({ chatId, status, busy, onChanged }: Props) {
           {stashes && stashes.stashes.length === 0 && <p className="muted small">Nothing set aside.</p>}
           <ul className="stash-list">
             {(stashes?.stashes ?? []).map((s) => (
-              <li key={s.sha}>
+              <li key={s.sha} data-testid={TID.stashItem}>
                 <div className="stash-info"><span>{s.message}</span><span className="muted small">{s.branch ? `from ${s.branch} · ` : ""}{ago(s.date)}</span></div>
                 {confirmDrop === s.sha ? (
                   <div className="row" role="group" aria-label="Confirm delete stash">

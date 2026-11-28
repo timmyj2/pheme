@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { notifyEnabled, notifySupport, setNotify } from "./notify.ts";
+import { TID } from "./testids.ts";
 
 /** Settings row for desktop notifications. The choice is per browser, because permission is. */
 export function NotificationSetting() {
@@ -8,7 +9,7 @@ export function NotificationSetting() {
   const [busy, setBusy] = useState(false);
   const support = notifySupport();
   return (
-    <div className="panel">
+    <div className="panel" data-testid={TID.settingsPanel}>
       <h3>Notifications</h3>
       <label className="check">
         <input

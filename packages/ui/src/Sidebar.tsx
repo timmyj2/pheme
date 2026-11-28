@@ -4,6 +4,7 @@ import { api, type AgentProfile, type ChatRow, type SearchHit } from "./api.ts";
 import type { View } from "./router.ts";
 import { formatCombo } from "./keybindings.ts";
 import { useBindings } from "./useBindings.ts";
+import { TID } from "./testids.ts";
 
 /** Rows rendered before "Show more": keeps the sidebar fast with thousands of chats. */
 export const ROW_LIMIT = 150;
@@ -102,7 +103,7 @@ function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, 
   };
 
   return (
-    <li className={`chat-item${active ? " active" : ""}`} data-chat-id={c.id} onContextMenu={(e) => {
+    <li className={`chat-item${active ? " active" : ""}`} data-testid={TID.sessionRow} data-active={active ? "true" : undefined} data-chat-id={c.id} onContextMenu={(e) => {
       e.preventDefault();
       // From the keyboard (Menu key / Shift+F10) there are no pointer coordinates: open it under the row.
       const r = e.currentTarget.getBoundingClientRect();
@@ -125,6 +126,7 @@ function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, 
       ) : (
         <button
           className="chat-row"
+          data-testid={TID.sessionButton}
           ref={rowBtn}
           tabIndex={tabStop ? 0 : -1}
           onClick={onOpen}

@@ -3,6 +3,7 @@ import { BranchBar } from "./BranchBar.tsx";
 import { CommitBox } from "./CommitBox.tsx";
 import { ShipBox } from "./ShipBox.tsx";
 import { api, type ChangedFile, type FileDiff, type GitStatus } from "./api.ts";
+import { TID } from "./testids.ts";
 
 const LABEL: Record<string, string> = { modified: "M", added: "A", deleted: "D", renamed: "R", copied: "C", untracked: "U", conflicted: "!", typechange: "T" };
 const WORD: Record<string, string> = { modified: "Modified", added: "Added", deleted: "Deleted", renamed: "Renamed", copied: "Copied", untracked: "Untracked", conflicted: "Conflict", typechange: "Type changed" };
@@ -16,10 +17,10 @@ export function DiffView({ diff }: { diff: string }) {
   const lines = diff.split("\n");
   if (lines.length && lines[lines.length - 1] === "") lines.pop(); // the text ends with a newline: no phantom blank line
   return (
-    <pre className="diff" aria-label="Diff">
+    <pre className="diff" data-testid={TID.diff} aria-label="Diff">
       {lines.map((l, i) => {
         const kind = l.startsWith("@@") ? "hunk" : l.startsWith("+++") || l.startsWith("---") || l.startsWith("diff ") || l.startsWith("index ") ? "meta" : l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : "ctx";
-        return <span key={i} className={`dl ${kind}`}>{l || " "}{"\n"}</span>;
+        return <span key={i} className={`dl ${kind}`} data-testid={TID.diffLine} data-kind={kind}>{l || " "}{"\n"}</span>;
       })}
     </pre>
   );
@@ -41,7 +42,7 @@ function FileRow({ chatId, f, stale }: { chatId: string; f: ChangedFile; stale: 
 
   return (
     <li className={`change-file st-${st}`}>
-      <button className="change-row" aria-expanded={open} onClick={() => setOpen((o) => !o)} title={f.from ? `${f.from} → ${f.path}` : f.path}>
+      <button className="change-row" data-testid={TID.changeRow} aria-expanded={open} onClick={() => setOpen((o) => !o)} title={f.from ? `${f.from} → ${f.path}` : f.path}>
         <span className={`st-badge st-${st}`} role="img" aria-label={WORD[st]}>{LABEL[st]}</span>
         <span className="change-path">{f.path}</span>
         {f.binary ? <span className="muted small">binary</span> : <span className="change-counts"><span className="plus">+{f.additions}</span> <span className="minus">−{f.deletions}</span></span>}
