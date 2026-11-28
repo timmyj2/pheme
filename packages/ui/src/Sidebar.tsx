@@ -92,7 +92,7 @@ function NavIcon({ name }: { name: string }) {
   );
 }
 
-const ROW = "group relative flex w-full min-h-[26px] items-center gap-2 rounded-md border border-solid bg-transparent px-2 py-1 text-left text-[12.5px] transition-colors duration-100 hover:transition-none";
+const ROW = "group relative flex w-full min-h-[28px] items-center gap-2 rounded-md border border-solid bg-transparent px-2 py-0 text-left text-[12.5px] transition-colors duration-100 hover:transition-none";
 
 function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, onDelete, onExport }: {
   c: ChatRow; active: boolean; unread: boolean; tabStop: boolean;
@@ -172,11 +172,11 @@ function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, 
           <span className="flex w-3.5 shrink-0 justify-center" aria-hidden="true">
             {c.busy ? <span className="running-dot" role="img" aria-label="working" /> : unread ? <span className="dot" role="img" aria-label="new activity" /> : <span className="size-[7px] rounded-full border border-muted-foreground/70" />}
           </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-px leading-tight">
-            <span className="truncate">{c.title}</span>
-            <span className="truncate text-[11px] text-muted-foreground">{c.model || "auto"} · {c.userMessages} {c.userMessages === 1 ? "message" : "messages"}</span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate leading-[14px]">{c.title}</span>
+            <span className="truncate text-[11px] leading-[12px] text-muted-foreground">{c.model || "auto"} · {c.userMessages} {c.userMessages === 1 ? "message" : "messages"}</span>
           </span>
-          <span className="shrink-0 self-start pt-px text-[11px] text-muted-foreground">{relTime(c.updatedAt)}</span>
+          <span className="shrink-0 self-start text-[11px] leading-[14px] text-muted-foreground">{relTime(c.updatedAt)}</span>
         </button>
       )}
       {!editing && (
@@ -194,8 +194,8 @@ function ProjectSection({ g, shown, expanded, onExpand, renderRow }: {
 }) {
   const Icon = g.dir ? IconFolder : IconHome;
   return (
-    <section className="mt-1" aria-label={g.label}>
-      <h2 className="flex items-center gap-2 px-1 py-1 text-[12.5px] font-normal text-foreground/90">
+    <section aria-label={g.label}>
+      <h2 className="flex h-7 items-center gap-2 px-1 text-[12.5px] font-normal text-foreground/90">
         <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="truncate" title={g.dir || "Home"}>{g.label}</span>
       </h2>
@@ -309,15 +309,13 @@ export function Sidebar(props: {
 
   const navItem = "flex h-7 w-full items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-[12.5px] text-foreground/90 hover:bg-foreground/[0.06]";
   const pages: [View, string, string][] = [["skills", "Capabilities", "skills"], ["memory", "Memory", "memory"], ["prompts", "Prompts", "prompts"], ["jobs", "Scheduled jobs", "jobs"], ["settings", "Settings", "settings"]];
-  const tabBtn = (on: boolean) => `border-x-0 border-t-0 bg-transparent px-2 py-1.5 text-[11px] font-medium uppercase tracking-[0.08em] border-b-2 ${on ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`;
+  const tabBtn = (on: boolean) => `h-7 border-x-0 border-t-0 bg-transparent px-2 text-[11px] font-medium uppercase tracking-[0.08em] border-b-2 ${on ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`;
 
   return (
-    <aside className="sidebar flex h-full min-h-0 w-full flex-col gap-1 overflow-hidden bg-sidebar px-2.5 pb-2 pt-1 text-sidebar-foreground" aria-label="Sidebar">
+    <aside className="sidebar flex h-full min-h-0 w-full flex-col gap-1 overflow-hidden bg-sidebar px-2.5 pb-2 pt-0 text-sidebar-foreground" aria-label="Sidebar">
+      <div className="flex flex-col">
       <div className="flex h-7 items-center justify-between">
-        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-foreground/80">
-          <img src="/icon.svg" alt="" width={16} height={16} />
-          Pheme
-        </span>
+        <img src="/icon.svg" alt="" width={16} height={16} className="ml-1" />
         <button className="icon-btn rounded border-0 bg-transparent p-1 text-muted-foreground hover:text-foreground" aria-label="Hide sidebar" title="Hide sidebar" onClick={props.onToggleSidebar}>
           <IconLayoutSidebarLeftCollapse className="size-4" aria-hidden="true" />
         </button>
@@ -325,6 +323,7 @@ export function Sidebar(props: {
       <div className="flex gap-1 border-b border-border/60" role="tablist" aria-label="Rail">
         <button role="tab" aria-selected={rail === "sessions"} aria-pressed={rail === "sessions"} className={tabBtn(rail === "sessions")} onClick={() => setRail("sessions")}>Sessions</button>
         <button role="tab" aria-selected={rail === "agents"} aria-pressed={rail === "agents"} className={tabBtn(rail === "agents")} onClick={() => setRail("agents")}>Agents</button>
+      </div>
       </div>
       {rail === "agents" ? (
         <nav className="chat-list min-h-0 flex-1 overflow-y-auto" aria-label="Agents">
@@ -381,7 +380,7 @@ export function Sidebar(props: {
             )}
           </section>
         )}
-        <section className="mt-3">
+        <section className="mt-2">
           <div className="flex items-center justify-between pr-1">
             <SectionLabel>{showArchived ? "Archived" : "Projects"}</SectionLabel>
             <button className="rounded border-0 bg-transparent p-0.5 text-muted-foreground hover:text-foreground" aria-label={showArchived ? "Back to sessions" : "Show archived"} title={showArchived ? "Back to sessions" : "Show archived"} onClick={() => setShowArchived(!showArchived)}>

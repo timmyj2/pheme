@@ -13,6 +13,7 @@ const TID = {
   assistantBlock: "assistant-block", composerWrap: "composer-wrap", composerInput: "composer-input", contextMeter: "context-meter",
   settingsPanel: "settings-panel", changeRow: "change-row", diffLine: "diff-line", commitDone: "commit-done", branchPill: "branch-pill", stashItem: "stash-item",
   rightPanelToggle: "right-panel-toggle", rightTabChanges: "right-tab-changes", thinking: "thinking", todoRow: "todo-row",
+  tab: "tab", tabClose: "tab-close", sessionRow: "session-row",
 } as const;
 const tid = (page: Page, id: string) => page.getByTestId(id);
 const composer = (page: Page) => tid(page, TID.composerInput);
@@ -123,6 +124,24 @@ test.describe("Pheme in a real browser", () => {
     await send(other, "second tab message");
     await expect(tid(page, TID.userBlock).filter({ hasText: "second tab message" })).toBeVisible();
     await other.close();
+  });
+
+  test("tabs: a chat opens its tab, × closes it onto the neighbour tab, and the open tabs survive a reload", async ({ page }) => {
+    await open(page);
+    await send(page, "first tab chat");
+    await expect(tid(page, TID.tabClose)).toHaveCount(1);
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await send(page, "second tab chat");
+    await expect(tid(page, TID.tabClose)).toHaveCount(2);
+    // Closing the active (second) tab moves to the first one.
+    await tid(page, TID.tabClose).nth(1).click();
+    await expect(tid(page, TID.tabClose)).toHaveCount(1);
+    await expect(tid(page, TID.tab).filter({ hasText: "first tab chat" })).toHaveAttribute("data-active", "true");
+    // The open tab is remembered in this browser; the closed one is not, and its chat is still in the sidebar.
+    await page.goto(`/?token=${TOKEN}`);
+    await expect(tid(page, TID.tabClose)).toHaveCount(1);
+    await expect(tid(page, TID.tab).filter({ hasText: "first tab chat" })).toBeVisible();
+    await expect(tid(page, TID.sessionRow).filter({ hasText: "second tab chat" })).toBeVisible();
   });
 
   test("settings: search narrows the panels and a rebound shortcut takes effect", async ({ page }) => {

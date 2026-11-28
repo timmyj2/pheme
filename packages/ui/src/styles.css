@@ -98,7 +98,7 @@ html.wallpaper .main {
   background:
     radial-gradient(1100px 640px at 78% 8%, color-mix(in srgb, var(--dt-primary) 14%, transparent), transparent 62%),
     radial-gradient(800px 520px at 8% 92%, color-mix(in srgb, var(--dt-primary) 8%, transparent), transparent 58%),
-    var(--dt-background);
+    var(--chat-canvas, var(--dt-background));
 }
 .change-counts { font-family: var(--dt-font-mono); font-size: 12px; white-space: nowrap; }
 .plus { color: var(--dt-success-text, #3fb950); } .minus { color: var(--dt-destructive-text); }

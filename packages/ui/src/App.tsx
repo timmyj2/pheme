@@ -23,6 +23,7 @@ import { THEMES, applyTheme, parseTheme, themeValue } from "./themes/presets.ts"
 import { useToast } from "./toast.tsx";
 import { useRoute, type View } from "./router.ts";
 import { TID } from "./testids.ts";
+import { neighbourTab, pruneTabs, readOpenTabs, withTab, writeOpenTabs } from "./tabs.ts";
 
 const TEXT_STEPS = [80, 90, 100, 110, 125];
 /** Chat text scale (transcript and composer) when the person has not chosen one. */
@@ -73,6 +74,7 @@ export function App() {
   const [skillNames, setSkillNames] = useState<string[]>([]);
   const [activeBusy, setActiveBusy] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [openTabs, setOpenTabs] = useState<string[]>(readOpenTabs);
   const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(NARROW).matches);
   useEffect(() => {
     const mq = window.matchMedia(NARROW);
@@ -137,6 +139,17 @@ export function App() {
   }, [route, activeChat?.title, activeBusy]);
 
   useEffect(() => { try { localStorage.setItem(HIDE_KEY, hidden ? "1" : "0"); } catch { /* ignore */ } }, [hidden]);
+
+  // Tabs: opening a chat adds its tab; a deleted chat's tab goes; the open set is kept per browser.
+  useEffect(() => {
+    if (activeId) setOpenTabs((prev) => withTab(prev, activeId));
+  }, [activeId]);
+  useEffect(() => {
+    if (!chatsLoaded) return;
+    const known = new Set(chats.map((c) => c.id));
+    setOpenTabs((prev) => pruneTabs(prev, known));
+  }, [chats, chatsLoaded]);
+  useEffect(() => writeOpenTabs(openTabs), [openTabs]);
 
   const exportChat = useCallback(async (c: ChatRow) => {
     try {
@@ -328,8 +341,7 @@ export function App() {
   const offline = conn.status === "offline";
   const pageTitle = view === "chat" ? (activeChat?.title ?? "New chat") : { skills: "Skills", memory: "Memory", agents: "Agents", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" }[view];
   const shellClass = `shell${hidden ? " sidebar-hidden" : ""}${drawer ? " drawer-open" : ""}`;
-  const tabs = [...chats].filter((c) => !c.archived && !c.hidden).sort((a, b) => (a.tabOrder ?? 1e9) - (b.tabOrder ?? 1e9) || b.updatedAt - a.updatedAt).slice(0, 6);
-  if (activeChat && !tabs.some((c) => c.id === activeChat.id)) tabs.unshift(activeChat);
+  const tabs = openTabs.map((id) => chats.find((c) => c.id === id)).filter((c): c is ChatRow => !!c);
   const dropTab = (targetId: string) => {
     if (!dragId || dragId === targetId) return;
     const ids = tabs.map((t) => t.id);
@@ -338,9 +350,16 @@ export function App() {
     if (from < 0 || to < 0) return;
     ids.splice(from, 1);
     ids.splice(to, 0, dragId);
+    setOpenTabs(ids);
     setChats((prev) => prev.map((c) => { const i = ids.indexOf(c.id); return i < 0 ? c : { ...c, tabOrder: i }; }));
     setDragId(null);
     void api.reorderChats(ids).then(refresh).catch((e: Error) => toast.error(e.message));
+  };
+  // Closing the open chat switches to its neighbour tab (right, else left), or to a new chat when it was the last one.
+  const closeTab = (id: string) => {
+    const next = neighbourTab(tabs.map((t) => t.id), id);
+    setOpenTabs((prev) => prev.filter((x) => x !== id));
+    if (id === activeId) { if (next) openChat(next); else newChat(); }
   };
 
   return (
@@ -372,11 +391,14 @@ export function App() {
           <h1 className="sr-only">{pageTitle}</h1>
           <div className="tab-strip flex min-w-0 flex-1 items-stretch overflow-x-auto" data-testid={TID.tabStrip} role="tablist" aria-label="Open chats">
             {view === "chat" && tabs.length > 0 ? tabs.map((c) => (
-              <button key={c.id} data-testid={TID.tab} data-active={c.id === activeId ? "true" : undefined} role="tab" aria-selected={c.id === activeId} draggable title={c.title} onClick={() => openChat(c.id)} onDragStart={() => setDragId(c.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropTab(c.id)}
-                className={`relative flex h-full max-w-[200px] min-w-0 flex-none cursor-grab border-0 bg-transparent items-center gap-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.02em] hover:brightness-125 ${c.id === activeId ? "text-foreground shadow-[inset_0_-2px_0_var(--dt-primary)]" : "text-muted-foreground"}`}>
-                <span className={`inline-block size-[7px] flex-none rounded-full border ${(c.busy || c.id === activeId && activeBusy) ? "border-primary bg-primary" : "border-muted-foreground/80"}`} aria-hidden="true" />
-                <span className="truncate">{c.title}</span>
-              </button>
+              <div key={c.id} role="presentation" className="group relative flex h-full max-w-[200px] min-w-0 flex-none">
+                <button data-testid={TID.tab} data-active={c.id === activeId ? "true" : undefined} role="tab" aria-selected={c.id === activeId} draggable title={c.title} onClick={() => openChat(c.id)} onDragStart={() => setDragId(c.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropTab(c.id)}
+                  className={`flex h-full min-w-0 flex-1 cursor-grab border-0 bg-transparent items-center gap-1.5 pl-3 pr-6 text-[11px] font-medium uppercase tracking-[0.02em] hover:brightness-125 ${c.id === activeId ? "text-foreground shadow-[inset_0_-2px_0_var(--dt-primary)]" : "text-muted-foreground"}`}>
+                  <span className={`inline-block size-[7px] flex-none rounded-full border ${(c.busy || c.id === activeId && activeBusy) ? "border-primary bg-primary" : "border-muted-foreground/80"}`} aria-hidden="true" />
+                  <span className="truncate">{c.title}</span>
+                </button>
+                <button type="button" data-testid={TID.tabClose} className="tab-close absolute right-1 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded border-0 bg-transparent p-0 text-[13px] leading-none text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100" aria-label={`Close ${c.title}`} title="Close tab" onClick={() => closeTab(c.id)}>×</button>
+              </div>
             )) : <span className="flex h-full items-center px-3 text-[11px] font-medium uppercase tracking-[0.02em] text-foreground shadow-[inset_0_-2px_0_var(--dt-primary)]" data-testid={TID.tab} data-active="true" role="tab" aria-selected="true">{pageTitle}</span>}
             <button className="flex flex-none items-center border-0 bg-transparent px-2.5 text-muted-foreground hover:text-foreground" aria-label="New chat" title={`New chat (${formatCombo(keys.new)})`} onClick={newChat}><IconPlus className="size-3.5" aria-hidden="true" /></button>
           </div>

@@ -14,6 +14,7 @@ export const TID = {
   sessionButton: "session-button", // the button inside it
   tabStrip: "tab-strip",
   tab: "tab",
+  tabClose: "tab-close", // the × that shows on a hovered or focused tab
   menuButton: "menu-button",
   transcript: "transcript",
   turn: "turn", // one user prompt and the replies after it
