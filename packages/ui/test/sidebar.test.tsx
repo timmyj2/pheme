@@ -23,7 +23,7 @@ describe("groupChats", () => {
 function setup(chats: ChatRow[], over: Partial<React.ComponentProps<typeof Sidebar>> = {}) {
   const props = {
     chats, activeId: null, view: "chat" as const, unread: new Set<string>(), searchRef: createRef<HTMLInputElement>(),
-    onNew: vi.fn(), onOpen: vi.fn(), onView: vi.fn(), onRename: vi.fn(), onPin: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn(), onExport: vi.fn(), ...over,
+    onNew: vi.fn(), onToggleSidebar: vi.fn(), onOpen: vi.fn(), onView: vi.fn(), onRename: vi.fn(), onPin: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn(), onExport: vi.fn(), ...over,
   };
   render(<Sidebar {...props} />);
   return props;
@@ -35,7 +35,7 @@ describe("Sidebar", () => {
     const p = setup([chat("a", "Alpha", 1000)]);
     await user.click(screen.getByText("Alpha"));
     expect(p.onOpen).toHaveBeenCalledWith("a");
-    await user.click(screen.getByText("New chat"));
+    await user.click(screen.getByText("New session"));
     expect(p.onNew).toHaveBeenCalled();
     await user.click(screen.getByText("Settings"));
     expect(p.onView).toHaveBeenCalledWith("settings");
@@ -106,6 +106,7 @@ describe("Sidebar", () => {
     const user = userEvent.setup();
     const many = Array.from({ length: ROW_LIMIT * 2 + 10 }, (_, i) => chat(`c${i}`, `Chat ${i}`, i));
     setup(many);
+    await user.click(screen.getByText(/Show all \d+ sessions/));
     expect(screen.getAllByTestId(TID.sessionRow)).toHaveLength(ROW_LIMIT);
     await user.click(screen.getByText(/Show \d+ more/));
     expect(screen.getAllByTestId(TID.sessionRow)).toHaveLength(ROW_LIMIT * 2);
@@ -114,7 +115,7 @@ describe("Sidebar", () => {
     const user = userEvent.setup();
     setup([chat("a", "Alpha", 1), chat("z", "Zeta", 2, { archived: true })]);
     expect(screen.queryByText("Zeta")).toBeNull();
-    await user.click(screen.getByText("Show archived"));
+    await user.click(screen.getByRole("button", { name: "Show archived" }));
     expect(screen.getByText("Zeta")).toBeInTheDocument();
     expect(screen.queryByText("Alpha")).toBeNull();
   });

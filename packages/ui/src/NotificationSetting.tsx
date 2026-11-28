@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { notifyEnabled, notifySupport, setNotify } from "./notify.ts";
-import { TID } from "./testids.ts";
+import { SettingsHeading, SwitchRow } from "./components/overlay/settings-rows.tsx";
 
 /** Settings row for desktop notifications. The choice is per browser, because permission is. */
 export function NotificationSetting() {
@@ -9,26 +9,25 @@ export function NotificationSetting() {
   const [busy, setBusy] = useState(false);
   const support = notifySupport();
   return (
-    <div className="panel" data-testid={TID.settingsPanel}>
-      <h3>Notifications</h3>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={on}
-          disabled={busy || support === "unsupported"}
-          onChange={async (e) => {
-            setBusy(true);
-            const r = await setNotify(e.target.checked);
-            setOn(r.enabled);
-            setProblem(r.problem ?? "");
-            setBusy(false);
-          }}
-        />
-        Show a desktop notification when a reply is ready or a tool needs your approval
-      </label>
-      <p className="muted small">Only when you are not looking at that chat. While this tab is in the background, your browser may delay checks by up to a minute. This setting is stored in this browser.</p>
-      {support === "unsupported" && <p className="muted small">This browser does not support desktop notifications.</p>}
-      {problem && <p className="notice error" role="alert">{problem}</p>}
-    </div>
+    <>
+      <SettingsHeading>Notifications</SettingsHeading>
+      <SwitchRow
+        checked={on}
+        description="Only when you are not looking at that chat. While this tab is in the background, your browser may delay checks by up to a minute. This setting is stored in this browser."
+        disabled={busy || support === "unsupported"}
+        label="Show a desktop notification when a reply is ready or a tool needs your approval"
+        onChange={async (next) => {
+          setBusy(true);
+          const r = await setNotify(next);
+          setOn(r.enabled);
+          setProblem(r.problem ?? "");
+          setBusy(false);
+        }}
+        below={<>
+          {support === "unsupported" && <p className="text-xs text-(--ui-text-tertiary)">This browser does not support desktop notifications.</p>}
+          {problem && <p className="over text-xs" role="alert">{problem}</p>}
+        </>}
+      />
+    </>
   );
 }

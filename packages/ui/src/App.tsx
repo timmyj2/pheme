@@ -1,5 +1,4 @@
-import { Badge } from "./components/ui/badge.tsx";
-import { IconKeyboard, IconMenu2 } from "./lib/icons.ts";
+import { IconArrowsExchange, IconLayoutNavbar, IconLayoutSidebarLeftCollapse, IconPlus, IconSettings } from "./lib/icons.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentsPage } from "./Agents.tsx";
 import { ChatView } from "./Chat.tsx";
@@ -156,12 +155,20 @@ export function App() {
     }
   }, [toast]);
   const closeDrawer = useCallback(() => setDrawer(false), []);
+  const toggleSidebar = useCallback(() => { if (window.matchMedia(NARROW).matches) setDrawer((d) => !d); else setHidden((h) => !h); }, []);
+  // "Swap" returns to the chat that was open before this one.
+  const lastActive = useRef<string | null>(null);
+  const lastOther = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastActive.current && lastActive.current !== activeId) lastOther.current = lastActive.current;
+    lastActive.current = activeId;
+  }, [activeId]);
   // Mobile drawer: Esc closes it, focus moves into it on open and back to the menu button on close.
   useEffect(() => {
     if (!drawer) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented) setDrawer(false); };
     window.addEventListener("keydown", onKey);
-    const t = setTimeout(() => (document.querySelector(".sidebar-wrap .chat-row, .sidebar-wrap input, .sidebar-wrap button") as HTMLElement | null)?.focus(), 0);
+    const t = setTimeout(() => (document.querySelector("[data-testid='session-button'], .sidebar-wrap input, .sidebar-wrap button") as HTMLElement | null)?.focus(), 0);
     return () => {
       window.removeEventListener("keydown", onKey);
       clearTimeout(t);
@@ -348,6 +355,7 @@ export function App() {
           unread={unread}
           searchRef={searchRef}
           onNew={newChat}
+          onToggleSidebar={toggleSidebar}
           onOpen={openChat}
           onView={(v) => go(v === "skills" ? { view: "skills", name: null } : ({ view: v } as never))}
           onRename={(c, title) => void patchChat(c, { title })}
@@ -359,20 +367,25 @@ export function App() {
       </div>
       {drawer && <div className="backdrop" onClick={closeDrawer} aria-hidden />}
       <main className="main" id="main" tabIndex={-1}>
-        <header className="topbar">
-          <button className="icon-btn menu-btn" data-testid={TID.menuButton} aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarOpen} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (narrow) setDrawer((d) => !d); else setHidden((h) => !h); }}><IconMenu2 className="size-4" aria-hidden="true" /></button>
-          <div id="top-folder" className="top-folder" />
+        <header className="flex h-7 flex-none items-stretch overflow-hidden border-b border-border/60 bg-background" data-testid="topbar">
+          {narrow && <button className="icon-btn mx-1 self-center rounded border-0 bg-transparent p-1 text-muted-foreground hover:text-foreground" data-testid={TID.menuButton} aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarOpen} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={toggleSidebar}><IconLayoutSidebarLeftCollapse className="size-4" aria-hidden="true" /></button>}
           <h1 className="sr-only">{pageTitle}</h1>
-          <div className="tab-strip" data-testid={TID.tabStrip} role="tablist" aria-label="Open chats">
+          <div className="tab-strip flex min-w-0 flex-1 items-stretch overflow-x-auto" data-testid={TID.tabStrip} role="tablist" aria-label="Open chats">
             {view === "chat" && tabs.length > 0 ? tabs.map((c) => (
-              <button key={c.id} data-testid={TID.tab} data-active={c.id === activeId ? "true" : undefined} role="tab" aria-selected={c.id === activeId} draggable className={`tab${c.id === activeId ? " active" : ""}`} title={c.title} onClick={() => openChat(c.id)} onDragStart={() => setDragId(c.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropTab(c.id)}>
-                {(c.busy || c.id === activeId && activeBusy) && <span className="tab-dot" aria-hidden="true" />}
-                <span className="tab-title">{c.title}</span>
+              <button key={c.id} data-testid={TID.tab} data-active={c.id === activeId ? "true" : undefined} role="tab" aria-selected={c.id === activeId} draggable title={c.title} onClick={() => openChat(c.id)} onDragStart={() => setDragId(c.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropTab(c.id)}
+                className={`relative flex h-full max-w-[200px] min-w-0 flex-none cursor-grab border-0 bg-transparent items-center gap-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.02em] hover:brightness-125 ${c.id === activeId ? "text-foreground shadow-[inset_0_-2px_0_var(--dt-primary)]" : "text-muted-foreground"}`}>
+                <span className={`inline-block size-[7px] flex-none rounded-full border ${(c.busy || c.id === activeId && activeBusy) ? "border-primary bg-primary" : "border-muted-foreground/80"}`} aria-hidden="true" />
+                <span className="truncate">{c.title}</span>
               </button>
-            )) : <span className="tab active" data-testid={TID.tab} data-active="true" role="tab" aria-selected="true">{pageTitle}</span>}
+            )) : <span className="flex h-full items-center px-3 text-[11px] font-medium uppercase tracking-[0.02em] text-foreground shadow-[inset_0_-2px_0_var(--dt-primary)]" data-testid={TID.tab} data-active="true" role="tab" aria-selected="true">{pageTitle}</span>}
+            <button className="flex flex-none items-center border-0 bg-transparent px-2.5 text-muted-foreground hover:text-foreground" aria-label="New chat" title={`New chat (${formatCombo(keys.new)})`} onClick={newChat}><IconPlus className="size-3.5" aria-hidden="true" /></button>
           </div>
-          {state.fake && <Badge className="self-center" size="xs" title="Using the built-in fake engine" variant="muted">fake</Badge>}
-          <button className="icon-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={() => setHelp(true)}><IconKeyboard className="size-4" aria-hidden="true" /></button>
+          <div className="flex flex-none items-center gap-0.5 pr-1 text-muted-foreground" id="top-right">
+            <button className="icon-btn rounded border-0 bg-transparent p-1 hover:text-foreground" aria-label="Settings" title="Settings" onClick={() => go({ view: "settings" })}><IconSettings className="size-3.5" aria-hidden="true" /></button>
+            <button className="icon-btn rounded border-0 bg-transparent p-1 hover:text-foreground" aria-label={hidden ? "Show sidebar" : "Hide sidebar"} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={toggleSidebar}><IconLayoutNavbar className="size-3.5" aria-hidden="true" /></button>
+            <button className="icon-btn rounded border-0 bg-transparent p-1 hover:text-foreground disabled:opacity-40" aria-label="Switch to the previous chat" title="Previous chat" disabled={!lastOther.current} onClick={() => lastOther.current && openChat(lastOther.current)}><IconArrowsExchange className="size-3.5" aria-hidden="true" /></button>
+            {/* The right-panel toggle and the project folder button are portalled here by the chat (ProjectBar). */}
+          </div>
         </header>
         {offline && (
           <div className="banner warn" role="alert">
@@ -405,17 +418,20 @@ export function App() {
           {view === "agents" && <AgentsPage onOpenChat={openChat} />}
           {view === "prompts" && <PromptsPage />}
           {view === "jobs" && <JobsPage onOpenChat={openChat} />}
-          {view === "settings" && <SettingsPage state={state} onChange={(settings) => conn.setState({ ...state, settings })} />}
+          {view === "settings" && <SettingsPage state={state} onChange={(settings) => conn.setState({ ...state, settings })} onClose={() => go({ view: "chat", chatId: null })} />}
         </ErrorBoundary>
       </main>
       </div>
-      <footer className="status-bar">
-        <span className={offline ? "over" : ""}>{offline ? "Can't reach Pheme" : "Ready"}</span>
-        <span className="spacer" />
+      <footer className="flex h-5 flex-none items-center gap-3.5 border-t border-border/60 bg-sidebar px-3 text-[11px] text-muted-foreground" data-testid="status-bar">
+        <span className={`flex items-center gap-1.5 ${offline ? "text-destructive" : ""}`}><span className={`inline-block size-[6px] rounded-full ${offline ? "bg-destructive" : "bg-primary"}`} aria-hidden="true" />{offline ? "Can't reach Pheme" : "Ready"}</span>
+        <span className="flex-1" />
+        <button type="button" className="rounded border-0 bg-transparent px-1 hover:text-foreground" data-testid="approval-mode" aria-pressed={!!state.settings.autoApproveAll} title="Approval mode: ask before tools run, or approve everything" onClick={() => void setSetting({ autoApproveAll: !state.settings.autoApproveAll })}>
+          {state.settings.autoApproveAll ? "Auto-approve all" : "Ask before running"}
+        </button>
         <span>{state.fake ? "Fake engine" : state.engine}</span>
-        <span className="text-size">
-          <button type="button" aria-label="Smaller text" title="Smaller text" onClick={() => bumpTextScale(-1)}>A−</button>
-          <button type="button" aria-label="Larger text" title="Larger text" onClick={() => bumpTextScale(1)}>A+</button>
+        <span className="text-size flex items-center gap-1">
+          <button type="button" className="rounded border-0 bg-transparent px-1 hover:text-foreground" aria-label="Smaller text" title="Smaller text" onClick={() => bumpTextScale(-1)}>A−</button>
+          <button type="button" className="rounded border-0 bg-transparent px-1 hover:text-foreground" aria-label="Larger text" title="Larger text" onClick={() => bumpTextScale(1)}>A+</button>
         </span>
         <span>v{state.version}</span>
       </footer>

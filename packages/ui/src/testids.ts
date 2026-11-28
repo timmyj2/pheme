@@ -16,6 +16,10 @@ export const TID = {
   tab: "tab",
   menuButton: "menu-button",
   transcript: "transcript",
+  turn: "turn", // one user prompt and the replies after it
+  scrollToBottom: "scroll-to-bottom", // the floating pill when the reader is scrolled up
+  workingRow: "working-row", // the quiet working line while a turn runs
+  replyActions: "reply-actions", // the hover bar under a reply
   userMessage: "user-message", // whole message (bubble + attachments + actions)
   userBlock: "user-block", // the bubble text
   assistantMessage: "assistant-message",

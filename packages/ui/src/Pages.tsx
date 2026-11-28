@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { OverlayView } from "./components/overlay/overlay-view.tsx";
+import { OverlayBreadcrumb, OverlayMain, OverlayNav, OverlaySplitLayout, type NavGroup } from "./components/overlay/overlay-split-layout.tsx";
+import { SettingRow, SettingSelect, SettingsHeading, SettingsPanel, SwitchRow } from "./components/overlay/settings-rows.tsx";
+import { formatCombo, matches } from "./keybindings.ts";
+import { useBindings } from "./useBindings.ts";
+import { IconBell, IconBrain, IconCloudUpload, IconCube, IconKeyboard, IconLock, IconMessage, IconPalette, IconSearch } from "./lib/icons.ts";
+import { cn } from "./lib/utils.ts";
 import { BackupSetting } from "./BackupSetting.tsx";
 import { KeybindingSettings } from "./KeybindingSettings.tsx";
 import { NotificationSetting } from "./NotificationSetting.tsx";
@@ -221,9 +228,11 @@ export const SETTING_RANGES: Partial<Record<keyof Settings, [number, number]>> =
   curatorStaleDays: [1, 3650],
 };
 
+// Adapted from hermes-agent (MIT, Copyright (c) 2025 Nous Research), apps/desktop/src/app/settings/index.tsx (layout, search pill, breadcrumb) @ 5688461d
 export function NumberField({ label, value, range, onCommit }: { label: string; value: number; range: [number, number]; onCommit: (n: number) => Promise<void> | void }) {
   const [text, setText] = useState(String(value));
   const [err, setErr] = useState("");
+  const id = useId();
   useEffect(() => { setText(String(value)); setErr(""); }, [value]);
   const commit = async () => {
     const n = Number(text);
@@ -235,23 +244,51 @@ export function NumberField({ label, value, range, onCommit }: { label: string; 
     if (n !== value) await onCommit(n);
   };
   return (
-    <label className="field">{label}
-      <input
-        inputMode="numeric"
-        value={text}
-        aria-invalid={!!err}
-        onChange={(e) => { setText(e.target.value); setErr(""); }}
-        onBlur={() => void commit()}
-        onKeyDown={(e) => { if (e.key === "Enter") void commit(); else if (e.key === "Escape") { setText(String(value)); setErr(""); } }}
-      />
-      {err && <span className="over small" role="alert">{err}</span>}
-    </label>
+    <SettingRow
+      control={
+        <input
+          aria-invalid={!!err}
+          className="settings-number"
+          id={id}
+          inputMode="numeric"
+          onBlur={() => void commit()}
+          onChange={(e) => { setText(e.target.value); setErr(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter") void commit(); else if (e.key === "Escape") { setText(String(value)); setErr(""); } }}
+          value={text}
+        />
+      }
+      id={id}
+      title={label}
+      below={err ? <span className="over small" role="alert">{err}</span> : undefined}
+    />
   );
 }
 
-export function SettingsPage({ state, onChange }: { state: BootstrapState; onChange: (s: Settings) => void }) {
+/** The left rail. Each leaf is a settings page; a group with children expands to its sub-pages. */
+const NAV: NavGroup[] = [
+  { id: "model", label: "Model", icon: IconCube, children: [{ id: "model-main", label: "Main model" }, { id: "model-review", label: "Review model" }] },
+  { id: "chat", label: "Chat", icon: IconMessage },
+  { id: "appearance", label: "Appearance", icon: IconPalette },
+  { id: "notifications", label: "Notifications", icon: IconBell },
+  { id: "shortcuts", label: "Keyboard shortcuts", icon: IconKeyboard },
+  { id: "backup", label: "Backup & transfer", icon: IconCloudUpload },
+  { id: "safety", label: "Safety", icon: IconLock },
+  { id: "loops", label: "Learning loops", icon: IconBrain },
+];
+
+function crumbs(page: string): { group?: string; leaf: string } {
+  for (const g of NAV) {
+    if (g.id === page) return { leaf: g.label };
+    const child = g.children?.find((c) => c.id === page);
+    if (child) return { group: g.label, leaf: child.label };
+  }
+  return { leaf: "Settings" };
+}
+
+export function SettingsPage({ state, onChange, onClose }: { state: BootstrapState; onChange: (s: Settings) => void; onClose: () => void }) {
   const toast = useToast();
   const loader = useLoaderKind();
+  const keys = useBindings();
   const { data: models } = useLoad<ModelOption[]>(api.models);
   const s = state.settings;
   const set = async (patch: Partial<Settings>) => {
@@ -266,123 +303,191 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
   const theme = cur.theme;
   const modes: Mode[] = ["system", ...(theme.light ? ["light" as const] : []), ...(theme.dark ? ["dark" as const] : [])];
   const list = models ?? [];
-  // Settings search: hide the panels whose text (headings, labels, option names, help text) does not contain the words typed.
+
+  const [page, setPage] = useState("model-main");
+  // Search: any word typed shows every group whose text contains all the words (across pages). An empty box shows the open page.
   const [find, setFind] = useState("");
   const [shown, setShown] = useState(-1);
   const body = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  const search = useRef<HTMLInputElement>(null);
+  const query = find.trim();
+  useLayoutEffect(() => {
     const words = find.toLowerCase().split(/\s+/).filter(Boolean);
     let visible = 0;
-    body.current?.querySelectorAll<HTMLElement>(`:scope > [data-testid="${TID.settingsPanel}"]`).forEach((el) => {
-      const text = (el.textContent ?? "").toLowerCase();
-      const hit = words.every((w) => text.includes(w));
+    body.current?.querySelectorAll<HTMLElement>(`[data-testid="${TID.settingsPanel}"]`).forEach((el) => {
+      const hit = words.length > 0 ? words.every((w) => (el.textContent ?? "").toLowerCase().includes(w)) : el.dataset.page === page;
       el.hidden = !hit;
       if (hit) visible++;
     });
     setShown((n) => (n === visible ? n : visible));
   });
+  // The palette combo (Ctrl/Cmd+K) focuses this search box while settings is open, instead of opening the palette over it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!matches(e, keys.palette)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      search.current?.focus();
+      search.current?.select();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [keys]);
+
+  const searchPill = (
+    <label className="settings-overlay flex h-7 items-center gap-1.5 rounded-full border border-(--ui-stroke-secondary) bg-(--ui-chat-surface-background) px-2.5 text-(--ui-text-tertiary) shadow-sm transition-colors focus-within:text-foreground">
+      <IconSearch aria-hidden="true" className="size-3" />
+      <input
+        aria-label="Search settings"
+        className="settings-search w-24 bg-transparent text-xs text-foreground outline-none placeholder:text-(--ui-text-tertiary)"
+        onChange={(e) => setFind(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Escape" && find) { e.preventDefault(); setFind(""); } }}
+        placeholder="Search"
+        ref={search}
+        type="search"
+        value={find}
+      />
+      <kbd className="rounded border border-(--ui-stroke-secondary) px-1 font-mono text-[0.625rem] leading-4">{formatCombo(keys.palette)}</kbd>
+    </label>
+  );
+  const crumb = query ? { leaf: "Search results" } : crumbs(page);
+
   return (
-    <section className="page settings-page">
-      <Head title="Settings" sub={`Pheme ${state.version} · engine: ${state.engine}${state.fake ? " (fake mode)" : ""}`} />
-      <div className="settings-find">
-        <input type="search" aria-label="Search settings" placeholder="Search settings (for example: theme, approve, memory)" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setFind(""); }} />
-        {find.trim() && shown === 0 && <p className="muted small" role="status">No settings match “{find.trim()}”.</p>}
-      </div>
-      <div className="settings-split">
-        <nav className="settings-nav" aria-label="Settings sections">
-          {["Model", "Appearance", "Notifications", "Keyboard shortcuts", "Backup and restore", "Permissions", "Learning loops"].map((name) => (
-            <button key={name} type="button" onClick={() => {
-              const hit = [...(body.current?.querySelectorAll("h3") ?? [])].find((h) => h.textContent === name);
-              hit?.scrollIntoView({ block: "start" });
-            }}>{name}</button>
-          ))}
-        </nav>
-        <div className="settings-body" ref={body}>
-      <div className="panel" data-testid={TID.settingsPanel}>
-        <h3>Model</h3>
-        <label className="field">Chat model
-          <select value={s.model} onChange={(e) => void set({ model: e.target.value })}>
-            {[{ id: "auto", name: "Auto" }, ...list.filter((m) => m.id !== "auto")].map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
-        </label>
-        <label className="field">Background review model
-          <select value={s.reviewModel} onChange={(e) => void set({ reviewModel: e.target.value })}>
-            <option value="">Cheapest available</option>
-            {list.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
-        </label>
-        <p className="muted small">Usage so far: {state.usage.turns} chat turns, {state.usage.reviews} background reviews, {state.usage.toolSteps} tool steps.</p>
-      </div>
-      <div className="panel" data-testid={TID.settingsPanel}>
-        <h3>Appearance</h3>
-        <div className="row">
-          <label className="field">Theme
-            <select value={theme.name} onChange={(e) => void set({ theme: themeValue(e.target.value, cur.mode) })}>
-              {THEMES.map((t) => <option key={t.name} value={t.name}>{t.label}</option>)}
-            </select>
-          </label>
-          <label className="field">Mode
-            <select value={modes.includes(cur.mode) ? cur.mode : "system"} onChange={(e) => void set({ theme: themeValue(theme.name, e.target.value as Mode) })}>
-              {modes.map((m) => <option key={m} value={m}>{m === "system" ? "Match system" : m[0].toUpperCase() + m.slice(1)}</option>)}
-            </select>
-          </label>
-        </div>
-        {(!theme.light || !theme.dark) && <p className="muted small">This theme has only one {theme.dark ? "dark" : "light"} palette.</p>}
-        <label className="check">
-          <input type="checkbox" defaultChecked={typeof localStorage !== "undefined" && localStorage.getItem("pheme-wallpaper") === "1"} onChange={(e) => { try { localStorage.setItem("pheme-wallpaper", e.target.checked ? "1" : "0"); } catch { /* private mode: this tab still shows it */ } document.documentElement.classList.toggle("wallpaper", e.target.checked); }} />
-          Soft background behind the chat (off unless you turn it on)
-        </label>
-        <div className="field">Loading indicator
-          <div className="loader-pick" role="group" aria-label="Loading indicator">
-            {(["grid", "light", "mist"] as const).map((k) => (
-              <button key={k} type="button" aria-pressed={loader === k} onClick={() => setLoaderKind(k)}>
-                <Loader kind={k} quiet />
-                <span className="small">{LOADER_LABEL[k]}</span>
-              </button>
-            ))}
+    <OverlayView edgeBadge={searchPill} label="Settings" onClose={onClose} closeLabel="Close settings">
+      <OverlaySplitLayout>
+        <OverlayNav
+          groups={NAV}
+          label="Settings sections"
+          onSelect={(id) => { setPage(id); setFind(""); }}
+          selected={page}
+        />
+        <OverlayMain>
+          <OverlayBreadcrumb group={crumb.group} leaf={crumb.leaf} root="Settings" />
+          {query && shown === 0 && <p className="mb-3 text-xs text-(--ui-text-tertiary)" role="status">No settings match “{query}”.</p>}
+          <div className="flex flex-col" ref={body}>
+            <SettingsPanel page="model-main">
+              <SettingsHeading>Main model</SettingsHeading>
+              <SettingRow
+                control={<SettingSelect id="chat-model" label="Chat model" onChange={(v) => void set({ model: v })} value={s.model}>
+                  {[{ id: "auto", name: "Auto" }, ...list.filter((m) => m.id !== "auto")].map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </SettingSelect>}
+                description="Used for new chats. Use the model picker in the composer to change one chat."
+                id="chat-model"
+                title="Chat model"
+              />
+              <p className="text-xs text-(--ui-text-tertiary)">Usage so far: {state.usage.turns} chat turns, {state.usage.reviews} background reviews, {state.usage.toolSteps} tool steps.</p>
+            </SettingsPanel>
+            <SettingsPanel page="model-review">
+              <SettingsHeading>Review model</SettingsHeading>
+              <SettingRow
+                control={<SettingSelect id="review-model" label="Background review model" onChange={(v) => void set({ reviewModel: v })} value={s.reviewModel}>
+                  <option value="">Cheapest available</option>
+                  {list.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </SettingSelect>}
+                description="Runs skill and memory reviews in the background."
+                id="review-model"
+                title="Background review model"
+              />
+            </SettingsPanel>
+            <SettingsPanel page="chat">
+              <SettingsHeading>Chat</SettingsHeading>
+              <SettingRow
+                control={<SettingSelect id="text-size" label="Text size" onChange={(v) => { const n = Number(v); try { localStorage.setItem("pheme-text-scale", String(n)); } catch { /* private mode */ } document.documentElement.style.setProperty("--chat-text-scale", String(n / 100)); }} value={typeof localStorage === "undefined" ? "110" : (localStorage.getItem("pheme-text-scale") || "110")}>
+                  <option value="80">Smaller</option>
+                  <option value="90">Small</option>
+                  <option value="100">Normal</option>
+                  <option value="110">Default</option>
+                  <option value="125">Larger</option>
+                </SettingSelect>}
+                id="text-size"
+                title="Text size"
+                description="Scales the chat text."
+              />
+              <SettingRow
+                control={
+                  <div className="flex items-center gap-1" role="group" aria-label="Loading indicator">
+                    {(["grid", "light", "mist"] as const).map((k) => (
+                      <button
+                        aria-pressed={loader === k}
+                        className={cn("flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs transition-colors", loader === k ? "border-(--ui-stroke-tertiary) bg-(--ui-bg-tertiary) text-foreground" : "border-transparent text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-foreground")}
+                        key={k}
+                        onClick={() => setLoaderKind(k)}
+                        type="button"
+                      >
+                        <Loader kind={k} quiet />
+                        <span>{LOADER_LABEL[k]}</span>
+                      </button>
+                    ))}
+                  </div>
+                }
+                description="Shown in the chat while a reply is running."
+                title="Loading indicator"
+              />
+              <SwitchRow
+                checked={typeof localStorage !== "undefined" && localStorage.getItem("pheme-wallpaper") === "1"}
+                description="Off unless you turn it on."
+                label="Soft background behind the chat"
+                onChange={(on) => { try { localStorage.setItem("pheme-wallpaper", on ? "1" : "0"); } catch { /* private mode: this tab still shows it */ } document.documentElement.classList.toggle("wallpaper", on); }}
+              />
+            </SettingsPanel>
+            <SettingsPanel page="appearance">
+              <SettingsHeading>Appearance</SettingsHeading>
+              <SettingRow
+                control={<SettingSelect id="theme" label="Theme" onChange={(v) => void set({ theme: themeValue(v, cur.mode) })} value={theme.name}>
+                  {THEMES.map((t) => <option key={t.name} value={t.name}>{t.label}</option>)}
+                </SettingSelect>}
+                id="theme"
+                title="Theme"
+              />
+              <SettingRow
+                control={<SettingSelect id="mode" label="Mode" onChange={(v) => void set({ theme: themeValue(theme.name, v as Mode) })} value={modes.includes(cur.mode) ? cur.mode : "system"}>
+                  {modes.map((m) => <option key={m} value={m}>{m === "system" ? "Match system" : m[0]!.toUpperCase() + m.slice(1)}</option>)}
+                </SettingSelect>}
+                description={!theme.light || !theme.dark ? `This theme has only one ${theme.dark ? "dark" : "light"} palette.` : undefined}
+                id="mode"
+                title="Mode"
+              />
+            </SettingsPanel>
+            <SettingsPanel page="notifications">
+              <NotificationSetting />
+            </SettingsPanel>
+            <SettingsPanel page="shortcuts">
+              <KeybindingSettings />
+            </SettingsPanel>
+            <SettingsPanel page="backup">
+              <BackupSetting />
+            </SettingsPanel>
+            <SettingsPanel page="safety">
+              <SettingsHeading>Permissions</SettingsHeading>
+              <SwitchRow
+                checked={s.autoApproveAll}
+                below={s.autoApproveAll ? <p className="over text-xs">Pheme will run commands and edit files without showing an approval card.</p> : undefined}
+                label="Auto-approve all (shell commands and file edits run without asking)"
+                onChange={(on) => void set({ autoApproveAll: on })}
+              />
+            </SettingsPanel>
+            <SettingsPanel page="loops">
+              <SettingsHeading>Learning loops</SettingsHeading>
+              <SwitchRow
+                checked={s.loopsEnabled}
+                label="Review chats in the background to improve skills and memory (uses extra Copilot requests)"
+                onChange={(on) => void set({ loopsEnabled: on })}
+              />
+              {num("skillReviewMinToolSteps", "Skill review after a turn with at least this many tool steps")}
+              {num("memoryReviewEveryUserMessages", "Memory review every this many user messages")}
+              <SwitchRow
+                checked={s.curatorEnabled}
+                label="Skill curator: periodically merge overlapping skills and archive unused ones"
+                onChange={(on) => void set({ curatorEnabled: on })}
+              />
+              {num("curatorEveryDays", "Curator runs every this many days")}
+              {num("curatorStaleDays", "Archive skills unused for this many days")}
+              {num("memoryLimit", "Memory limit (characters)")}
+              {num("userLimit", "User profile limit (characters)")}
+            </SettingsPanel>
           </div>
-          <p className="muted small">Shown in the chat while a reply is running.</p>
-        </div>
-        <label className="field">Text size
-          <select aria-label="Text size" defaultValue={typeof localStorage === "undefined" ? "110" : (localStorage.getItem("pheme-text-scale") || "110")} onChange={(e) => { const n = Number(e.target.value); try { localStorage.setItem("pheme-text-scale", String(n)); } catch { /* private mode */ } document.documentElement.style.setProperty("--chat-text-scale", String(n / 100)); }}>
-            <option value="80">Smaller</option>
-            <option value="90">Small</option>
-            <option value="100">Normal</option>
-            <option value="110">Default</option>
-            <option value="125">Larger</option>
-          </select>
-        </label>
-      </div>
-      <NotificationSetting />
-      <KeybindingSettings />
-      <BackupSetting />
-      <div className="panel" data-testid={TID.settingsPanel}>
-        <h3>Permissions</h3>
-        <label className="check">
-          <input type="checkbox" checked={s.autoApproveAll} onChange={(e) => void set({ autoApproveAll: e.target.checked })} />
-          Auto-approve all (shell commands and file edits run without asking)
-        </label>
-        {s.autoApproveAll && <p className="over small">Pheme will run commands and edit files without showing an approval card.</p>}
-      </div>
-      <div className="panel" data-testid={TID.settingsPanel}>
-        <h3>Learning loops</h3>
-        <label className="check">
-          <input type="checkbox" checked={s.loopsEnabled} onChange={(e) => void set({ loopsEnabled: e.target.checked })} />
-          Review chats in the background to improve skills and memory (uses extra Copilot requests)
-        </label>
-        {num("skillReviewMinToolSteps", "Skill review after a turn with at least this many tool steps")}
-        {num("memoryReviewEveryUserMessages", "Memory review every this many user messages")}
-        <label className="check">
-          <input type="checkbox" checked={s.curatorEnabled} onChange={(e) => void set({ curatorEnabled: e.target.checked })} />
-          Skill curator: periodically merge overlapping skills and archive unused ones
-        </label>
-        {num("curatorEveryDays", "Curator runs every this many days")}
-        {num("curatorStaleDays", "Archive skills unused for this many days")}
-        {num("memoryLimit", "Memory limit (characters)")}
-        {num("userLimit", "User profile limit (characters)")}
-      </div>
-        </div>
-      </div>
-    </section>
+        </OverlayMain>
+      </OverlaySplitLayout>
+    </OverlayView>
   );
 }

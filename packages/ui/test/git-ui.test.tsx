@@ -29,7 +29,7 @@ describe("DiffView", () => {
 });
 
 describe("ChangesPanel", () => {
-  const props = { chatId: "c1", error: "", loading: false, onRefresh: vi.fn(), onClose: vi.fn() };
+  const props = { chatId: "c1", error: "", loading: false, onRefresh: vi.fn() };
 
   it("groups files into Staged / Changes / Untracked / Conflicts with counts and badges", () => {
     const s = status([
@@ -59,9 +59,9 @@ describe("ChangesPanel", () => {
 
   it("loads a file's diff on expand, handles binary/empty/error/truncated, and refresh/close work", async () => {
     const user = userEvent.setup();
-    const onRefresh = vi.fn(), onClose = vi.fn();
+    const onRefresh = vi.fn();
     gitDiff.mockResolvedValueOnce({ path: "a.ts", diff: "@@ -1 +1 @@\n-a\n+b\n", binary: false, truncated: true });
-    render(<ChangesPanel {...props} onRefresh={onRefresh} onClose={onClose} status={status([file({ path: "a.ts" })])} />);
+    render(<ChangesPanel {...props} onRefresh={onRefresh} status={status([file({ path: "a.ts" })])} />);
     await user.click(screen.getByRole("button", { name: /a\.ts/ }));
     expect(await screen.findByText("+b")).toBeInTheDocument();
     expect(screen.getByText(/cut short/)).toBeInTheDocument();
@@ -72,9 +72,7 @@ describe("ChangesPanel", () => {
     await user.click(screen.getByRole("button", { name: /a\.ts/ }));
     expect(await screen.findByText("boom")).toBeInTheDocument();
     await user.click(screen.getByLabelText("Refresh changes"));
-    await user.click(screen.getByLabelText("Close changes"));
     expect(onRefresh).toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
   });
 
   it("shows a friendly line for a binary diff and an empty one", async () => {
@@ -93,7 +91,7 @@ describe("ProjectBar", () => {
     const user = userEvent.setup();
     const onSetDir = vi.fn().mockRejectedValueOnce(new Error("That folder does not exist: /nope")).mockResolvedValueOnce(undefined);
     render(<ProjectBar {...base} dir={undefined} onSetDir={onSetDir} />);
-    await user.click(screen.getByText(/Choose a project folder/));
+    await user.click(screen.getByLabelText("Choose a project folder"));
     const input = screen.getByLabelText("Folder path");
     expect(input).toHaveFocus();
     expect(screen.getByText("Use this folder")).toBeDisabled(); // empty input
@@ -111,9 +109,8 @@ describe("ProjectBar", () => {
     const onSetDir = vi.fn().mockResolvedValue(undefined);
     const s = status([file({ path: "a" }), file({ path: "b" })], { branch: "feat/x", ahead: 2, behind: 1, upstream: "origin/feat/x" });
     const { rerender } = render(<ProjectBar {...base} dir="/Users/me/proj" status={s} onSetDir={onSetDir} />);
-    expect(screen.getByText("proj")).toBeInTheDocument();
-    expect(screen.getByText(/feat\/x ↑2 ↓1/)).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Project folder \/Users\/me\/proj/)).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument(); // change count on the panel toggle while it is closed
     await user.click(screen.getByLabelText(/Project folder \/Users\/me\/proj/));
     await user.click(screen.getByText("Remove folder"));
     expect(onSetDir).toHaveBeenCalledWith(null);
@@ -127,8 +124,8 @@ describe("ProjectBar", () => {
     const user = userEvent.setup();
     const onTogglePanel = vi.fn();
     render(<ProjectBar {...base} onTogglePanel={onTogglePanel} dir={"C:\\Users\\me\\my project"} onSetDir={vi.fn()} />);
-    expect(screen.getByText("my project")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Changes/ }));
+    expect(screen.getByLabelText(/my project/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show the right panel" }));
     expect(onTogglePanel).toHaveBeenCalled();
   });
 });

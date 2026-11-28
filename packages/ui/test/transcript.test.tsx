@@ -43,7 +43,7 @@ describe("Transcript", () => {
     const events = [ev({ type: "user", text: "q1" }), ev({ type: "message", text: "a1" }), ev({ type: "user", text: "q2" }), ev({ type: "message", text: "a2" })];
     const { rerender } = render(<Transcript {...props({ events, onCopy, onRetry })} />);
     expect(screen.getAllByLabelText("Try again")).toHaveLength(1);
-    await user.click(screen.getAllByLabelText("Copy message")[1]);
+    await user.click(screen.getAllByLabelText("Copy message")[0]);
     expect(onCopy).toHaveBeenCalledWith("a1");
     await user.click(screen.getByLabelText("Try again"));
     expect(onRetry).toHaveBeenCalledWith("q2");
@@ -119,14 +119,14 @@ describe("Transcript", () => {
     // the reader scrolls up
     m.scrollTop = 300;
     fireEvent.scroll(scroller);
-    expect(screen.getByLabelText("Jump to the latest message")).toHaveTextContent("Latest");
+    expect(screen.getByTestId(TID.scrollToBottom)).toHaveTextContent("Scroll to bottom");
     m.scrollHeight = 2800;
     rerender(<Transcript {...props({ events: [ev({ type: "message", text: "one" }), ev({ type: "message", text: "two" }), ev({ type: "message", text: "three" })] })} />);
     expect(m.scrollTop).toBe(300); // not yanked
-    expect(screen.getByLabelText("Jump to the latest message")).toHaveTextContent("New messages");
-    act(() => screen.getByLabelText("Jump to the latest message").click());
+    expect(screen.getByTestId(TID.scrollToBottom)).toHaveAttribute("data-unseen");
+    act(() => screen.getByTestId(TID.scrollToBottom).click());
     expect(m.scrollTop).toBe(2800);
-    expect(screen.queryByLabelText("Jump to the latest message")).toBeNull();
+    expect(screen.queryByTestId(TID.scrollToBottom)).toBeNull();
   });
 
   it("sending your own message always scrolls to it", () => {

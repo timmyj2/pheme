@@ -2,7 +2,7 @@
  * Visual capture harness (build-plan item 3). NOT part of `npx playwright test` (the default run ignores this file).
  *
  * Run:      npm run build && npm run visual        (set PW_EXECUTABLE_PATH or PW_CHANNEL like the smoke tests)
- * Output:   e2e/visual-out/<state>.png               Pheme at 1000x560, deviceScaleFactor 2, dark theme (THEME below)
+ * Output:   e2e/visual-out/<state>.png               Pheme at 1390x754, deviceScaleFactor 1.4388 (2000px wide, like the references), dark theme (THEME below)
  *           e2e/visual-out/compare-<state>.png       reference (left) beside Pheme (right), same height, labelled
  * States:   chat, capabilities, settings, right-panel, approval, composer. Reference shots live in docs/visual/hermes-reference/.
  *
@@ -111,6 +111,7 @@ async function composite(browser: Browser, state: string, pheme: string) {
   await ctx.close();
 }
 
+test.use({ viewport: VIEWPORT, deviceScaleFactor: 1.4388 }); // the references are 2000px wide for a 1390px window
 test.describe.configure({ mode: "serial" });
 const files: Record<string, string> = {};
 
@@ -185,10 +186,10 @@ test("settings", async ({ page }) => {
 
 test("right-panel", async ({ page }) => {
   await visit(page, `#/chat/${mainChat}`);
-  await page.getByRole("button", { name: /^Changes/ }).click();
-  await expect(tid(page, "change-row").first()).toBeVisible();
-  // Pheme's Changes panel is a dialog; the Files list (FilesPanel) is not reachable from the UI yet.
-  files["right-panel"] = await shoot(page, "right-panel", page.getByRole("dialog", { name: "Changes" }));
+  await page.getByRole("button", { name: "Show the right panel" }).click();
+  await expect(tid(page, "files-panel")).toBeVisible();
+  // The docked right column: the file tree (FilesPanel) is the default tab; Changes is the second tab.
+  files["right-panel"] = await shoot(page, "right-panel", tid(page, "right-panel"));
 });
 
 test("approval", async ({ page }) => {

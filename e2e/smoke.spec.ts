@@ -113,6 +113,7 @@ test.describe("Pheme in a real browser", () => {
     await page.getByLabel("Search settings").fill("backup");
     await expect(tid(page, TID.settingsPanel).filter({ visible: true }).getByRole("heading", { level: 3 })).toHaveText(["Backup and restore"]);
     await page.getByLabel("Search settings").fill("");
+    await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
     await page.getByRole("button", { name: /New chat: .* Change/ }).click();
     await page.keyboard.press("Alt+KeyJ");
     await expect(page.getByRole("button", { name: /New chat: .*J\. Change/ })).toBeVisible();
@@ -120,6 +121,18 @@ test.describe("Pheme in a real browser", () => {
     await page.keyboard.press("Alt+KeyJ");
     await expect(page).toHaveURL(/#\/$|#\/chat\//);
     await page.evaluate(() => localStorage.removeItem("pheme-keys"));
+  });
+
+  test("settings overlay: opens over the app, Escape closes it, and the breadcrumb follows the page", async ({ page }) => {
+    await open(page, "#/settings");
+    const dialog = page.getByRole("dialog", { name: "Settings" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Main model");
+    await page.getByRole("button", { name: "Notifications" }).click();
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Notifications");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page).toHaveURL(/#\/$|#\/chat\//);
   });
 
   test("git: choosing a project folder shows its changes, a diff, and commits to a new branch", async ({ page }) => {
@@ -305,6 +318,7 @@ test.describe("Pheme in a real browser", () => {
 
   test("backup downloads a file that previews as a valid backup", async ({ page }) => {
     await open(page, "#/settings");
+    await page.getByRole("button", { name: "Backup & transfer" }).click();
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download backup" }).click()]);
     expect(download.suggestedFilename()).toMatch(/^pheme-backup-\d{8}-\d{4}\.pheme-backup$/);
     const file = await download.path();

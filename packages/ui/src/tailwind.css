@@ -5,7 +5,7 @@
    and form controls. Items 6-7 move components to utilities; the one that finishes the move adds
    `@import "tailwindcss/preflight.css" layer(base);` below. Until then utilities lose to the older unlayered rules, so a migrated
    component must delete its old rule. */
-@layer theme, base, components, utilities;
+@layer theme, base, legacy, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 

@@ -1,5 +1,5 @@
 import { GlyphSpinner } from "./components/ui/glyph-spinner.tsx";
-import { IconRefresh, IconX } from "./lib/icons.ts";
+import { IconRefresh } from "./lib/icons.ts";
 import { useEffect, useState } from "react";
 import { BranchBar } from "./BranchBar.tsx";
 import { CommitBox } from "./CommitBox.tsx";
@@ -65,12 +65,11 @@ interface Props {
   error: string;
   loading: boolean;
   onRefresh: () => void;
-  onClose: () => void;
   /** A reply is running: committing is paused so files are not changed underneath it. */
   busy?: boolean;
 }
 
-export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClose, busy = false }: Props) {
+export function ChangesPanel({ chatId, status, error, loading, onRefresh, busy = false }: Props) {
   const staged = status?.files.filter((f) => f.staged && f.unstaged !== "conflicted") ?? [];
   const unstaged = status?.files.filter((f) => f.unstaged && f.unstaged !== "untracked" && f.unstaged !== "conflicted") ?? [];
   const untracked = status?.files.filter((f) => f.unstaged === "untracked") ?? [];
@@ -88,13 +87,10 @@ export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClos
     ) : null;
 
   return (
-    <aside className="changes-panel" aria-label="Changes">
-      <header className="changes-head">
-        <h2>Changes</h2>
-        <span className="spacer" />
-        <button className="icon-btn" aria-label="Refresh changes" title="Refresh" onClick={onRefresh} disabled={loading}>{loading ? <GlyphSpinner /> : <IconRefresh className="size-3.5" aria-hidden="true" />}</button>
-        <button className="icon-btn" aria-label="Close changes" title="Close" onClick={onClose}><IconX className="size-3.5" aria-hidden="true" /></button>
-      </header>
+    <div className="flex min-h-0 flex-1 flex-col" aria-label="Changes" data-testid="changes-panel">
+      <div className="flex h-6 flex-none items-center justify-end px-2">
+        <button className="icon-btn rounded p-0.5 text-muted-foreground hover:text-foreground" aria-label="Refresh changes" title="Refresh" onClick={onRefresh} disabled={loading}>{loading ? <GlyphSpinner /> : <IconRefresh className="size-3.5" aria-hidden="true" />}</button>
+      </div>
       {status?.repo && !status.problem && status.hasCommits && <BranchBar key={`branch-${chatId}`} chatId={chatId} status={status} busy={busy} onChanged={onRefresh} />}
       <div className="changes-body">
         {error && <p className="notice error" role="alert">{error}</p>}
@@ -110,6 +106,6 @@ export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClos
       </div>
       {status?.repo && !status.problem && <CommitBox key={chatId} chatId={chatId} status={status} busy={busy} onDone={onRefresh} />}
       {status?.repo && !status.problem && status.hasCommits && !status.protectedBranch && <ShipBox key={`ship-${chatId}`} chatId={chatId} status={status} busy={busy} suggestedTitle={status.lastSubject || status.branch || ""} onDone={onRefresh} />}
-    </aside>
+    </div>
   );
 }
