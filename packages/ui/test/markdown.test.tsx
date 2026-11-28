@@ -100,16 +100,24 @@ describe("security", () => {
 });
 
 describe("code blocks", () => {
-  afterEach(() => vi.useRealTimers());
-  const setClipboard = (writeText: unknown) => Object.defineProperty(navigator, "clipboard", { value: writeText === undefined ? undefined : { writeText }, configurable: true });
-
-  it("shows language, highlights, and keeps raw code", () => {
-    const c = html("```js\nconst a = 1;\n```");
-    expect(c.querySelector(".code-lang")?.textContent).toBe("js");
-    expect(c.querySelector(".hljs-keyword")?.textContent).toBe("const");
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    delete (HTMLElement.prototype as { scrollHeight?: number }).scrollHeight;
   });
-  it("labels language-less fences 'text'", () => {
-    expect(html("```\nhi\n```").querySelector(".code-lang")?.textContent).toBe("text");
+  const setClipboard = (writeText: unknown) => Object.defineProperty(navigator, "clipboard", { value: writeText === undefined ? undefined : { writeText }, configurable: true });
+  /** jsdom has no layout: make every element report this scrollHeight so the expand control can appear. */
+  const setScrollHeight = (px: number) => Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => px });
+
+  it("highlights code and keeps the raw text", () => {
+    const c = html("```js\nconst a = 1;\n```");
+    expect(c.querySelector(".hljs-keyword")?.textContent).toBe("const");
+    expect(c.querySelector("pre code")?.textContent).toBe("const a = 1;\n");
+  });
+  it("shows no header or language label", () => {
+    const c = html("```js\nconst a = 1;\n```");
+    expect(c.querySelector(".code-card")?.textContent).toBe("const a = 1;\n");
+    expect(c.textContent).not.toContain("js");
   });
   it("does not throw on unknown languages and leaves them unhighlighted", () => {
     const c = html("```klingon\nqapla 'a\n```");
@@ -122,28 +130,48 @@ describe("code blocks", () => {
     setClipboard(writeText);
     html("```js\nconst a = 1;\nlet b;\n```");
     const btn = screen.getByRole("button", { name: "Copy code" });
-    expect(btn.textContent).toBe("Copy");
     await act(async () => { fireEvent.click(btn); });
     expect(writeText).toHaveBeenCalledWith("const a = 1;\nlet b;");
-    expect(btn.textContent).toBe("Copied");
+    expect(screen.getByRole("button", { name: "Copied" })).toBe(btn);
     await act(async () => { vi.advanceTimersByTime(1600); });
-    expect(btn.textContent).toBe("Copy");
+    expect(screen.getByRole("button", { name: "Copy code" })).toBe(btn);
+  });
+  it("gives every code card its own copy button", () => {
+    html("```\na\n```\n\n```\nb\n```");
+    expect(screen.getAllByRole("button", { name: "Copy code" })).toHaveLength(2);
   });
   it("shows Copy failed when the clipboard rejects or is missing", async () => {
     setClipboard(vi.fn().mockRejectedValue(new Error("denied")));
     html("```\nx\n```");
     const btn = screen.getByRole("button", { name: "Copy code" });
     await act(async () => { fireEvent.click(btn); });
-    expect(btn.textContent).toBe("Copy failed");
-    cleanupAndRetryMissing();
-    function cleanupAndRetryMissing() { setClipboard(undefined); }
+    expect(screen.getByRole("button", { name: "Copy failed" })).toBe(btn);
+    setClipboard(undefined);
     await act(async () => { fireEvent.click(btn); });
-    expect(btn.textContent).toBe("Copy failed");
+    expect(screen.getByRole("button", { name: "Copy failed" })).toBe(btn);
+  });
+  it("expands a long code block with the chevron and collapses it again", async () => {
+    setScrollHeight(400);
+    const { container } = render(<Markdown text={"```\nline\n```"} />);
+    const scroller = container.querySelector(".expandable-scroll")!;
+    expect(scroller.hasAttribute("data-expanded")).toBe(false);
+    const toggle = screen.getByRole("button", { name: "Expand" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => { fireEvent.click(toggle); });
+    expect(scroller.hasAttribute("data-expanded")).toBe(true);
+    expect(screen.getByRole("button", { name: "Collapse" }).getAttribute("aria-expanded")).toBe("true");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Collapse" })); });
+    expect(scroller.hasAttribute("data-expanded")).toBe(false);
+  });
+  it("shows no chevron for code that fits the cap", () => {
+    setScrollHeight(60);
+    html("```\nshort\n```");
+    expect(screen.queryByRole("button", { name: "Expand" })).toBeNull();
   });
   it("renders an unterminated fence as a code block", () => {
     const c = html("text\n\n```python\nprint(1)");
-    expect(c.querySelector(".code-block pre code")?.textContent).toContain("print(1)");
-    expect(c.querySelector(".code-lang")?.textContent).toBe("python");
+    expect(c.querySelector(".code-card pre code")?.textContent).toContain("print(1)");
+    expect(c.querySelector(".hljs-built_in, .hljs-keyword")).toBeTruthy();
   });
 });
 

@@ -1,4 +1,4 @@
-import { Component, memo, type ComponentPropsWithoutRef, useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, memo, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -22,6 +22,7 @@ import sql from "highlight.js/lib/languages/sql";
 import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
+import { CodeCard } from "./components/chat/code-card.tsx";
 import "./markdown.css";
 
 const languages = { javascript, typescript, json, bash, shell, python, xml, css, yaml, markdown, diff, sql, powershell, csharp, java, go, rust, c, cpp, plaintext };
@@ -66,45 +67,11 @@ function textOf(node: ReactNode): string {
   return "";
 }
 
-function CodeBlock({ language, code, children }: { language: string; code: string; children: ReactNode }) {
-  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const copy = async () => {
-    let next: "copied" | "failed" = "copied";
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
-      await navigator.clipboard.writeText(code);
-    } catch {
-      next = "failed";
-    }
-    setState(next);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setState("idle"), 1500);
-  };
-  return (
-    <div className="code-block">
-      <div className="code-head">
-        <span className="code-lang">{language}</span>
-        <button type="button" className="code-copy" aria-label="Copy code" onClick={() => void copy()}>
-          {state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy"}
-        </button>
-      </div>
-      <pre>{children}</pre>
-    </div>
-  );
-}
-
 const components: Components = {
   pre({ children }) {
     const el = Array.isArray(children) ? children[0] : children;
-    const props = (el && typeof el === "object" && "props" in el ? el.props : {}) as { className?: string; children?: ReactNode };
-    const language = /language-([^\s]+)/.exec(props.className ?? "")?.[1] ?? "text";
-    return (
-      <CodeBlock language={language} code={textOf(props.children).replace(/\n$/, "")}>
-        {el}
-      </CodeBlock>
-    );
+    const props = (el && typeof el === "object" && "props" in el ? el.props : {}) as { children?: ReactNode };
+    return <CodeCard code={textOf(props.children).replace(/\n$/, "")}>{el}</CodeCard>;
   },
   a({ href, children }: ComponentPropsWithoutRef<"a"> & ExtraProps) {
     const url = safeUrl(href);
