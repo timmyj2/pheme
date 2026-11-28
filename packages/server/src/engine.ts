@@ -30,6 +30,8 @@ export interface SessionOptions {
   id: string;
   resume: boolean;
   model: string;
+  /** Reasoning effort to ask for; ignored by models that do not report support. */
+  reasoningEffort?: string;
   /** Appended to the engine's own system prompt: persona, memory block, skills index. */
   systemMessage: string;
   tools: ToolDef[];

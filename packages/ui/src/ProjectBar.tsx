@@ -2,6 +2,7 @@ import { IconFolder, IconLayoutSidebarRight } from "./lib/icons.ts";
 import { useState } from "react";
 import { Dialog } from "./Dialog.tsx";
 import type { GitStatus } from "./api.ts";
+import { TID } from "./testids.ts";
 
 interface Props {
   dir: string | undefined;
@@ -45,7 +46,7 @@ export function ProjectBar({ dir, status, busy, panelOpen, onTogglePanel, onSetD
         <IconFolder className="size-3.5" aria-hidden="true" />
       </button>
       {dir && (
-        <button className={`${iconBtn} ${panelOpen ? "text-primary" : ""}`} aria-pressed={panelOpen} aria-label={panelOpen ? "Hide the right panel" : "Show the right panel"} title={panelOpen ? "Hide the right panel" : "Show files and changes"} onClick={onTogglePanel}>
+        <button className={`${iconBtn} ${panelOpen ? "text-primary" : ""}`} aria-pressed={panelOpen} data-testid={TID.rightPanelToggle} aria-label={panelOpen ? "Hide the right panel" : "Show the right panel"} title={panelOpen ? "Hide the right panel" : "Show files and changes"} onClick={onTogglePanel}>
           <IconLayoutSidebarRight className="size-3.5" aria-hidden="true" />
           {!panelOpen && count > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-3 rounded-full bg-primary px-0.5 text-center text-[9px] leading-3 text-primary-foreground">{count}</span>}
         </button>

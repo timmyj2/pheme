@@ -188,8 +188,9 @@ test("right-panel", async ({ page }) => {
   await visit(page, `#/chat/${mainChat}`);
   await page.getByRole("button", { name: "Show the right panel" }).click();
   await expect(tid(page, "files-panel")).toBeVisible();
-  // The docked right column: the file tree (FilesPanel) is the default tab; Changes is the second tab.
-  files["right-panel"] = await shoot(page, "right-panel", tid(page, "right-panel"));
+  // The whole window, like the reference: the docked right column (file tree by default, Changes as the second tab) beside the chat.
+  await expect(tid(page, "right-panel")).toBeVisible();
+  files["right-panel"] = await shoot(page, "right-panel");
 });
 
 test("approval", async ({ page }) => {

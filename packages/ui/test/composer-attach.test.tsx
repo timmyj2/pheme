@@ -79,7 +79,8 @@ describe("Composer attachments", () => {
     rerender(<Composer {...base} busy={false} />);
     expect(screen.getByRole("button", { name: "Send message" })).toBeEnabled();
   });
-  it("switching chats drops the pending files; offline disables the paperclip; the handle can put files back", async () => {
+  it("switching chats drops the pending files; offline disables attaching; the handle can put files back", async () => {
+    const user = userEvent.setup();
     const ref = createRef<ComposerHandle>();
     const { rerender } = render(<Composer {...base} ref={ref} />);
     pick([f("a.txt")]);
@@ -89,7 +90,8 @@ describe("Composer attachments", () => {
     act(() => ref.current!.addFiles([f("back.txt")]));
     expect(await screen.findByText("back.txt")).toBeInTheDocument();
     rerender(<Composer {...base} ref={ref} chatId="c2" offline />);
-    expect(screen.getByRole("button", { name: "Attach files" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Add files or saved prompts" }));
+    expect(await screen.findByRole("menuitem", { name: "Attach files or images" })).toHaveAttribute("data-disabled");
   });
   it("revokes image preview addresses when the file is removed (no leak)", async () => {
     const user = userEvent.setup();

@@ -1,5 +1,7 @@
 /* Adapted from hermes-agent (MIT, Copyright (c) 2025 Nous Research), apps/desktop/src/app/settings/primitives.tsx and components/ui/switch.tsx @ 5688461d.
    Form controls for the settings overlay. Scoped under .settings-overlay so they beat the global select/input rules in app.css. */
+/* The close X is a plain icon: no fill, no bevel (the browser default button look is not reset here). */
+.overlay-close { border: 0; background: transparent; padding: 0; box-shadow: none; }
 .settings-overlay select.settings-select {
   appearance: none;
   -webkit-appearance: none;
@@ -9,7 +11,7 @@
   padding: 0 2rem 0 0.625rem;
   border: 1px solid var(--ui-stroke-secondary);
   border-radius: 0.375rem;
-  background-color: var(--ui-bg-secondary);
+  background-color: transparent;
   background-image: none;
   color: var(--ui-text-primary);
   font: inherit;
@@ -17,7 +19,7 @@
   cursor: pointer;
   transition: background-color 100ms ease-out;
 }
-.settings-overlay select.settings-select:hover { background-color: var(--ui-control-hover-background); }
+.settings-overlay select.settings-select:hover { background-color: color-mix(in srgb, var(--ui-base) 5%, transparent); }
 .settings-overlay input.settings-number {
   box-sizing: border-box;
   width: 100%;
@@ -25,7 +27,7 @@
   padding: 0 0.625rem;
   border: 1px solid var(--ui-stroke-secondary);
   border-radius: 0.375rem;
-  background-color: var(--ui-bg-secondary);
+  background-color: transparent;
   color: var(--ui-text-primary);
   font: inherit;
   font-size: 13px;

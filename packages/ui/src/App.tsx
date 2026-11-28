@@ -401,6 +401,8 @@ export function App() {
               projectDir={chats.find((c) => c.id === activeId)?.projectDir}
               model={chats.find((c) => c.id === activeId)?.model}
               defaultModel={state.settings.model}
+              reasoningEffort={state.settings.reasoningEffort}
+              onReasoningEffort={(e) => void setSetting({ reasoningEffort: e })}
               offline={offline}
               folderInTop={!sidebarOpen}
               composerRef={composerRef}

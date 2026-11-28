@@ -12,6 +12,7 @@ const TID = {
   shell: "shell", sidebarWrap: "sidebar-wrap", menuButton: "menu-button", userMessage: "user-message", userBlock: "user-block",
   assistantBlock: "assistant-block", composerWrap: "composer-wrap", composerInput: "composer-input", contextMeter: "context-meter",
   settingsPanel: "settings-panel", changeRow: "change-row", diffLine: "diff-line", commitDone: "commit-done", branchPill: "branch-pill", stashItem: "stash-item",
+  rightPanelToggle: "right-panel-toggle", rightTabChanges: "right-tab-changes",
 } as const;
 const tid = (page: Page, id: string) => page.getByTestId(id);
 const composer = (page: Page) => tid(page, TID.composerInput);
@@ -150,8 +151,8 @@ test.describe("Pheme in a real browser", () => {
     await page.getByRole("button", { name: /Choose a project folder/ }).click();
     await page.getByLabel("Folder path").fill(repo);
     await page.getByRole("button", { name: "Use this folder" }).click();
-    const changes = page.getByRole("button", { name: /^Changes/ });
-    await changes.click();
+    await tid(page, TID.rightPanelToggle).click();
+    await tid(page, TID.rightTabChanges).click();
     await expect(tid(page, TID.changeRow)).toHaveCount(2);
     await tid(page, TID.changeRow).filter({ hasText: "a.txt" }).click();
     await expect(page.locator(`[data-testid="${TID.diffLine}"][data-kind="add"]`, { hasText: "+TWO" })).toBeVisible();
@@ -185,7 +186,8 @@ test.describe("Pheme in a real browser", () => {
     await page.getByRole("button", { name: /Choose a project folder/ }).click();
     await page.getByLabel("Folder path").fill(repo);
     await page.getByRole("button", { name: "Use this folder" }).click();
-    await page.getByRole("button", { name: /^Changes/ }).click();
+    await tid(page, TID.rightPanelToggle).click();
+    await tid(page, TID.rightTabChanges).click();
     await tid(page, TID.branchPill).click();
 
     // switching onto a branch that would overwrite the edit asks first and changes nothing

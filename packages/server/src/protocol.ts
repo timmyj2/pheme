@@ -42,6 +42,8 @@ export type ApprovalDecision = "once" | "chat" | "deny";
 
 export interface Settings {
   model: string; // "auto" or a model id
+  /** Reasoning effort for new sessions (global). "" = the model's own default. Only sent to models that report support. */
+  reasoningEffort: string;
   reviewModel: string; // "" = cheapest available
   theme: string;
   autoApproveAll: boolean;
@@ -58,6 +60,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   model: "auto",
+  reasoningEffort: "",
   reviewModel: "",
   theme: "pheme-gold-dark",
   autoApproveAll: false,
@@ -100,6 +103,9 @@ export interface SkillSummary {
 export interface ModelOption {
   id: string;
   name: string;
+  /** Reasoning effort levels the model accepts, when the engine reports them. Absent or empty = no effort control. */
+  reasoningEfforts?: string[];
+  defaultReasoningEffort?: string;
 }
 
 export type JobSchedule =

@@ -173,7 +173,7 @@ function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, 
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-px leading-tight">
             <span className="truncate">{c.title}</span>
-            <span className="truncate text-[11px] text-muted-foreground">{c.model || "auto"} · {c.userMessages} messages</span>
+            <span className="truncate text-[11px] text-muted-foreground">{c.model || "auto"} · {c.userMessages} {c.userMessages === 1 ? "message" : "messages"}</span>
           </span>
           <span className="shrink-0 self-start pt-px text-[11px] text-muted-foreground">{relTime(c.updatedAt)}</span>
         </button>
@@ -356,7 +356,7 @@ export function Sidebar(props: {
           </button>
         ))}
       </nav>
-      <label className="flex h-7 items-center gap-2 px-2 text-muted-foreground focus-within:text-foreground">
+      <label className="sidebar-search flex h-7 items-center gap-2 px-2 text-muted-foreground focus-within:text-foreground">
         <IconSearch className="size-3.5 shrink-0" aria-hidden="true" />
         <input
           ref={props.searchRef}

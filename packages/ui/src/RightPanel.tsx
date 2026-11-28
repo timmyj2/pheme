@@ -4,6 +4,7 @@ import { ChangesPanel } from "./ChangesPanel.tsx";
 import { FilesPanel } from "./FilesPanel.tsx";
 import { SectionLabel } from "./components/ui/rail.tsx";
 import type { GitStatus } from "./api.ts";
+import { TID } from "./testids.ts";
 
 interface Props {
   chatId: string;
@@ -25,7 +26,7 @@ export function RightPanel({ chatId, dir, status, error, loading, busy, onRefres
     <button
       role="tab"
       aria-selected={tab === id}
-      data-testid={id === "files" ? "right-tab-files" : "right-tab-changes"}
+      data-testid={id === "files" ? TID.rightTabFiles : TID.rightTabChanges}
       className={`flex flex-1 items-center justify-center gap-1 border-b-2 text-[11px] font-medium uppercase tracking-[0.04em] ${tab === id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
       onClick={() => setTab(id)}
     >
@@ -33,7 +34,7 @@ export function RightPanel({ chatId, dir, status, error, loading, busy, onRefres
     </button>
   );
   return (
-    <aside className="flex h-full min-h-0 w-[209px] flex-none flex-col border-l border-border/60 bg-background" aria-label="Right panel" data-testid="right-panel">
+    <aside className="flex h-full min-h-0 w-[209px] flex-none flex-col border-l border-border/60 bg-background" aria-label="Right panel" data-testid={TID.rightPanel}>
       <header className="flex h-8 flex-none items-center px-3">
         <SectionLabel className="min-w-0 truncate">
           <span className="truncate" title={dir}>{name}</span>

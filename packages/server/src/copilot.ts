@@ -77,10 +77,22 @@ export class CopilotEngine implements Engine {
     return client.getAuthStatus();
   }
 
+  /** Effort levels per model, from the last model listing (the SDK reports them per model). */
+  private efforts = new Map<string, string[]>();
+
   async listModels(): Promise<ModelOption[]> {
     const { client } = await this.ensure();
     const models = await client.listModels();
-    return [{ id: "auto", name: "Auto" }, ...models.map((m) => ({ id: m.id, name: m.name ?? m.id }))];
+    const out: ModelOption[] = [{ id: "auto", name: "Auto" }];
+    this.efforts.clear();
+    for (const m of models) {
+      const levels = (m as { supportedReasoningEfforts?: unknown }).supportedReasoningEfforts;
+      const efforts = Array.isArray(levels) ? levels.filter((x): x is string => typeof x === "string" && /^[a-z]{1,20}$/.test(x)) : [];
+      const def = (m as { defaultReasoningEffort?: unknown }).defaultReasoningEffort;
+      if (efforts.length) this.efforts.set(m.id, efforts);
+      out.push({ id: m.id, name: m.name ?? m.id, ...(efforts.length ? { reasoningEfforts: efforts, defaultReasoningEffort: typeof def === "string" ? def : efforts[0] } : {}) });
+    }
+    return out;
   }
 
   async createSession(opts: SessionOptions): Promise<EngineSession> {
@@ -129,6 +141,11 @@ export class CopilotEngine implements Engine {
     if (opts.workingDirectory) config.workingDirectory = opts.workingDirectory;
     if (opts.agents?.length) {
       config.customAgents = opts.agents.map((a) => ({ name: a.name, displayName: a.name, description: a.description, prompt: a.prompt, tools: a.tools ?? null, infer: true }));
+    }
+    // Only send an effort the model reports; the list is fetched once if this engine has not seen it yet.
+    if (opts.reasoningEffort && opts.model !== "auto") {
+      if (!this.efforts.size) await this.listModels();
+      if (this.efforts.get(opts.model)?.includes(opts.reasoningEffort)) config.reasoningEffort = opts.reasoningEffort;
     }
     if (opts.customToolsOnly) config.availableTools = opts.tools.map((t) => t.name);
     const session = opts.resume

@@ -96,7 +96,8 @@ export class FakeEngine implements Engine {
     return [
       { id: "auto", name: "Auto" },
       { id: "fake-mini", name: "Fake Mini (cheap)" },
-      { id: "fake-large", name: "Fake Large" },
+      // Only this model reports reasoning effort, so the composer's effort pill can be tried in fake mode.
+      { id: "fake-large", name: "Fake Large", reasoningEfforts: ["low", "medium", "high"], defaultReasoningEffort: "medium" },
     ];
   }
 

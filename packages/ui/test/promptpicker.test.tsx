@@ -19,6 +19,12 @@ const box = () => screen.getByLabelText("Message") as HTMLTextAreaElement;
 const ui = (o: Partial<typeof base> & { projectDir?: string } = {}, ref?: React.Ref<ComposerHandle>) => <ToastProvider><Composer {...base} {...o} ref={ref} /></ToastProvider>;
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); m("prompts").mockResolvedValue(ALL); });
 
+/** The saved-prompt list opens from the "+" menu, like any other item in it. */
+async function togglePrompts(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Add files or saved prompts" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Insert a saved prompt" }));
+}
+
 describe("promptsFor", () => {
   it("offers global prompts plus this project's, hides other projects', and ranks project and prefix matches first", () => {
     expect(promptsFor(ALL, "/p/app", "").map((p) => p.name)).toEqual(["Release notes", "Explain", "Review"]);
@@ -40,7 +46,7 @@ describe("Composer prompt picker", () => {
     const user = userEvent.setup();
     render(ui());
     expect(m("prompts")).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Insert a saved prompt" }));
+    await togglePrompts(user);
     expect(await screen.findByRole("option", { name: /Explain/ })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Release notes/ })).toBeNull(); // another project's, or none given
     await user.type(screen.getByLabelText("Search prompts"), "expl");
@@ -55,7 +61,7 @@ describe("Composer prompt picker", () => {
     const user = userEvent.setup();
     render(ui());
     await user.type(box(), "My notes");
-    await user.click(screen.getByRole("button", { name: "Insert a saved prompt" }));
+    await togglePrompts(user);
     await user.click(await screen.findByRole("option", { name: /Review/ }));
     await waitFor(() => expect(box().value).toBe("My notes\nReview the diff"));
   });
@@ -105,7 +111,7 @@ describe("Composer prompt picker", () => {
   it("offers this chat's project prompts too, project ones first", async () => {
     const user = userEvent.setup();
     render(ui({ projectDir: "/p/app" }));
-    await user.click(screen.getByRole("button", { name: "Insert a saved prompt" }));
+    await togglePrompts(user);
     const names = (await screen.findAllByRole("option")).map((o) => o.textContent);
     expect(names[0]).toMatch(/Release notes/);
     expect(names.join()).not.toMatch(/Other project/);
@@ -114,11 +120,11 @@ describe("Composer prompt picker", () => {
     const user = userEvent.setup();
     m("prompts").mockResolvedValueOnce([]);
     render(ui());
-    await user.click(screen.getByRole("button", { name: "Insert a saved prompt" }));
+    await togglePrompts(user);
     expect(await screen.findByText("No saved prompts yet.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Insert a saved prompt" })); // close
+    await togglePrompts(user); // close
     m("prompts").mockRejectedValueOnce(new Error("Can't reach Pheme")).mockResolvedValue(ALL);
-    await user.click(screen.getByRole("button", { name: "Insert a saved prompt" }));
+    await togglePrompts(user);
     expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach Pheme");
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("option", { name: /Explain/ })).toBeInTheDocument();
@@ -128,7 +134,7 @@ describe("Composer prompt picker", () => {
     m("createPrompt").mockResolvedValue(P("Mine", "draft"));
     render(ui({ projectDir: "/p/app" }));
     await user.type(box(), "draft");
-    await user.click(screen.getByRole("button", { name: "Insert a saved prompt" }));
+    await togglePrompts(user);
     await user.click(await screen.findByRole("button", { name: /Save this message as a prompt/ }));
     await user.type(screen.getByLabelText("Prompt name"), "Mine");
     await user.click(screen.getByLabelText(/Only in this project/));
@@ -142,7 +148,7 @@ describe("Composer prompt picker", () => {
     m("createPrompt").mockRejectedValue(new Error('You already have a prompt called "Mine" for all chats.'));
     render(ui());
     await user.type(box(), "draft");
-    await user.click(screen.getByRole("button", { name: "Insert a saved prompt" }));
+    await togglePrompts(user);
     await user.click(await screen.findByRole("button", { name: /Save this message as a prompt/ }));
     await user.type(screen.getByLabelText("Prompt name"), "Mine{Enter}");
     expect(await screen.findByRole("alert")).toHaveTextContent("already have a prompt");

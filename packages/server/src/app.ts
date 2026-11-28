@@ -65,6 +65,8 @@ export class App {
   readonly chatPolicy = new Map<string, "allow" | "deny">();
   private turns = new Map<string, Turn>();
   private sessions = new Map<string, EngineSession>();
+  /** The model and effort each open session was created with, so a change starts a new one. */
+  private sessionKeys = new Map<string, string>();
   private chatAllow = new Map<string, Set<string>>();
   private pending = new Set<Promise<unknown>>();
 
@@ -112,6 +114,7 @@ export class App {
   private async dropSession(chatId: string): Promise<void> {
     const s = this.sessions.get(chatId);
     this.sessions.delete(chatId);
+    this.sessionKeys.delete(chatId);
     await s?.close().catch(() => {});
   }
 
@@ -236,24 +239,29 @@ export class App {
   }
 
   private async sessionFor(chatId: string, resume: boolean, turn: Turn): Promise<EngineSession> {
+    const s: Settings = this.settings.get();
+    const model = this.store.get(chatId)?.model ?? s.model;
+    const key = `${model}|${s.reasoningEffort}`;
     const existing = this.sessions.get(chatId);
-    if (existing) {
+    if (existing && this.sessionKeys.get(chatId) === key) {
       this.sessions.delete(chatId); // re-insert: most recently used goes last
       this.sessions.set(chatId, existing);
       return existing;
     }
-    const s: Settings = this.settings.get();
+    if (existing) await this.dropSession(chatId); // the model or effort changed: start a new (resumed) session
     const session = await this.engine.createSession({
       id: chatId,
       resume,
       workingDirectory: this.store.get(chatId)?.projectDir,
-      model: this.store.get(chatId)?.model ?? s.model,
+      model,
+      reasoningEffort: s.reasoningEffort || undefined,
       systemMessage: this.buildSystemMessage(),
       tools: [memoryTool(this.memory), ...skillTools(this.skills), agentTool((task, profile) => this.runAgent(chatId, task, profile))],
       agents: this.agents.listProfiles().map((p) => ({ name: p.name, description: p.description, prompt: p.instructions, tools: p.tools.length ? p.tools : undefined })),
       onPermission: (req) => this.askUser(chatId, req, this.turns.get(chatId) ?? turn),
     });
     this.sessions.set(chatId, session);
+    this.sessionKeys.set(chatId, key);
     return session;
   }
 

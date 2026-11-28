@@ -64,12 +64,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .notice.error { background: color-mix(in srgb, var(--dt-destructive) 14%, transparent); color: var(--dt-destructive-text); }
 .notice.banner { margin: 0 24px 8px; }
 
-.composer { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--dt-border); border-radius: 16px; background: var(--dt-input); padding: 8px 10px; box-shadow: 0 1px 2px color-mix(in srgb, #000 6%, transparent); }
-.composer:focus-within { border-color: var(--dt-primary); box-shadow: none; }
-.composer-row { display: flex; gap: 6px; align-items: flex-end; }
-.composer textarea { flex: 1; resize: none; min-height: 40px; padding: 6px 4px; border: 0; background: transparent; border-radius: 6px; }
-.composer textarea:focus-visible { outline: 2px solid transparent; outline-offset: 1px; }
-.composer.too-long { border-color: var(--dt-destructive); box-shadow: none; }
 
 /* The page itself is full width so its scrollbar sits at the window edge; the content column is centred with padding. */
 .page { --col: 760px; width: 100%; overflow-y: auto; padding: 0 max(0px, calc((100% - var(--col)) / 2)) 32px; box-sizing: border-box; }
@@ -182,9 +176,6 @@ html.wallpaper .main {
 
 .chat-toolbar { display: none; }
 .chat-toolbar .project-bar { flex: 1; min-width: 0; border-bottom: 0; }
-.model-pick { display: flex; align-items: center; gap: 6px; padding: 0 16px 0 0; font-size: 12px; flex: none; }
-@media (max-width: 560px) { .chat-toolbar { flex-wrap: wrap; } .model-pick { padding: 0 16px 6px; } }
-.model-pick select { background: var(--dt-muted); color: var(--dt-foreground); border: 1px solid var(--dt-border); border-radius: 6px; padding: 3px 8px; font-size: 12px; max-width: 100%; }
 
 .msg-hit { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; background: none; border: 0; color: var(--dt-foreground); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
 .msg-hit:hover { background: var(--dt-muted); }
@@ -235,24 +226,8 @@ kbd { font-family: var(--dt-font-mono); font-size: 12px; }
 .stash-list li { border: 1px solid var(--dt-border); border-radius: 6px; padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
 .stash-info { display: flex; flex-direction: column; font-size: 12px; overflow-wrap: anywhere; }
 
-.ctx-meter { display: flex; align-items: center; gap: 8px; justify-content: flex-end; padding: 0 16px 2px; color: var(--dt-muted-foreground); }
-.ctx-bar { width: 84px; height: 5px; border-radius: 3px; background: var(--dt-border); overflow: hidden; }
-.ctx-bar > i { display: block; height: 100%; background: var(--dt-primary); }
-.ctx-meter.warn { color: var(--dt-foreground); }
-.ctx-meter.warn .ctx-bar > i { background: #d9a400; }
-.ctx-meter.full { color: var(--dt-destructive-text, var(--dt-foreground)); }
-.ctx-meter.full .ctx-bar > i { background: var(--dt-destructive-text, #e5534b); }
 
-.composer-wrap.dragging .composer { outline: 2px dashed var(--dt-primary); outline-offset: 2px; }
-.attach-btn { align-self: flex-end; }
-.att-draft, .att-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.att-draft li { display: flex; align-items: center; gap: 8px; border: 1px solid var(--dt-border); border-radius: 10px; padding: 6px 8px; max-width: 100%; background: color-mix(in srgb, var(--dt-foreground) 4%, transparent); }
-.att-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.att-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: none; }
-.composer .send-btn { width: 32px; height: 32px; min-width: 32px; border-radius: 999px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.composer .send-btn svg { display: block; }
 .att-list { flex-direction: row; flex-wrap: wrap; padding: 0 0 6px; }
-.att-mini { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; flex: none; }
 .user-msg .att-list { justify-content: flex-end; padding: 4px 0 0; }
 .att-thumb { background: none; border: 1px solid var(--dt-border); border-radius: 8px; padding: 0; cursor: pointer; overflow: hidden; max-width: 220px; }
 .att-thumb img { display: block; max-width: 220px; max-height: 180px; object-fit: contain; }

@@ -18,7 +18,7 @@ describe("Settings search", () => {
   it("shows only the open page with no query, then searches every page by any word and says when nothing matches", async () => {
     const user = userEvent.setup();
     render(ui());
-    expect(visibleHeadings()).toEqual([expect.stringMatching(/./)]);
+    expect(screen.getAllByTestId(TID.settingsPanel).filter((p) => !p.hidden).map((p) => p.dataset.page)).toEqual(["model-main"]);
     const box = screen.getByLabelText("Search settings");
     await user.type(box, "backup");
     expect(visibleHeadings()).toEqual(["Backup and restore"]);
@@ -34,7 +34,7 @@ describe("Settings search", () => {
     expect(visibleHeadings()).toEqual([]);
     expect(await screen.findByText(/No settings match “zzzz-nothing”/)).toBeInTheDocument();
     await user.type(box, "{Escape}");
-    expect(visibleHeadings()).toEqual([expect.stringMatching(/./)]);
+    expect(screen.getAllByTestId(TID.settingsPanel).filter((p) => !p.hidden).map((p) => p.dataset.page)).toEqual(["model-main"]);
   });
   it("matches several words in any order, case-insensitively", async () => {
     const user = userEvent.setup();

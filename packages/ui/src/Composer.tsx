@@ -1,15 +1,22 @@
-import { IconClipboardList, IconPaperclip, IconPhoto } from "./lib/icons.ts";
+import { IconArrowUp, IconGitBranch, IconPaperclip, IconPhoto, IconPlus, IconX } from "./lib/icons.ts";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { ACCEPT, checkFiles, DEFAULT_TEXT, isImage, nameForPasted, sizeLabel } from "./attach.ts";
 import { firstPlaceholder, PromptList, promptsFor, SaveAsPrompt, usePrompts } from "./PromptPicker.tsx";
 import { loadDraft, loadHistory, pushHistory, saveDraft } from "./drafts.ts";
 import { TID } from "./testids.ts";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./components/ui/dropdown-menu.tsx";
+import { StatusStack, type ActivityRun } from "./components/composer/status-stack.tsx";
 
 /** The server rejects bodies over 1,000,000 bytes; stay safely under that. */
 export const MAX_CHARS = 250_000;
 
-const NEW_PLACEHOLDERS = ["What can I help with?", "Give Pheme a task", "What's on your mind?", "Describe what you need", "Ask anything", "Start with a goal"];
-const FOLLOWUP_PLACEHOLDERS = ["Send a follow-up", "Add more context", "Refine the request", "What's next?", "Keep it going"];
+/** Short hints that take turns in the empty box. The first one of each list is shown first. */
+const NEW_PLACEHOLDERS = ["What can I help with?", "Give Pheme a task", "Describe what you need", "Ask anything"];
+const FOLLOWUP_PLACEHOLDERS = ["Add more context", "Send a follow-up", "Refine the request", "What's next?"];
+const PLACEHOLDER_MS = 5000;
+
+/** The git facts the composer's top strip shows, from the chat's project folder. Null when there is no repository. */
+export interface GitStrip { branch: string; behind: number; changed: number }
 
 export interface ComposerHandle {
   focus: () => void;
@@ -32,11 +39,15 @@ interface Props {
   onSend: (text: string, files: File[]) => void;
   onStop: () => void;
   onRemoveQueued: (i: number) => void;
-  /** Sits in the box, to the left of Send. Used for the model control. */
+  /** Sits in the box, before Send. Used for the model and effort pills. */
   extra?: ReactNode;
+  /** The chat's repository, for the strip at the top of the box. Omitted when the folder is not a repository. */
+  git?: GitStrip | null;
+  /** Agent runs still going in this chat (shown in the status stack). */
+  activity?: ActivityRun[];
 }
 
-export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, projectDir, onSend, onStop, onRemoveQueued, extra }, ref) {
+export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, projectDir, onSend, onStop, onRemoveQueued, extra, git, activity = [] }, ref) {
   const [text, setText] = useState(() => loadDraft(chatId));
   const latest = useRef(text); // the current text, readable from cleanup code after the textarea is gone
   latest.current = text;
@@ -45,7 +56,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
   const [fileNote, setFileNote] = useState("");
   const [dragging, setDragging] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
-  // saved prompts: a button opens a searchable list; typing "/" at the start of the box does the same inline
+  // saved prompts: the "+" menu opens a searchable list; typing "/" at the start of the box does the same inline
   const [promptsOpen, setPromptsOpen] = useState(false);
   const [promptFilter, setPromptFilter] = useState("");
   const [active, setActive] = useState(0);
@@ -56,10 +67,17 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
   const histIdx = useRef(-1); // -1 = not browsing history
   const stash = useRef("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const placeholder = useMemo(() => {
-    const list = hasMessages ? FOLLOWUP_PLACEHOLDERS : NEW_PLACEHOLDERS;
-    return list[Math.floor(Math.random() * list.length)];
-  }, [chatId, hasMessages]);
+  const [hint, setHint] = useState(0);
+  const hints = hasMessages ? FOLLOWUP_PLACEHOLDERS : NEW_PLACEHOLDERS;
+  const placeholder = hints[hint % hints.length];
+  // The hint takes turns only while the box is empty and the tab is in view; the first one shows at once.
+  const rotate = !text && !busy && !offline;
+  useEffect(() => {
+    if (!rotate) return;
+    const id = setInterval(() => { if (!document.hidden) setHint((h) => h + 1); }, PLACEHOLDER_MS);
+    return () => clearInterval(id);
+  }, [rotate, chatId]);
+  useEffect(() => { setHint(0); }, [chatId, hasMessages]);
 
   // Switching chats swaps the draft; the old chat's draft was already saved as it was typed.
   useEffect(() => {
@@ -186,6 +204,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
     }
   };
 
+  const sendTitle = busy ? (text.trim() ? "Queue message" : "Stop the reply") : "Send message";
+  const picking = () => picker.current?.click();
+
   return (
     <div
       className={`composer-wrap${dragging ? " dragging" : ""}`}
@@ -195,19 +216,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
       onDrop={(e) => { if (e.dataTransfer?.files.length) { e.preventDefault(); setDragging(false); addFiles([...e.dataTransfer.files]); } }}
     >
-      {queue.length > 0 && (
-        <ul className="queue" aria-label="Queued messages">
-          {queue.map((q, i) => (
-            <li key={i}>
-              <span className="queue-n">Queued</span>
-              <span className="queue-text">{q}</span>
-              <button className="icon-btn" aria-label={`Remove queued message ${i + 1}`} onClick={() => onRemoveQueued(i)}>×</button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <StatusStack chatId={chatId} activity={activity} queue={queue} onRemoveQueued={onRemoveQueued} />
       {pickerVisible && (
-        <div className="prompt-picker" role="group" aria-label="Insert a saved prompt">
+        <div className="prompt-picker composer-panel-card" role="group" aria-label="Insert a saved prompt">
           {promptsOpen && (
             <input className="prompt-filter" autoFocus aria-label="Search prompts" placeholder="Search saved prompts…" value={promptFilter} onChange={(e) => setPromptFilter(e.target.value)} onKeyDown={(e) => { promptKey(e); }} />
           )}
@@ -224,25 +235,44 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           </div>
         </div>
       )}
-      <div className={`composer${tooLong ? " too-long" : ""}`}>
+      <div className={`composer${tooLong ? " too-long" : ""}${busy ? " is-busy" : ""}`} data-testid={TID.composerBox}>
         <input ref={picker} type="file" multiple hidden accept={ACCEPT} aria-hidden="true" tabIndex={-1} onChange={(e) => { addFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
+        {git && (
+          <div className="composer-strip" aria-label="Repository">
+            <IconGitBranch className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="composer-strip-branch">{git.branch || "detached"}</span>
+            <span className="composer-strip-spacer" />
+            {git.behind > 0 && <span className="composer-strip-behind" title={`${git.behind} commit${git.behind === 1 ? "" : "s"} behind upstream`}>↓{git.behind}</span>}
+            {git.changed > 0 && <span className="composer-strip-changed">{git.changed} changed</span>}
+          </div>
+        )}
         {files.length > 0 && (
           <ul className="att-draft" aria-label="Files to send">
             {files.map((f, i) => (
               <li key={`${f.name}-${f.size}-${i}`}>
-                {isImage(f) ? <Thumb file={f} /> : <IconPaperclip className="size-4" aria-hidden="true" />}
+                {isImage(f) ? <Thumb file={f} /> : <span className="att-icon"><IconPaperclip className="size-3.5" aria-hidden="true" /></span>}
                 <span className="att-meta">
                   <span className="att-name">{f.name}</span>
-                  <span className="muted small">{sizeLabel(f.size)}</span>
+                  <span className="att-size">{sizeLabel(f.size)}</span>
                 </span>
-                <button className="icon-btn" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))}>×</button>
+                <button type="button" className="att-x" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))}><IconX className="size-3" aria-hidden="true" /></button>
               </li>
             ))}
           </ul>
         )}
         <div className="composer-row">
-          <button className="icon-btn attach-btn" aria-label="Insert a saved prompt" aria-expanded={promptsOpen} title="Saved prompts (or type /)" onClick={() => { setPromptsOpen((o) => !o); setSavingPrompt(false); setPromptFilter(""); }}><IconClipboardList className="size-4" aria-hidden="true" /></button>
-          <button className="icon-btn attach-btn" aria-label="Attach files" title="Attach images or text files (or drop or paste them)" disabled={offline} onClick={() => picker.current?.click()}>+</button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="composer-ghost" aria-label="Add files or saved prompts" title="Add files or saved prompts">
+                <IconPlus className="size-4" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-56">
+              <DropdownMenuItem disabled={offline} onSelect={picking} data-testid={TID.attachFiles}>Attach files or images</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem aria-label="Insert a saved prompt" onSelect={() => { setPromptsOpen((o) => !o); setSavingPrompt(false); setPromptFilter(""); }}>Saved prompts</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <textarea
             ref={ta}
             data-testid={TID.composerInput}
@@ -260,12 +290,18 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
             }}
             spellCheck
           />
-          {extra && <div className="composer-extra">{extra}</div>}
-          {busy && !text.trim() ? (
-            <button className="btn danger" data-testid={TID.stopButton} onClick={onStop} aria-label="Stop the reply">Stop</button>
-          ) : (
-            <button className={`btn primary${busy ? "" : " send-btn"}`} data-testid={TID.sendButton} onClick={submit} disabled={!canSend} aria-label={busy ? "Queue message" : "Send message"}>{busy ? "Queue" : <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5V3.5M8 3.5 4.5 7M8 3.5 11.5 7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
-          )}
+          <div className="composer-right">
+            {extra && <div className="composer-extra">{extra}</div>}
+            {busy && !text.trim() ? (
+              <button type="button" className="composer-send is-stop" data-testid={TID.stopButton} onClick={onStop} aria-label="Stop the reply" title="Stop (Esc)">
+                <span className="composer-stop-square" aria-hidden="true" />
+              </button>
+            ) : (
+              <button type="button" className="composer-send" data-testid={TID.sendButton} onClick={submit} disabled={!canSend} aria-label={busy ? "Queue message" : "Send message"} title={sendTitle}>
+                <IconArrowUp className="size-3.5" aria-hidden="true" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {fileNote && <div className="composer-note over" role="alert">{fileNote}</div>}

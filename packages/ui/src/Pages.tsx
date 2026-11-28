@@ -5,13 +5,11 @@ import { SettingRow, SettingSelect, SettingsHeading, SettingsPanel, SwitchRow } 
 import { formatCombo, matches } from "./keybindings.ts";
 import { useBindings } from "./useBindings.ts";
 import { IconBell, IconBrain, IconCloudUpload, IconCube, IconKeyboard, IconLock, IconMessage, IconPalette, IconSearch } from "./lib/icons.ts";
-import { cn } from "./lib/utils.ts";
 import { BackupSetting } from "./BackupSetting.tsx";
 import { KeybindingSettings } from "./KeybindingSettings.tsx";
 import { NotificationSetting } from "./NotificationSetting.tsx";
 import { useUnsaved } from "./unsaved.ts";
 import { ConfirmDialog } from "./Dialog.tsx";
-import { Loader, LOADER_LABEL, setLoaderKind, useLoaderKind } from "./Loader.tsx";
 import { THEMES, parseTheme, themeValue, type Mode } from "./themes/presets.ts";
 import { api, type BootstrapState, type CuratorState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
 import { useToast } from "./toast.tsx";
@@ -287,7 +285,6 @@ function crumbs(page: string): { group?: string; leaf: string } {
 
 export function SettingsPage({ state, onChange, onClose }: { state: BootstrapState; onChange: (s: Settings) => void; onClose: () => void }) {
   const toast = useToast();
-  const loader = useLoaderKind();
   const keys = useBindings();
   const { data: models } = useLoad<ModelOption[]>(api.models);
   const s = state.settings;
@@ -366,7 +363,6 @@ export function SettingsPage({ state, onChange, onClose }: { state: BootstrapSta
           {query && shown === 0 && <p className="mb-3 text-xs text-(--ui-text-tertiary)" role="status">No settings match “{query}”.</p>}
           <div className="flex flex-col" ref={body}>
             <SettingsPanel page="model-main">
-              <SettingsHeading>Main model</SettingsHeading>
               <SettingRow
                 control={<SettingSelect id="chat-model" label="Chat model" onChange={(v) => void set({ model: v })} value={s.model}>
                   {[{ id: "auto", name: "Auto" }, ...list.filter((m) => m.id !== "auto")].map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -402,26 +398,6 @@ export function SettingsPage({ state, onChange, onClose }: { state: BootstrapSta
                 id="text-size"
                 title="Text size"
                 description="Scales the chat text."
-              />
-              <SettingRow
-                control={
-                  <div className="flex items-center gap-1" role="group" aria-label="Loading indicator">
-                    {(["grid", "light", "mist"] as const).map((k) => (
-                      <button
-                        aria-pressed={loader === k}
-                        className={cn("flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs transition-colors", loader === k ? "border-(--ui-stroke-tertiary) bg-(--ui-bg-tertiary) text-foreground" : "border-transparent text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-foreground")}
-                        key={k}
-                        onClick={() => setLoaderKind(k)}
-                        type="button"
-                      >
-                        <Loader kind={k} quiet />
-                        <span>{LOADER_LABEL[k]}</span>
-                      </button>
-                    ))}
-                  </div>
-                }
-                description="Shown in the chat while a reply is running."
-                title="Loading indicator"
               />
               <SwitchRow
                 checked={typeof localStorage !== "undefined" && localStorage.getItem("pheme-wallpaper") === "1"}
