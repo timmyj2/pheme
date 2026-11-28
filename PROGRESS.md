@@ -92,3 +92,6 @@ Open, in priority order:
 1. Visual frame is closer to the light desktop screenshots: Sessions | Agents in the left rail, no right-hand file panel, folder control in the rail (a 28px icon in the top bar when the rail is hidden), text size control. Still not a copy: no Capabilities, Messaging, Artifacts, Quota, or Profiles, and chats are grouped by day, not by project.
 2. Not verified: real GitHub PR creation/checks (fake gh only); Windows UI on a real PC (CI only); text attachments on real Copilot.
 3. Unconfirmed: scale-stress "1501 chats vs 1502" (probably script off-by-one); 56 SSE connections after rapid chat switching (single probe).
+
+## Hermes UI match, item 1 (2026-11-28)
+Docs only. Owner decisions recorded: goal is an exact match of the Hermes webapp, porting Hermes code under MIT is allowed (upstream `5688461d`), identity, brand fonts and artwork are not. Hybrid port approach, stub-or-skip policy, and the real-Copilot probe skipped (Copilot-dependent UI is feature-detected, fake mode only). New queue is at the top of `docs/NEXT.md`. `THIRD_PARTY_NOTICES.md` now names the SHA and carries the JetBrains Mono OFL text and a Codicons line. No code changed.

@@ -13,13 +13,13 @@ Compared against three screenshots of the running Hermes desktop app, then Pheme
 - Light theme and the 390px drawer still work. A fresh narrow load does not overflow.
 
 **Does not match, and why**
-- No Bots tab, profile pills, or reasoning menu. Those are features Pheme does not have.
-- The file list shows names only (no icons drawn like the reference, no file preview). It cannot leave the project folder, or the home folder when none is set.
-- The background is an original gold-tinted gradient, not the reference picture. It turns off in Settings.
-- Settings has a section list beside the existing panels. It is not a full two-column settings app (no providers, billing, or gateways).
-- Tab drag reorders the strip. It does not split the window.
-- The branch list still scrolls inside a cap, so only a few names show at once. The file list is no longer squeezed out.
-- Other themes keep their own accent. Only the default theme is the screenshot gold.
+
+Status as of 2026-11-28. The goal is now an exact match of the Hermes webapp (`docs/VISUAL-GOAL.md`), so the old exclusions "no Bots tab, no reasoning menu" are dropped. The rule is stub-or-skip: only UI the Copilot CLI backend can support. This list is rewritten in the last build-plan item with the final deliberate gaps.
+- Not built because Copilot has no backing: Hermes pages that need a Hermes backend (for example messaging gateways, billing, quota, profiles, Nous Portal).
+- Built but feature-detected: reasoning, intent line, todos, progress and the effort pill. They are hidden when the event never arrives. They are tested in fake mode only, because the real-Copilot probe was skipped.
+- Not planned: assistant-ui, the contentEditable editor, voice, branching and checkpoint restore, the Shiki and Streamdown stack, the plugin registry, the flexible pane-tree layout, glass and vibrancy effects.
+- Never copied, by rule: Hermes and Nous names, logos, artwork, backgrounds, app icons, and the Collapse, Rules, Mondwest and NeueBit fonts. Pheme shows its own mark and system fonts.
+- Still different today (to be closed by the build plan in `docs/NEXT.md`): the UI is not yet on Tailwind and the Hermes token layer, the transcript and tool rows are not the Hermes layout, and the background is an original gradient, not the reference picture.
 
 The feature table below is the 2026-11-22 source-folder audit. It is not this visual pass, and several "Missing" rows have since been built.
 

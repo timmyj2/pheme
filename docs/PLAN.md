@@ -15,7 +15,7 @@ then log it in `docs/DECISIONS.md` (one line: decision + why).
 |---|---|
 | Repo | Public `timmyj2/pheme`. Commits as `timmyj2` with the GitHub no-reply email. |
 | License | MIT, copyright `timmyj2`. Reused code keeps its original MIT notice (see `THIRD_PARTY_NOTICES.md`). |
-| Reuse | IT approved reusing the Hermes desktop interface code (MIT). **Option 1:** copy selected pieces (theme tokens and styles, chat transcript, composer, sidebar session list, Ctrl+K palette) into a small new app. Mirror the source folder layout so more can be pulled in later. |
+| Reuse | IT approved reusing the Hermes desktop interface code (MIT). **Option 1:** copy selected pieces (theme tokens and styles, chat transcript, composer, sidebar session list, Ctrl+K palette) into a small new app. Mirror the source folder layout so more can be pulled in later. **Updated 2026-11-28:** hybrid port of the Hermes webapp, see `docs/DECISIONS.md` and `docs/VISUAL-GOAL.md`. |
 | Branding | The app says **Pheme** in the title bar with a simple original icon. No Hermes or Nous name, wordmark, logo or artwork in the app UI. |
 | Who builds | Hermes (the agent) writes and tests the code at home; the owner reviews. |
 | Engine | GitHub Copilot CLI only, driven through the GitHub Copilot SDK. No other model providers. |
@@ -81,8 +81,13 @@ Hermes source: `~/.hermes/hermes-agent/apps/desktop` (MIT, Copyright (c) 2025 No
 - `src/styles.css`, `src/themes/presets.ts` — tokens and themes.
 - `src/app/chat/**`, `src/components/**` — transcript, composer, tool rows, approval card stack, palette.
 - `src/i18n/en.ts` — labels (grep one top-level key at a time; the file is large).
-- `@nous-research/ui` (npm, MIT) may be used as a dependency.
-Strip Hermes/Nous names and logos from anything copied. Keep the MIT notice. Do not copy gateway/transport code; Pheme has its own small API.
+- `@nous-research/ui` (npm) is NOT used: it ships the foundry fonts Collapse, Rules, Mondwest and NeueBit.
+
+Porting rules (2026-11-28):
+- Copying Hermes code is allowed under MIT. Pinned upstream commit: `5688461d66fadd3ce3d6ed6bccccd958c7370eae`.
+- Each copied file starts with `// Adapted from hermes-agent (MIT, Copyright (c) 2025 Nous Research), apps/desktop/src/<path> @ 5688461d`.
+- Never copy names ("Hermes", "Nous"), logos, the brand mark, artwork, backgrounds, app icons or the four foundry fonts. Keep the MIT notice.
+- Do not copy gateway/transport code; Pheme has its own small API.
 
 Learning-loop behaviour to reproduce (from `agent/background_review.py`, `agent/turn_context.py`, `agent/curator.py`): reviews run in a forked hidden session given the recent transcript; the skill review is **active** (most sessions produce at least a small update), prefers patching an existing skill over creating a new one, writes class-level skills (procedure first, pitfalls as rule + why, no incident narration), never saves environment-specific failures or negative claims about tools; the memory review saves only facts grounded in the conversation, one fact in one store (user profile vs environment). Write Pheme's prompts in its own words.
 
