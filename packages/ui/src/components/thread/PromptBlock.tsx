@@ -26,9 +26,8 @@ export function PromptBlock({ id, enabled, pending, failed, children, footer }: 
     return () => ro.disconnect();
   }, []);
   const lifted = expanded || !clamped;
-  // The sticky wrapper is the turn's direct child, so it holds for the whole turn. Attachments sit below it in flow.
+  // The sticky wrapper is the turn's direct child, so it holds for the whole turn. Attachments sit inside it, below the bar.
   return (
-    <>
     <Enter id={id} enabled={enabled} className={`turn-prompt${pending ? " pending" : ""}${failed ? " failed" : ""}`} style={{ position: "sticky", top: "0.23rem", zIndex: 3 }} testId={TID.userMessage}>
       <div className="prompt-bar">
         <div className="prompt-clamp" data-clamped={clamped && !expanded ? "true" : undefined}>
@@ -40,8 +39,7 @@ export function PromptBlock({ id, enabled, pending, failed, children, footer }: 
           </button>
         )}
       </div>
-    </Enter>
-    {footer}
-    </>
+        {footer}
+      </Enter>
   );
 }

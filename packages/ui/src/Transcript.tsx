@@ -257,9 +257,11 @@ export function Transcript(props: Props) {
             return (
               <div key={turn.key} className="turn" data-testid={TID.turn}>
                 {turn.user && (
-                  <PromptBlock id={turn.user.key} enabled={enterFor(turn.user.key)}>{turn.user.text}</PromptBlock>
+                  <PromptBlock id={turn.user.key} enabled={enterFor(turn.user.key)}
+                    footer={turn.user.attachments ? <div className="turn-attachments"><Attachments chatId={props.chatId ?? null} items={turn.user.attachments} /></div> : undefined}>
+                    {turn.user.text}
+                  </PromptBlock>
                 )}
-                {turn.user?.attachments && <div className="turn-attachments"><Attachments chatId={props.chatId ?? null} items={turn.user.attachments} /></div>}
                 {turn.body.map((b, i) => renderBlock(b, i, turn, ti, lastInTurn))}
               </div>
             );
