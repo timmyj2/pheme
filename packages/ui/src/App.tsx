@@ -24,17 +24,19 @@ import { useRoute, type View } from "./router.ts";
 import { TID } from "./testids.ts";
 
 const TEXT_STEPS = [80, 90, 100, 110, 125];
+/** Chat text scale (transcript and composer) when the person has not chosen one. */
+export const DEFAULT_TEXT_SCALE = 110;
 export function applyTextScale(percent?: number) {
   let raw = percent;
   if (raw == null) {
-    try { raw = Number(localStorage.getItem("pheme-text-scale") || "100"); } catch { raw = 100; }
+    try { raw = Number(localStorage.getItem("pheme-text-scale") || String(DEFAULT_TEXT_SCALE)); } catch { raw = DEFAULT_TEXT_SCALE; }
   }
-  const n = TEXT_STEPS.includes(raw) ? raw : 100;
+  const n = TEXT_STEPS.includes(raw) ? raw : DEFAULT_TEXT_SCALE;
   document.documentElement.style.setProperty("--chat-text-scale", String(n / 100));
 }
 export function bumpTextScale(dir: -1 | 1) {
-  let cur = 100;
-  try { cur = Number(localStorage.getItem("pheme-text-scale") || "100"); } catch { /* blocked storage: stay at the default */ }
+  let cur = DEFAULT_TEXT_SCALE;
+  try { cur = Number(localStorage.getItem("pheme-text-scale") || String(DEFAULT_TEXT_SCALE)); } catch { /* blocked storage: stay at the default */ }
   const i = Math.max(0, TEXT_STEPS.indexOf(cur));
   const next = TEXT_STEPS[Math.max(0, Math.min(TEXT_STEPS.length - 1, i + dir))] ?? 100;
   try { localStorage.setItem("pheme-text-scale", String(next)); } catch { /* private mode: this tab still changes */ }

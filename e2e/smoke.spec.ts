@@ -59,7 +59,7 @@ test.describe("Pheme in a real browser", () => {
     await expect(page.getByRole("option").first()).toContainText(/Solarized/i);
     await page.keyboard.press("Enter");
     await expect(page.getByRole("combobox")).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--dt-background").trim())).toMatch(/^#/);
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--theme-background-seed").trim())).toBe("#002b36"); // Solarized dark: the seed applyTheme wrote
     await page.keyboard.press(`${MOD}+KeyK`);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("combobox")).toHaveCount(0);

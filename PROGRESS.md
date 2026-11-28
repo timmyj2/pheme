@@ -98,3 +98,6 @@ Docs only. Owner decisions recorded: goal is an exact match of the Hermes webapp
 
 ## Hermes UI match, item 3 (2026-11-28)
 Visual harness: `npm run visual` seeds fake-mode data and captures chat, capabilities, settings, right-panel, approval and composer at 1000x560 @2x, plus side-by-side composites against `docs/visual/hermes-reference/` in `e2e/visual-out/` (git-ignored). Separate Playwright config; default `npx playwright test` ignores it. Never fails on pixel differences.
+
+## Hermes UI match, item 5 (2026-11-28)
+Tailwind v4 (`@tailwindcss/vite` on Vite 6, no preflight yet), the Hermes token chain (`tokens.css`: seeds -> `--ui-*` -> `--dt-*` -> Tailwind `--color-*`), shadows, z-ladder, scrollbars, reduced-motion and reduced-transparency rules. New default theme `pheme-gold` (gold on navy; sampled sidebar `#1f1e31` and settings page `#171726` match the reference pixels). Body 13px/1.5, chat text scale default 110%. JetBrains Mono Regular/Bold/Italic bundled and served as `font/woff2` (smoke and e2e check no external request). Size: `dist/pheme.mjs` 2211 KB (2264361 B) -> 2607 KB (2670061 B), gzip 648271 -> 941512 B (+286 kB). Over the 250 kB gzip guard, and about 283 kB of it is the three fonts (woff2 does not compress further); Tailwind and tokens add about 10 kB. Dropping Italic would bring it to about +190 kB. Left for the owner to decide.

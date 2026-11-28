@@ -59,7 +59,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   model: "auto",
   reviewModel: "",
-  theme: "light",
+  theme: "pheme-gold-dark",
   autoApproveAll: false,
   loopsEnabled: true,
   curatorEnabled: true,

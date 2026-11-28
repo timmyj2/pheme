@@ -344,11 +344,11 @@ export function SettingsPage({ state, onChange }: { state: BootstrapState; onCha
           <p className="muted small">Shown in the chat while a reply is running.</p>
         </div>
         <label className="field">Text size
-          <select aria-label="Text size" defaultValue={typeof localStorage === "undefined" ? "100" : (localStorage.getItem("pheme-text-scale") || "100")} onChange={(e) => { const n = Number(e.target.value); try { localStorage.setItem("pheme-text-scale", String(n)); } catch { /* private mode */ } document.documentElement.style.setProperty("--chat-text-scale", String(n / 100)); }}>
+          <select aria-label="Text size" defaultValue={typeof localStorage === "undefined" ? "110" : (localStorage.getItem("pheme-text-scale") || "110")} onChange={(e) => { const n = Number(e.target.value); try { localStorage.setItem("pheme-text-scale", String(n)); } catch { /* private mode */ } document.documentElement.style.setProperty("--chat-text-scale", String(n / 100)); }}>
             <option value="80">Smaller</option>
             <option value="90">Small</option>
-            <option value="100">Default</option>
-            <option value="110">Large</option>
+            <option value="100">Normal</option>
+            <option value="110">Default</option>
             <option value="125">Larger</option>
           </select>
         </label>

@@ -17,9 +17,9 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-/** The dark theme to capture. One constant: change it when the gold-on-navy theme lands. */
-const THEME = "midnight-dark";
-const VIEWPORT = { width: 1000, height: 560 };
+/** The dark theme to capture (the default gold-on-navy theme). */
+const THEME = "pheme-gold-dark";
+const VIEWPORT = { width: 1390, height: 754 };
 const TOKEN = "visual-token-0123456789abcdefghij";
 const REF_DIR = path.resolve("docs/visual/hermes-reference");
 const OUT = path.resolve("e2e/visual-out");

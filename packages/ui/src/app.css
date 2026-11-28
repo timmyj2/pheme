@@ -1,26 +1,8 @@
 /* Layout and interaction styles. Loaded after styles.css; uses only the --dt-* theme tokens.
-   Defaults below are the Pheme dark palette so the very first paint is never unstyled. */
+   The colour tokens and their first-paint defaults live in tokens.css. */
 :root {
-  --dt-background: #0d1117;
-  --dt-foreground: #e6edf3;
-  --dt-card: #010409;
-  --dt-muted: #1a1e24;
-  --dt-muted-foreground: #8b949e;
-  --dt-popover: #161b22;
-  --dt-primary: #f7bb2d;
-  --dt-primary-foreground: #161616;
-  --dt-accent: #2a2a38;
-  --dt-border: #30363d;
-  --dt-input: #12121c;
-  --dt-ring: #f7bb2d;
-  --dt-destructive: #f85149;
-  --dt-sidebar: #1a1a24;
-  --dt-sidebar-border: #30363d;
-  --dt-user-bubble: #07162c;
-  --dt-user-bubble-border: #30363d;
   --sidebar-w: 280px;
   --topbar-h: 36px;
-  color-scheme: dark;
 }
 html { -webkit-text-size-adjust: 100%; }
 body { overflow: hidden; overscroll-behavior: none; }
@@ -137,7 +119,7 @@ button.tab { cursor: pointer; }
 .composer-wrap { flex: none; max-width: 820px; width: 100%; margin: 0 auto; padding: 0 24px calc(14px + env(safe-area-inset-bottom)); }
 @media (max-width: 820px) { .composer-wrap { padding: 0 12px calc(10px + env(safe-area-inset-bottom)); } }
 .composer { max-width: none; margin: 0; }
-.composer textarea { min-height: 44px; max-height: 260px; line-height: 1.45; overflow-y: auto; }
+.composer textarea { min-height: 44px; max-height: 260px; font-size: var(--conversation-text-font-size); line-height: var(--conversation-line-height); overflow-y: auto; }
 @media (max-width: 820px) { .composer textarea, .search, .area, .field input, .field select { font-size: 16px; } }
 .composer.too-long { border-color: var(--dt-destructive); }
 .composer-note { font-size: 12px; padding: 4px 4px 0; }

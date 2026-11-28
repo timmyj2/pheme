@@ -7,8 +7,12 @@ import { MemoryStore } from "../src/memory.ts";
 import { AgentStore } from "../src/agents.ts";
 import { defaultScript, type FakeScript } from "../src/fake.ts";
 import { makeApp, tmpDir } from "./helpers.ts";
+import { DEFAULT_SETTINGS } from "../src/protocol.ts";
 
 describe("settings validation", () => {
+  it("defaults to the dark gold theme", () => {
+    expect(DEFAULT_SETTINGS.theme).toBe("pheme-gold-dark");
+  });
   it("accepts sane values and ignores garbage", () => {
     expect(validSetting("memoryReviewEveryUserMessages", 5)).toBe(true);
     for (const [k, v] of [["memoryReviewEveryUserMessages", 0], ["memoryReviewEveryUserMessages", 2.5], ["skillReviewMinToolSteps", -3], ["memoryLimit", 5], ["curatorEveryDays", 1e12], ["theme", "x".repeat(500)], ["autoApproveAll", "yes"]] as const) {
