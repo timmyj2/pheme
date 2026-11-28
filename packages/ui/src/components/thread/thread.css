@@ -1,0 +1,81 @@
+/*
+ * Transcript layout, sticky prompts, scroll-follow pill, working row and reply actions.
+ * Adapted from hermes-agent (MIT, Copyright (c) 2025 Nous Research), apps/desktop/src/components/assistant-ui/thread/
+ * {list,user-message,assistant-message,status}.tsx and components/ui/status-pulse.tsx @ 5688461d. Values are re-typed
+ * as plain CSS against Pheme's tokens; no Hermes artwork or fonts.
+ */
+
+.transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; outline: none; font-size: var(--conversation-text-font-size); line-height: var(--conversation-line-height); }
+.transcript-inner { max-width: 72rem; margin: 0 auto; padding: 8px 16px 24px; display: flex; flex-direction: column; min-height: 100%; }
+@media (max-width: 820px) { .transcript-inner { padding: 8px 16px 20px; } }
+
+/* One turn: a prompt and everything after it. The prompt is the turn's direct child so it sticks for the whole turn. */
+.turn { display: flex; flex-direction: column; min-width: 0; }
+.turn > * + * { margin-top: 0.5rem; }
+.turn + .turn { margin-top: 1rem; }
+.turn-attachments { display: flex; justify-content: flex-end; }
+.turn-attachments .att-list { justify-content: flex-end; padding: 4px 0 0; }
+
+/* The prompt bar: full-width, gold-tinted, 1px gold-ish border. Its wrapper paints the transcript colour so replies do not show through the gap. */
+.turn-prompt { min-width: 0; background: var(--dt-background); padding: 0.25rem 0; }
+.prompt-bar { border: 1px solid color-mix(in srgb, var(--dt-primary) 22%, transparent); background: color-mix(in srgb, var(--dt-primary) 8%, var(--dt-background)); border-radius: 0.75rem; padding: 0.5rem 0.75rem; color: var(--dt-foreground); }
+.prompt-clamp { line-height: 1.5; }
+.prompt-clamp[data-clamped="true"] { max-height: 6em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent); mask-image: linear-gradient(to bottom, #000 55%, transparent); }
+.prompt-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt-toggle { background: none; border: 0; padding: 2px 0 0; color: var(--dt-muted-foreground); font-size: 0.75rem; cursor: pointer; }
+.prompt-toggle:hover { color: var(--dt-foreground); }
+.turn-prompt.pending .prompt-bar { opacity: 0.6; }
+.turn-prompt.failed .prompt-bar { border-color: var(--dt-destructive); opacity: 1; }
+.turn-status { padding: 4px 0 0 0.25rem; font-size: 0.75rem; }
+.turn-status .msg-actions { display: flex; gap: 4px; align-items: center; min-height: 24px; }
+
+/* Replies: unboxed prose, indented 0.75rem. */
+.reply { min-width: 0; padding-left: 0.75rem; overflow-wrap: anywhere; }
+.reply.streaming { color: var(--dt-foreground); }
+.block { min-width: 0; }
+
+/* Scaffold lines (tool runs, agent cards) sit dimmer and lift on hover. Hover paints at once; only the return eases. */
+.scaffold { opacity: 0.7; transition: opacity 100ms ease-out; }
+.scaffold:hover { opacity: 1; transition: none; }
+
+/* Per-reply action bar: hidden until the reply is hovered or focused. */
+.reply-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; margin-top: 2px; opacity: 0; transition: opacity 100ms ease-out; }
+.reply:hover .reply-actions, .reply:focus-within .reply-actions { opacity: 1; transition: none; }
+@media (hover: none) { .reply-actions { opacity: 1; } }
+.reply-duration { display: inline-flex; align-items: center; gap: 4px; font-size: 0.6875rem; color: var(--dt-muted-foreground); font-variant-numeric: tabular-nums; }
+.reply-buttons { display: inline-flex; gap: 2px; }
+.reply-btn { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--dt-muted-foreground); cursor: pointer; }
+.reply-btn:hover, .reply-btn:focus-visible { background: var(--dt-accent); color: var(--dt-foreground); }
+
+/* The quiet working row: a 12px dithered square pulsing once every 5s (400ms), a muted hint and a small timer. */
+.working-row { display: flex; align-items: center; gap: 0.5rem; min-height: 1.25rem; padding: 0.25rem 0 0 0.75rem; font-size: 0.75rem; color: var(--dt-muted-foreground); }
+.working-square { display: inline-block; flex: none; width: 12px; height: 12px; border-radius: 2px; background-color: color-mix(in srgb, var(--dt-primary) 12%, transparent); background-image: radial-gradient(circle, var(--dt-primary) 0.9px, transparent 1.2px); background-size: 3px 3px; animation: working-pulse 5s linear infinite; }
+.working-timer { font-size: 0.625rem; font-variant-numeric: tabular-nums; opacity: 0.8; }
+@keyframes working-pulse { 0%, 8%, 100% { opacity: 1; } 4% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .working-square { animation: none; } }
+
+/* Scroll-to-bottom pill. */
+.scroll-bottom { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 5; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--dt-border); background: var(--dt-popover); color: var(--dt-foreground); border-radius: 999px; padding: 6px 14px; font-size: 12.5px; cursor: pointer; box-shadow: var(--shadow-float); }
+.scroll-bottom:hover { background: var(--dt-accent); }
+.scroll-bottom[data-unseen] { border-color: var(--dt-primary); }
+
+/* Empty chat intro. */
+.empty { margin: auto; padding: 8vh 0; text-align: center; display: flex; flex-direction: column; gap: 18px; align-items: center; }
+.empty-mark { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; color: var(--dt-primary); }
+.empty-title { font-size: 22px; color: var(--dt-muted-foreground); }
+
+/* Thinking disclosure (components/thread/Thinking.tsx). Shimmer and caret motion stop under reduced motion. */
+.thinking { font-size: 0.8125rem; color: var(--dt-muted-foreground); }
+.thinking-head { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.thinking-caret { width: 0.75rem; height: 0.75rem; flex: none; opacity: 0.4; transition: transform 100ms ease; }
+.thinking-caret.is-open { transform: rotate(90deg); }
+.thinking-shimmer { animation: thinking-pulse 1.6s ease-in-out infinite; }
+.thinking-timer { font-size: 0.625rem; font-variant-numeric: tabular-nums; opacity: 0.8; }
+.thinking-body { margin-top: 0.125rem; padding-bottom: 0.25rem; overflow: auto; overscroll-behavior-y: auto; overflow-wrap: anywhere; font-size: 0.75rem; line-height: 1.4; }
+.thinking-body.is-preview { max-height: 10rem; }
+.tool-progress { display: block; margin-left: 1.25rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 0.6875rem; color: var(--dt-muted-foreground); }
+@keyframes thinking-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .thinking-shimmer { animation: none; }
+  .thinking-caret { transition: none; }
+}

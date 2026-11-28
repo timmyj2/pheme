@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "./Dialog.tsx";
 import { api, type Prompt } from "./api.ts";
+import { CapabilitiesTabs } from "./components/page/capabilities-tabs.tsx";
+import { PageHeader } from "./components/page/page-header.tsx";
+import { Input } from "./components/ui/input.tsx";
+import { Textarea } from "./components/ui/textarea.tsx";
 import { LoadError } from "./Pages.tsx";
 import { useToast } from "./toast.tsx";
 import { useUnsaved } from "./unsaved.ts";
@@ -19,7 +23,7 @@ export function folderLabel(dir: string): string {
   return parts[parts.length - 1] ?? dir;
 }
 
-/** Saved prompts: create, edit, delete. They are inserted from the message box (the 📋 button, or type "/"). */
+/** Saved prompts: create, edit, delete. They are inserted from the message box (the saved prompts button, or type "/"). */
 export function PromptsPage() {
   const toast = useToast();
   const [items, setItems] = useState<Prompt[] | null>(null);
@@ -61,15 +65,13 @@ export function PromptsPage() {
 
   return (
     <section className="page wide">
-      <header className="page-head">
-        <h2 className="page-title">Prompts</h2>
-        <p className="muted">Saved messages you use again and again. In a chat, press the 📋 button next to the message box, or type <kbd>/</kbd>, to insert one. Put <code>{"{{like this}}"}</code> where you want to fill something in.</p>
-      </header>
+      <CapabilitiesTabs active="prompts" counts={{ prompts: items?.length }} />
+      <PageHeader title="Prompts" subtitle={<>Saved messages you use again and again. In a chat, press the saved prompts button next to the message box, or type <kbd>/</kbd>, to insert one. Put <code>{"{{like this}}"}</code> where you want to fill something in.</>} />
       {loadError && !items && <LoadError error={loadError} onRetry={() => void load()} />}
       <div className="panel">
         <div className="row">
           <button className="btn primary" onClick={() => open({ ...BLANK })}>New prompt</button>
-          <input className="grow" aria-label="Search prompts" placeholder="Search prompts…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input className="grow" aria-label="Search prompts" placeholder="Search prompts…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         {items && items.length === 0 && !edit && <p className="muted small">No saved prompts yet. Try one like “Explain {"{{this}}"} to me as if I am new to it”.</p>}
         {items && items.length > 0 && shown.length === 0 && <p className="muted small">No prompt matches “{query}”.</p>}
@@ -91,9 +93,9 @@ export function PromptsPage() {
         {edit && (
           <div className="panel" role="group" aria-label={edit.id ? "Edit prompt" : "New prompt"}>
             {error && <p className="notice error" role="alert">{error}</p>}
-            <label className="field">Name<input value={edit.name} maxLength={80} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
-            <label className="field">Text<textarea className="area" rows={8} value={edit.text} maxLength={20000} onChange={(e) => setEdit({ ...edit, text: e.target.value })} /></label>
-            <label className="field">Only in this project folder (optional)<input value={edit.projectDir} placeholder="Leave empty to offer it in every chat" onChange={(e) => setEdit({ ...edit, projectDir: e.target.value })} /></label>
+            <label className="field">Name<Input value={edit.name} maxLength={80} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+            <label className="field">Text<Textarea rows={8} value={edit.text} maxLength={20000} onChange={(e) => setEdit({ ...edit, text: e.target.value })} /></label>
+            <label className="field">Only in this project folder (optional)<Input value={edit.projectDir} placeholder="Leave empty to offer it in every chat" onChange={(e) => setEdit({ ...edit, projectDir: e.target.value })} /></label>
             <div className="row">
               <button className="btn primary" disabled={saving || !edit.name.trim() || !edit.text.trim()} onClick={() => void save()}>{saving ? "Saving…" : "Save"}</button>
               <button className="btn" onClick={() => setEdit(null)}>Cancel</button>

@@ -1,3 +1,26 @@
+# Current queue: Hermes UI match (owner decision 2026-11-28)
+
+Goal: an exact match of the Hermes webapp. Reference shots: `docs/visual/hermes-reference/`. Code may be ported under MIT (upstream `5688461d`), identity, fonts and artwork never. Detail for each item (scope, files, ported vs rewritten, done-when) is in `reports/Pheme Hermes UI revamp.md`, "Build plan". Item 4 (real-Copilot event probe) is skipped by the owner. Rules as below, plus: log `dist/pheme.mjs` size after each item.
+
+1. Docs: drop the "do not copy" rules, record the porting and provenance rules, notices. (This pass.)
+2. Stable test selectors (`data-testid`, roles); move e2e and unit tests off CSS classes.
+3. Visual reference set and a Playwright side-by-side harness against the five reference shots. DONE: `npm run visual` (e2e/visual.spec.ts, playwright.visual.config.ts), output in `e2e/visual-out/`.
+5. Tailwind v4, the Hermes token layer, type metrics, JetBrains Mono served by Pheme. DONE: `tokens.css`, `tailwind.css`, `themes/color.ts`, theme `pheme-gold` (default), fonts in `packages/ui/src/fonts/`.
+6. Port the `components/ui` primitives; replace every emoji with real icons. DONE: button, kbd, badge, tooltip, dialog, dropdown-menu, popover, confirm-dialog, glyph-spinner, codicon, disclosure-caret under `packages/ui/src/components/ui`; `lib/icons.ts`; no emoji icon left (grep gate `packages/ui/test/icon-gate.test.ts`); `Menu.tsx` and `Dialog.tsx` on the ports; fake pill is a Badge.
+7. Port the shell: 28px tab strip, 237px left rail, 20px status bar, settings overlay.
+8. Port the transcript: sticky user bubble, centred column, instant scroll-follow, jump-to-bottom pill.
+9. Port tool rows, run summaries, ticker and diffs, with a Copilot tool-name map.
+10. Port the approval card stack (Run, Reject, Allow this session; no "Always allow").
+11. Server events and UI for reasoning, intent, progress and todos, feature-detected, fake mode only.
+12. Port the composer and status stack, model pill, effort pill (only where the model reports it).
+13. Port markdown and code cards (keep react-markdown and highlight.js).
+14. Restyle the remaining pages onto the page shell; no "Hermes" or "Nous" strings anywhere in `packages/ui/src`.
+15. Motion audit, accessibility pass, exact-match gate, final `PARITY.md`. DONE (2026-11-28): motion timings aligned, hidden-window pause, one kill switch, scaffold 0.7, live working line, unused CSS pruned, final `PARITY.md`. Bundle 3019 KB.
+
+Not planned, on purpose: assistant-ui, nanostores, react-query, the contentEditable editor, voice, branching, Shiki and Streamdown, the plugin registry, the pane-tree layout, glass effects, and Hermes pages Copilot cannot back.
+
+# Earlier queue
+
 # Work queue (agreed order)
 
 Rules for every item: fake mode only (no Copilot quota), work on a branch `feat/<name>`, typecheck + lint + tests + smoke + stress
@@ -42,6 +65,6 @@ Rule for every push: `npm run lint && npm run typecheck && npm test` first (CI l
 Status of the six: all built and tested on branch feat/git-workflow (see PROGRESS.md). Ideas not started: attachments in backups, queueing a message with attachments, prompt import/export, a "resolve conflicts" helper in the Git panel, an install button inside Settings.
 
 ## Next (after v0.3.0)
-1. Visual frame plus the three features the owner asked for (file list, tab drag, original gradient) are on `feat/shell-features`. Still not a spitting image.
+1. Visual frame plus the three features the owner asked for (file list, tab drag, original gradient) are on `feat/shell-features`. Superseded by the Hermes-match queue above.
 2. Re-test text attachments on real Copilot (one short request).
 3. Check the SSE connection count after rapid chat switching.

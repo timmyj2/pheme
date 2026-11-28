@@ -35,6 +35,16 @@ try {
   if (!html.includes("<title>Pheme</title>")) fail("UI html missing");
   const asset = /src="(\/assets\/[^"]+\.js)"/.exec(html)?.[1];
   if (!asset || !(await fetch(base + asset)).ok) fail("UI script missing");
+  // The bundled code font is served by Pheme itself (no web-font request leaves the machine), with the right MIME type.
+  const cssPath = /href="(\/assets\/[^"]+\.css)"/.exec(html)?.[1];
+  const css = cssPath ? await (await fetch(base + cssPath)).text() : "";
+  const fontPaths = [...css.matchAll(/url\((\/assets\/JetBrainsMono-[^)]+\.woff2)\)/g)].map((m) => m[1]);
+  if (fontPaths.length !== 2) fail("expected two JetBrains Mono font files in the stylesheet, found " + fontPaths.length);
+  if (/url\(\s*["']?https?:/.test(css) || /@import[^;]*https?:/.test(css)) fail("the stylesheet references an external URL");
+  for (const f of fontPaths) {
+    const r = await fetch(base + f);
+    if (!r.ok || r.headers.get("content-type") !== "font/woff2" || (await r.arrayBuffer()).byteLength < 50000) fail("font not served correctly: " + f);
+  }
   const h = { "x-pheme-token": token, "content-type": "application/json" };
   if ((await fetch(base + "/api/state")).status !== 401) fail("API must require the token");
   const chat = await (await fetch(base + "/api/chats", { method: "POST", headers: h, body: "{}" })).json();

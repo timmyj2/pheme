@@ -4,6 +4,27 @@ import { spawnSync } from "node:child_process";
 import type { Engine, EngineSession, SessionOptions } from "./engine.ts";
 import type { ModelOption } from "./protocol.ts";
 
+// Reads the todo rows over RPC. Never throws and never hangs the turn: a CLI without rpc.plan, a synchronous throw
+// or a read that does not settle within the timeout resolves to undefined, so idle is not held for long.
+const TODO_READ_TIMEOUT_MS = 3000;
+type TodoRow = Record<string, unknown>;
+async function readTodoRows(session: unknown, timeoutMs = TODO_READ_TIMEOUT_MS): Promise<TodoRow[] | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const plan = (session as { rpc?: { plan?: { readSqlTodosWithDependencies?: () => Promise<{ rows?: TodoRow[] }> } } } | undefined)?.rpc?.plan;
+    if (typeof plan?.readSqlTodosWithDependencies !== "function") return undefined;
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), timeoutMs);
+    });
+    const result = await Promise.race([plan.readSqlTodosWithDependencies(), timeout]);
+    return Array.isArray(result?.rows) ? result.rows : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Find the user's installed Copilot CLI. Returns a path the SDK can launch (a binary or npm-loader.js). */
 export function findCopilotCli(env: NodeJS.ProcessEnv = process.env): string | undefined {
   if (env.COPILOT_CLI_PATH && fs.existsSync(env.COPILOT_CLI_PATH)) return env.COPILOT_CLI_PATH;
@@ -77,10 +98,22 @@ export class CopilotEngine implements Engine {
     return client.getAuthStatus();
   }
 
+  /** Effort levels per model, from the last model listing (the SDK reports them per model). */
+  private efforts = new Map<string, string[]>();
+
   async listModels(): Promise<ModelOption[]> {
     const { client } = await this.ensure();
     const models = await client.listModels();
-    return [{ id: "auto", name: "Auto" }, ...models.map((m) => ({ id: m.id, name: m.name ?? m.id }))];
+    const out: ModelOption[] = [{ id: "auto", name: "Auto" }];
+    this.efforts.clear();
+    for (const m of models) {
+      const levels = (m as { supportedReasoningEfforts?: unknown }).supportedReasoningEfforts;
+      const efforts = Array.isArray(levels) ? levels.filter((x): x is string => typeof x === "string" && /^[a-z]{1,20}$/.test(x)) : [];
+      const def = (m as { defaultReasoningEffort?: unknown }).defaultReasoningEffort;
+      if (efforts.length) this.efforts.set(m.id, efforts);
+      out.push({ id: m.id, name: m.name ?? m.id, ...(efforts.length ? { reasoningEfforts: efforts, defaultReasoningEffort: typeof def === "string" ? def : efforts[0] } : {}) });
+    }
+    return out;
   }
 
   async createSession(opts: SessionOptions): Promise<EngineSession> {
@@ -130,6 +163,11 @@ export class CopilotEngine implements Engine {
     if (opts.agents?.length) {
       config.customAgents = opts.agents.map((a) => ({ name: a.name, displayName: a.name, description: a.description, prompt: a.prompt, tools: a.tools ?? null, infer: true }));
     }
+    // Only send an effort the model reports; the list is fetched once if this engine has not seen it yet.
+    if (opts.reasoningEffort && opts.model !== "auto") {
+      if (!this.efforts.size) await this.listModels();
+      if (this.efforts.get(opts.model)?.includes(opts.reasoningEffort)) config.reasoningEffort = opts.reasoningEffort;
+    }
     if (opts.customToolsOnly) config.availableTools = opts.tools.map((t) => t.name);
     const session = opts.resume
       ? await client.resumeSession(opts.id, config as never).catch(() => client.createSession({ ...config, sessionId: opts.id } as never))
@@ -138,6 +176,8 @@ export class CopilotEngine implements Engine {
     return {
       async send(prompt, onEvent, signal, attachments) {
         const names = new Map<string, string>();
+        const reasoningStart = new Map<string, number>(); // first delta time per reasoning block, for "Thought for Ns"
+        const todoReads: Promise<void>[] = [];
         await new Promise<void>((resolve, reject) => {
           let lastUsage: { used: number; limit: number } | undefined;
           const off = session.on(((raw: unknown) => {
@@ -146,6 +186,42 @@ export class CopilotEngine implements Engine {
             switch (ev.type) {
               case "assistant.message_delta":
                 onEvent({ type: "delta", text: String(d.deltaContent ?? "") });
+                break;
+              case "assistant.reasoning_delta": {
+                const id = String(d.reasoningId ?? "");
+                if (!reasoningStart.has(id)) reasoningStart.set(id, Date.now());
+                onEvent({ type: "reasoning_delta", id, text: String(d.deltaContent ?? "") });
+                break;
+              }
+              case "assistant.reasoning": {
+                const id = String(d.reasoningId ?? "");
+                const started = reasoningStart.get(id);
+                if (d.content) onEvent({ type: "reasoning", id, text: String(d.content), ...(started !== undefined ? { ms: Date.now() - started } : {}) });
+                break;
+              }
+              case "assistant.intent":
+                if (d.intent) onEvent({ type: "intent", text: String(d.intent) });
+                break;
+              case "session.todos_changed":
+                // Signal only: the rows are read back over RPC. Idle waits for these reads so the list lands inside the turn.
+                todoReads.push(
+                  readTodoRows(session).then((rows) => {
+                    if (!rows) return;
+                    const items = rows
+                      .map((row) => ({ id: String(row.id ?? ""), title: String(row.title ?? ""), status: String(row.status ?? "pending") }))
+                      .filter((t) => t.title);
+                    onEvent({ type: "todos", items });
+                  }),
+                );
+                break;
+              case "tool.execution_progress":
+                if (d.progressMessage) onEvent({ type: "progress", id: String(d.toolCallId), text: String(d.progressMessage) });
+                break;
+              case "tool.execution_partial_result":
+                if (d.partialOutput) onEvent({ type: "progress", id: String(d.toolCallId), text: String(d.partialOutput), partial: true });
+                break;
+              case "session.title_changed":
+                if (typeof d.title === "string" && d.title.trim()) onEvent({ type: "title", title: d.title.trim() });
                 break;
               case "assistant.message":
                 if (d.content) onEvent({ type: "message", text: String(d.content) });
@@ -179,8 +255,10 @@ export class CopilotEngine implements Engine {
               }
               case "session.idle":
                 if (lastUsage) onEvent({ type: "usage", ...lastUsage }); // once per turn: the log stays small
-                off();
-                resolve();
+                void Promise.allSettled(todoReads).then(() => {
+                  off();
+                  resolve();
+                });
                 break;
             }
           }) as never);

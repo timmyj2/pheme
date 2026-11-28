@@ -1,4 +1,5 @@
 import type { SeqEvent } from "./api.ts";
+import { TID } from "./testids.ts";
 
 export interface Usage { used: number; limit: number }
 
@@ -31,7 +32,7 @@ export function ContextMeter({ events }: { events: SeqEvent[] }) {
   const words = `${formatTokens(u.used)} of ${formatTokens(u.limit)} tokens, ${pct} percent`;
   const hint = level === "full" ? "Almost full. Start a new chat for a clean slate, or Copilot will compact older messages." : level === "warn" ? "Getting full. Copilot compacts older messages automatically when it runs out." : "How much of the model's memory this chat is using.";
   return (
-    <div className={`ctx-meter ${level}`} title={hint}>
+    <div className={`ctx-meter ${level}`} data-testid={TID.contextMeter} title={hint}>
       <div role="meter" aria-label="Context used" aria-valuemin={0} aria-valuemax={u.limit} aria-valuenow={Math.min(u.used, u.limit)} aria-valuetext={words} className="ctx-bar"><i style={{ width: `${pct}%` }} /></div>
       <span className="small">{formatTokens(u.used)} / {formatTokens(u.limit)}{level !== "ok" ? ` · ${level === "full" ? "almost full" : "getting full"}` : ""}</span>
     </div>

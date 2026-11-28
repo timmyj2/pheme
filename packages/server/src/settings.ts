@@ -36,6 +36,7 @@ export function validSetting(key: keyof Settings, v: unknown): boolean {
   if (typeof v !== typeof DEFAULT_SETTINGS[key]) return false;
   const range = INT_RANGES[key];
   if (range) return Number.isInteger(v) && (v as number) >= range[0] && (v as number) <= range[1];
+  if (key === "reasoningEffort") return typeof v === "string" && /^[a-z]{0,20}$/.test(v);
   if (typeof v === "string") return v.length <= 200;
   return true;
 }

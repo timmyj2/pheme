@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import { AgentCard } from "./AgentCard.tsx";
+import { CapabilitiesTabs } from "./components/page/capabilities-tabs.tsx";
+import { PageHeader } from "./components/page/page-header.tsx";
+import { Input } from "./components/ui/input.tsx";
+import { Textarea } from "./components/ui/textarea.tsx";
 import { ConfirmDialog } from "./Dialog.tsx";
 import { api, type AgentProfile, type AgentRun } from "./api.ts";
 import { LoadError } from "./Pages.tsx";
@@ -41,10 +45,8 @@ export function AgentsPage({ onOpenChat }: { onOpenChat: (id: string) => void })
 
   return (
     <section className="page wide">
-      <header className="page-head">
-        <h2 className="page-title">Agents</h2>
-        <p className="muted">Sub-agents work in their own sessions. In a chat, ask Pheme to split work up (for example: "research A and B in parallel"), or save an agent below and Copilot can hand it tasks. Saved agents apply to new chats.</p>
-      </header>
+      <CapabilitiesTabs active="agents" counts={{ agents: profiles.length }} />
+      <PageHeader title="Agents" subtitle='Sub-agents work in their own sessions. In a chat, ask Pheme to split work up (for example: "research A and B in parallel"), or save an agent below and Copilot can hand it tasks. Saved agents apply to new chats.' />
       <div className="panel">
         <h3>Running now ({running.length})</h3>
         {loadError && runs.length === 0 && <LoadError error={loadError} onRetry={load} />}
@@ -66,10 +68,10 @@ export function AgentsPage({ onOpenChat }: { onOpenChat: (id: string) => void })
         ))}
         {edit && (
           <div className="panel">
-            <label className="field">Name (lowercase, - or _)<input value={edit.name} disabled={existing} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
-            <label className="field">When should it be used?<input value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} /></label>
-            <label className="field">Instructions<textarea className="area" rows={6} value={edit.instructions} onChange={(e) => setEdit({ ...edit, instructions: e.target.value })} /></label>
-            <label className="field">Allowed Copilot tools (comma-separated; empty = all)<input value={tools} onChange={(e) => setTools(e.target.value)} /></label>
+            <label className="field">Name (lowercase, - or _)<Input value={edit.name} disabled={existing} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+            <label className="field">When should it be used?<Input value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} /></label>
+            <label className="field">Instructions<Textarea rows={6} value={edit.instructions} onChange={(e) => setEdit({ ...edit, instructions: e.target.value })} /></label>
+            <label className="field">Allowed Copilot tools (comma-separated; empty = all)<Input value={tools} onChange={(e) => setTools(e.target.value)} /></label>
             <div className="row">
               <button className="btn primary" onClick={() => void save()}>Save</button>
               <button className="btn" onClick={() => setEdit(null)}>Cancel</button>

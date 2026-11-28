@@ -1,6 +1,8 @@
+import { IconChevronDown, IconChevronUp, IconCircleFilled, IconGitBranch } from "./lib/icons.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type BranchList, type GitStatus, type StashEntry } from "./api.ts";
 import { useToast } from "./toast.tsx";
+import { TID } from "./testids.ts";
 
 interface Props {
   chatId: string;
@@ -77,9 +79,9 @@ export function BranchBar({ chatId, status, busy, onChanged }: Props) {
 
   return (
     <div className="branch-bar">
-      <button className="branch-pill" aria-expanded={open} aria-controls="branch-panel" onClick={() => setOpen((o) => !o)}>
-        <span aria-hidden="true">⎇</span> {status.detached ? "detached HEAD" : status.branch ?? "no branch"}
-        <span className="muted small"> · branches and stash {open ? "▴" : "▾"}</span>
+      <button className="branch-pill" data-testid={TID.branchPill} aria-expanded={open} aria-controls="branch-panel" onClick={() => setOpen((o) => !o)}>
+        <IconGitBranch className="inline size-3.5 align-[-2px]" aria-hidden="true" /> {status.detached ? "detached HEAD" : status.branch ?? "no branch"}
+        <span className="muted small"> · branches and stash {open ? <IconChevronUp className="inline size-3" aria-hidden="true" /> : <IconChevronDown className="inline size-3" aria-hidden="true" />}</span>
       </button>
       {open && (
         <div id="branch-panel" className="branch-panel">
@@ -101,7 +103,7 @@ export function BranchBar({ chatId, status, busy, onChanged }: Props) {
               {shown.map((b) => (
                 <li key={b.name}>
                   <button className="branch-item" aria-current={b.current ? "true" : undefined} disabled={b.current || working || !!wait} title={wait || b.subject} onClick={() => void switchTo(b.name)}>
-                    <span className="branch-name">{b.current ? "● " : ""}{b.name}</span>
+                    <span className="branch-name">{b.current ? <IconCircleFilled className="mr-1 inline size-2 align-[-1px]" aria-hidden="true" /> : null}{b.name}</span>
                     <span className="muted small">{b.subject} · {ago(b.date)}</span>
                   </button>
                 </li>
@@ -122,7 +124,7 @@ export function BranchBar({ chatId, status, busy, onChanged }: Props) {
           {stashes && stashes.stashes.length === 0 && <p className="muted small">Nothing set aside.</p>}
           <ul className="stash-list">
             {(stashes?.stashes ?? []).map((s) => (
-              <li key={s.sha}>
+              <li key={s.sha} data-testid={TID.stashItem}>
                 <div className="stash-info"><span>{s.message}</span><span className="muted small">{s.branch ? `from ${s.branch} · ` : ""}{ago(s.date)}</span></div>
                 {confirmDrop === s.sha ? (
                   <div className="row" role="group" aria-label="Confirm delete stash">

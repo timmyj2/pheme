@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
-    <meta name="theme-color" content="#0d1117" />
+    <meta name="theme-color" content="#171726" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
@@ -13,15 +13,17 @@
   <body>
     <div id="root"></div>
     <script>
+      // Paint the saved theme before React loads: replay the seed variables applyTheme stored last time. Default is dark gold.
       try {
+        var r = document.documentElement;
         var b = JSON.parse(localStorage.getItem("pheme-theme-boot") || "null");
-        if (b && typeof b.bg === "string" && typeof b.fg === "string") {
-          var r = document.documentElement;
-          r.style.setProperty("--dt-background", b.bg);
-          r.style.setProperty("--dt-foreground", b.fg);
-          r.classList.toggle("dark", !!b.dark);
-          r.style.colorScheme = b.dark ? "dark" : "light";
+        var dark = b && typeof b.dark === "boolean" ? b.dark : true;
+        if (b && b.vars && typeof b.vars === "object") {
+          for (var k in b.vars) if (typeof b.vars[k] === "string" && k.indexOf("--") === 0) r.style.setProperty(k, b.vars[k]);
         }
+        r.classList.toggle("dark", dark);
+        r.style.colorScheme = dark ? "dark" : "light";
+        if (b && typeof b.bg === "string") r.style.backgroundColor = b.bg;
       } catch (e) {}
     </script>
     <script type="module" src="/src/main.tsx"></script>

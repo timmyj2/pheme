@@ -1,0 +1,275 @@
+/* Adapted from hermes-agent (MIT, Copyright (c) 2025 Nous Research), apps/desktop/src/styles.css @ 5688461d
+   (the :root / :root.dark token chain, shadows, z-ladder, scrollbars, base layer, reduced-motion and reduced-transparency rules).
+   Omitted: the display font, pets, kanban, error cards, window glass, brand pieces. Pheme names and glue are its own.
+
+   The chain: --theme-* seeds (written by themes/presets.ts applyTheme) -> --ui-* (color-mix) -> --dt-* -> Tailwind --color-* (tailwind.css).
+   Plain CSS on purpose (no Tailwind syntax), so a unit test can read it. */
+
+/* JetBrains Mono (SIL OFL 1.1, see THIRD_PARTY_NOTICES.md), bundled so code looks the same on every machine. */
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("./fonts/JetBrainsMono-Regular.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; font-display: swap; src: url("./fonts/JetBrainsMono-Bold.woff2") format("woff2"); }
+
+@layer base {
+  :root {
+    color-scheme: dark;
+
+    /* Seeds. These defaults are the Pheme Gold dark palette so the first paint is right; applyTheme and the boot script overwrite them inline. */
+    --theme-foreground: #fff8dc;
+    --theme-primary: #ffbf00;
+    --theme-secondary: #5a4821;
+    --theme-accent-soft: #433826;
+    --theme-midground: #ffbf00;
+    --theme-warm: #ffbf00;
+    --theme-background-seed: #1a1a2e;
+    --theme-sidebar-seed: #1f1e31;
+    --theme-card-seed: #232335;
+    --theme-elevated-seed: #2c2c3c;
+    --theme-bubble-seed: #433826;
+    --theme-neutral-chrome: #f3f3f3;
+    --theme-neutral-sidebar: #f3f3f3;
+    --theme-neutral-card: #fcfcfc;
+    --theme-mix-chrome: 92%;
+    --theme-mix-sidebar: 100%;
+    --theme-mix-card: 22%;
+    --theme-mix-elevated: 28%;
+    --theme-mix-bubble: 0%;
+    --theme-fill-primary-accent-mix: 16%;
+    --theme-fill-secondary-accent-mix: 11%;
+    --theme-fill-tertiary-accent-mix: 8%;
+    --theme-fill-quaternary-accent-mix: 5%;
+    --theme-fill-quinary-accent-mix: 3%;
+    --theme-stroke-primary-accent-mix: 24%;
+    --theme-stroke-secondary-accent-mix: 16%;
+    --theme-stroke-tertiary-accent-mix: 10%;
+    --theme-stroke-quaternary-accent-mix: 6%;
+    --theme-row-hover-accent-mix: 4%;
+    --theme-row-active-accent-mix: 8%;
+    --theme-control-hover-accent-mix: 6%;
+    --theme-control-active-accent-mix: 8%;
+
+    --ui-base: var(--theme-foreground);
+    --ui-accent: var(--theme-midground);
+    --ui-accent-secondary: var(--theme-primary);
+    --ui-warm: var(--theme-warm);
+    --ui-red: #cf2d56;
+    --ui-orange: #db704b;
+    --ui-yellow: #c08532;
+    --ui-green: #1f8a65;
+    --ui-cyan: #4c7f8c;
+    --ui-blue: #0053fd;
+    --ui-purple: #9e94d5;
+    --ui-diff-add-border: var(--ui-green);
+    --ui-diff-add-background: color-mix(in srgb, var(--ui-green) 12%, transparent);
+    --ui-diff-add-foreground: color-mix(in srgb, var(--ui-green) 70%, #000);
+    --ui-diff-remove-border: var(--ui-red);
+    --ui-diff-remove-background: color-mix(in srgb, var(--ui-red) 12%, transparent);
+    --ui-diff-remove-foreground: color-mix(in srgb, var(--ui-red) 70%, #000);
+
+    /* Overlay ladder: pick the rung that describes the surface instead of an ad-hoc z-index. */
+    --z-modal-backdrop: 120;
+    --z-modal: 130;
+    --z-modal-popover: 140;
+    --z-over-modal: 200;
+    --z-over-modal-content: 210;
+    --z-switcher-backdrop: 219;
+    --z-switcher: 220;
+    --z-connecting: 1200;
+    --z-onboarding: 1300;
+    --z-onboarding-popover: 1310;
+    --z-setup: 1400;
+    --z-crash: 1500;
+
+    --ui-bg-chrome: color-mix(in srgb, var(--theme-background-seed) var(--theme-mix-chrome), var(--theme-neutral-chrome));
+    --ui-bg-sidebar: color-mix(in srgb, var(--theme-sidebar-seed) var(--theme-mix-sidebar), var(--theme-neutral-sidebar));
+    --ui-bg-editor: color-mix(in srgb, var(--theme-card-seed) var(--theme-mix-card), var(--theme-neutral-card));
+    --ui-bg-elevated: color-mix(in srgb, var(--theme-elevated-seed) var(--theme-mix-elevated), var(--theme-neutral-card));
+    --ui-bg-card: color-mix(in srgb, var(--ui-accent) 4%, color-mix(in srgb, var(--ui-base) 4%, transparent));
+    --ui-bg-primary: color-mix(in srgb, var(--ui-accent) var(--theme-fill-primary-accent-mix), color-mix(in srgb, var(--ui-base) 10%, transparent));
+    --ui-bg-secondary: color-mix(in srgb, var(--ui-accent) var(--theme-fill-secondary-accent-mix), color-mix(in srgb, var(--ui-base) 7%, transparent));
+    --ui-bg-tertiary: color-mix(in srgb, var(--ui-accent) var(--theme-fill-tertiary-accent-mix), color-mix(in srgb, var(--ui-base) 5%, transparent));
+    --ui-bg-quaternary: color-mix(in srgb, var(--ui-accent) var(--theme-fill-quaternary-accent-mix), color-mix(in srgb, var(--ui-base) 4%, transparent));
+    --ui-bg-quinary: color-mix(in srgb, var(--ui-accent) var(--theme-fill-quinary-accent-mix), color-mix(in srgb, var(--ui-base) 3%, transparent));
+    --ui-row-hover-background: color-mix(in srgb, var(--ui-accent) var(--theme-row-hover-accent-mix), color-mix(in srgb, var(--ui-base) 3%, transparent));
+    --ui-row-active-background: color-mix(in srgb, var(--ui-accent) var(--theme-row-active-accent-mix), color-mix(in srgb, var(--ui-base) 5%, transparent));
+    --ui-row-open-background: color-mix(in srgb, var(--ui-row-active-background) 28%, transparent);
+    --ui-control-hover-background: color-mix(in srgb, var(--ui-accent) var(--theme-control-hover-accent-mix), color-mix(in srgb, var(--ui-base) 4%, transparent));
+    --ui-control-active-background: color-mix(in srgb, var(--ui-accent) var(--theme-control-active-accent-mix), color-mix(in srgb, var(--ui-base) 5%, transparent));
+    --ui-text-primary: color-mix(in srgb, var(--ui-base) 94%, transparent);
+    --ui-text-secondary: color-mix(in srgb, var(--ui-base) 74%, transparent);
+    --ui-text-tertiary: color-mix(in srgb, var(--ui-base) 54%, transparent);
+    --ui-text-quaternary: color-mix(in srgb, var(--ui-base) 36%, transparent);
+    --conversation-scaffold-text: color-mix(in srgb, var(--ui-base) 64%, transparent);
+    --conversation-scaffold-meta: color-mix(in srgb, var(--ui-base) 44%, transparent);
+    --ui-stroke-primary: color-mix(in srgb, var(--ui-accent) var(--theme-stroke-primary-accent-mix), color-mix(in srgb, var(--ui-base) 10%, transparent));
+    --ui-stroke-secondary: color-mix(in srgb, var(--ui-accent) var(--theme-stroke-secondary-accent-mix), color-mix(in srgb, var(--ui-base) 7%, transparent));
+    --ui-stroke-tertiary: color-mix(in srgb, var(--ui-accent) var(--theme-stroke-tertiary-accent-mix), color-mix(in srgb, var(--ui-base) 5%, transparent));
+    --ui-stroke-quaternary: color-mix(in srgb, var(--ui-accent) var(--theme-stroke-quaternary-accent-mix), color-mix(in srgb, var(--ui-base) 3%, transparent));
+    --ui-sash-hover-border: color-mix(in srgb, var(--ui-accent) 18%, var(--ui-stroke-tertiary));
+    --ui-sash-hover-background: color-mix(in srgb, var(--ui-accent) 6%, transparent);
+    --ui-surface-background: var(--ui-bg-editor);
+    --ui-sidebar-surface-background: var(--ui-bg-sidebar);
+    --ui-chat-surface-background: var(--ui-bg-chrome);
+    --ui-editor-surface-background: var(--ui-bg-chrome);
+    --ui-widget-surface-background: var(--ui-bg-editor);
+    --ui-chat-bubble-background: color-mix(in srgb, var(--theme-bubble-seed) var(--theme-mix-bubble), var(--theme-neutral-card));
+    --ui-chat-bubble-opaque-background: var(--ui-bg-editor);
+    --ui-inline-code-background: color-mix(in srgb, #141414 5%, transparent);
+    --ui-inline-code-foreground: color-mix(in srgb, #141414 88%, transparent);
+    --ui-selection-background: color-mix(in srgb, #ffd24a 55%, transparent);
+
+    --dt-background: var(--ui-bg-chrome);
+    --dt-foreground: var(--ui-text-primary);
+    --dt-card: var(--ui-bg-editor);
+    --dt-card-foreground: var(--ui-text-primary);
+    --dt-muted: var(--ui-bg-tertiary);
+    --dt-muted-foreground: var(--ui-text-tertiary);
+    --dt-popover: color-mix(in srgb, var(--ui-bg-elevated) 96%, transparent);
+    --dt-popover-foreground: var(--ui-text-primary);
+    --dt-primary: var(--theme-primary);
+    --dt-primary-foreground: #161616;
+    --dt-primary-solid: var(--theme-primary);
+    --dt-primary-solid-foreground: #fcfcfc;
+    --dt-secondary: var(--theme-secondary);
+    --dt-secondary-foreground: var(--ui-text-secondary);
+    --dt-accent: var(--theme-accent-soft);
+    --dt-accent-foreground: var(--ui-text-primary);
+    --dt-border: var(--ui-stroke-secondary);
+    --dt-input: var(--ui-stroke-primary);
+    --dt-input-border: 7%;
+    --dt-input-bg: 0%;
+    --dt-input-inset: inset 0 1px 1px color-mix(in srgb, #000 10%, transparent);
+    --ui-tab-hover-darken: 2.5%;
+    --dt-ring: var(--ui-stroke-primary);
+    --dt-midground: var(--theme-midground);
+    /* Scrollbars carry no theme colour: same lightness as the midground, chroma 0. */
+    --dt-scrollbar-thumb: oklch(from var(--dt-midground) l 0 h);
+    --dt-composer-ring: var(--ui-base);
+    --dt-destructive: #cf2d56;
+    --dt-destructive-foreground: #ffffff;
+    --dt-sidebar-bg: var(--ui-bg-sidebar);
+    --dt-sidebar-border: var(--ui-stroke-secondary);
+    --dt-user-bubble: color-mix(in srgb, var(--ui-chat-bubble-background) var(--user-bubble-keep, 100%), transparent);
+    --dt-user-bubble-border: var(--ui-stroke-tertiary);
+
+    /* Pheme's older component names, mapped onto the chain so existing rules keep working until items 6-7 move them.
+       applyTheme overwrites the two *-text tokens with contrast-checked values. */
+    --dt-sidebar: var(--dt-sidebar-bg);
+    --dt-primary-text: var(--dt-primary);
+    --dt-destructive-text: var(--dt-destructive);
+
+    --dt-font-sans: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", emoji;
+    --dt-font-kbd: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    --dt-font-mono: "JetBrains Mono", "Cascadia Code", "Cascadia Mono", "DejaVu Sans Mono", "Liberation Mono", "Noto Sans Mono", "Noto Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", emoji;
+    --dt-base-size: 1rem;
+    --dt-line-height: 1.5;
+    --dt-letter-spacing: 0;
+    --dt-spacing-mul: 1;
+
+    /* Pheme's own corner radius for the existing components; Tailwind's rounded-* utilities use the scalar (tailwind.css). */
+    --radius: 0.625rem;
+    --radius-scalar: 0.2;
+
+    /* Text: body is 13px. The chat text scale (80-125%, default 110%) applies to the transcript and the composer only. */
+    --chat-text-scale: 1.1;
+    --conversation-text-base-size: 0.8125rem;
+    --conversation-tool-base-size: 0.6875rem;
+    --conversation-caption-base-size: 0.75rem;
+    --conversation-text-font-size: calc(var(--conversation-text-base-size) * var(--chat-text-scale));
+    --conversation-tool-font-size: var(--conversation-tool-base-size);
+    --conversation-caption-font-size: var(--conversation-caption-base-size);
+    --conversation-line-height: var(--dt-line-height);
+    --turn-block-gap: 0.75rem;
+    --paragraph-gap: 0.7rem;
+
+    --shadow-float:
+      0 0.125rem 0.25rem -0.125rem color-mix(in srgb, #000 7%, transparent),
+      0 0.5rem 0.75rem -0.375rem color-mix(in srgb, #000 6%, transparent),
+      0 1.25rem 1.75rem -0.875rem color-mix(in srgb, #000 6%, transparent),
+      0 2.25rem 3rem -1.75rem color-mix(in srgb, #000 0%, transparent);
+    --stroke-float: color-mix(in srgb, currentColor 3%, transparent);
+
+    --sidebar: var(--dt-sidebar-bg);
+    --sidebar-foreground: var(--dt-foreground);
+    --sidebar-primary: var(--dt-primary);
+    --sidebar-primary-foreground: var(--dt-primary-foreground);
+    --sidebar-accent: var(--ui-control-active-background);
+    --sidebar-accent-foreground: var(--dt-accent-foreground);
+    --sidebar-border: var(--dt-sidebar-border);
+    --sidebar-ring: var(--dt-ring);
+    --sidebar-edge-border: color-mix(in srgb, var(--ui-base) 7.5%, transparent);
+  }
+
+  :root.dark {
+    --theme-mix-chrome: 74%;
+    --theme-mix-card: 38%;
+    --theme-mix-elevated: 46%;
+    --theme-mix-bubble: 46%;
+    --theme-neutral-chrome: #0d0d0e;
+    --theme-neutral-sidebar: #0a0a0b;
+    --theme-neutral-card: #161618;
+    --ui-red: #e75e78;
+    --ui-green: #55a583;
+    --ui-cyan: #6f9ba6;
+    --ui-diff-add-foreground: color-mix(in srgb, var(--ui-green) 62%, #fff);
+    --ui-diff-remove-foreground: color-mix(in srgb, var(--ui-red) 62%, #fff);
+    --sidebar-edge-border: color-mix(in srgb, var(--ui-base) 12%, transparent);
+    --dt-input-inset: inset 0 1px 1px color-mix(in srgb, #000 38%, transparent);
+    --ui-tab-hover-darken: 6%;
+    --dt-input-border: 4%;
+    --ui-inline-code-background: color-mix(in srgb, #ffffff 7%, transparent);
+    --ui-inline-code-foreground: color-mix(in srgb, #ffffff 88%, transparent);
+    --ui-selection-background: color-mix(in srgb, #ffd24a 38%, transparent);
+    --ui-widget-surface-background: color-mix(in srgb, var(--ui-bg-editor) 88%, #000);
+  }
+
+  * { border-color: var(--dt-border); }
+
+  html { font-size: var(--dt-base-size, 1rem); }
+
+  body {
+    background: var(--ui-chat-surface-background);
+    color: var(--dt-foreground);
+    font-family: var(--dt-font-sans);
+    font-size: 0.8125rem;
+    line-height: var(--dt-line-height, 1.5);
+    letter-spacing: var(--dt-letter-spacing, 0);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *::selection { background: var(--ui-selection-background); color: inherit; }
+
+  /* Scrollbars: thin, no thumb until the pointer is over the scroller. Webkit pseudo-elements for Chromium, the standard properties elsewhere. */
+  *::-webkit-scrollbar { width: 0.5rem; height: 0.5rem; }
+  *::-webkit-scrollbar-track, *::-webkit-scrollbar-corner { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999rem; background-clip: padding-box; transition: none; }
+  *:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--dt-scrollbar-thumb) 18%, transparent); }
+  *:hover::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--dt-scrollbar-thumb) 40%, transparent); background-clip: padding-box; }
+  *::-webkit-scrollbar-button { display: none; }
+  @supports not selector(::-webkit-scrollbar) {
+    * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+    *:hover { scrollbar-color: color-mix(in srgb, var(--dt-scrollbar-thumb) 18%, transparent) transparent; }
+  }
+}
+
+/* Loops (working square, shimmers, glyph spinners) pause while the window is hidden. main.tsx sets the attribute. */
+:root[data-renderer-animations-paused] *, :root[data-renderer-animations-paused] *::before, :root[data-renderer-animations-paused] *::after {
+  animation-play-state: paused !important;
+}
+
+/* Reduced motion: the one kill switch for every animation and transition. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reduced transparency: no backdrop blur anywhere. Frosted surfaces already carry their own alpha-mixed fill. */
+@media (prefers-reduced-transparency: reduce) {
+  *, *::before, *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}

@@ -1,7 +1,14 @@
+import type { ReactNode } from "react";
+import { IconCheck, IconCircleFilled, IconMinus, IconX } from "./lib/icons.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type PrCheck, type PrDetail } from "./api.ts";
 
-const MARK: Record<PrCheck["state"], string> = { passing: "✓", failing: "✗", pending: "●", skipped: "–" };
+const MARK: Record<PrCheck["state"], ReactNode> = {
+  passing: <IconCheck className="size-3" />,
+  failing: <IconX className="size-3" />,
+  pending: <IconCircleFilled className="size-2.5" />,
+  skipped: <IconMinus className="size-3" />,
+};
 const WORD: Record<PrCheck["state"], string> = { passing: "passed", failing: "failed", pending: "running", skipped: "skipped" };
 
 export function reviewText(r: PrDetail["review"]): string {

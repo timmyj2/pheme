@@ -1,6 +1,8 @@
+import { IconFolder, IconLayoutSidebarRight } from "./lib/icons.ts";
 import { useState } from "react";
 import { Dialog } from "./Dialog.tsx";
 import type { GitStatus } from "./api.ts";
+import { TID } from "./testids.ts";
 
 interface Props {
   dir: string | undefined;
@@ -9,18 +11,20 @@ interface Props {
   panelOpen: boolean;
   onTogglePanel: () => void;
   onSetDir: (dir: string | null) => Promise<void>;
-  /** Icon only. Used in the top bar, where a wrapping label covers the chat. */
+  /** Kept for the chat's call site; the controls are always icon-sized now. */
   compact?: boolean;
 }
 
-/** The folder this chat works in, with the branch and a Changes toggle. */
-export function ProjectBar({ dir, status, busy, panelOpen, onTogglePanel, onSetDir, compact }: Props) {
+/**
+ * The project folder button and the right-panel toggle, shown in the top-right icon cluster. The folder name and
+ * branch are shown in the right column itself (RightPanel).
+ */
+export function ProjectBar({ dir, status, busy, panelOpen, onTogglePanel, onSetDir }: Props) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
   const count = status?.repo ? status.files.length + (status.moreFiles ?? 0) : 0;
-  const folderName = dir ? dir.split(/[\\/]/).filter(Boolean).pop() ?? dir : "";
 
   const save = async (next: string | null) => {
     setSaving(true);
@@ -35,29 +39,17 @@ export function ProjectBar({ dir, status, busy, panelOpen, onTogglePanel, onSetD
     }
   };
 
-  const box = compact ? { width: 28, height: 28, minWidth: 28, minHeight: 0, maxWidth: 28, maxHeight: 28, padding: 0, margin: 0, overflow: "hidden", flex: "0 0 28px" } as const : undefined;
+  const iconBtn = "icon-btn relative rounded p-1 hover:text-foreground";
   return (
-    <div className="project-bar" style={box}>
-      {dir ? (
-        <>
-          <button className="project-folder" style={box} title={`${dir}\nClick to change`} onClick={() => { setValue(dir); setErr(""); setEditing(true); }} aria-label={`Project folder ${dir}. Change`}>
-            <span aria-hidden>📁</span> {!compact && <span className="project-name">{folderName}</span>}
-          </button>
-          {!compact && status?.repo && status.branch && <span className="project-branch" title={status.upstream ? `Tracking ${status.upstream}` : "No upstream branch"}>⎇ {status.branch}{status.ahead ? ` ↑${status.ahead}` : ""}{status.behind ? ` ↓${status.behind}` : ""}</span>}
-          {!compact && status?.repo && status.detached && <span className="project-branch warn">detached HEAD</span>}
-          {!compact && <span className="spacer" />}
-          {!compact && (
-            <button className={`btn small${panelOpen ? " active" : ""}`} aria-pressed={panelOpen} onClick={onTogglePanel} title="Show changed files and diffs">
-              Changes{count ? <span className="count-badge">{count}</span> : null}
-            </button>
-          )}
-        </>
-      ) : (
-        <>
-        <button className="project-folder empty" style={box} aria-label="Choose a project folder" onClick={() => { setValue(""); setErr(""); setEditing(true); }}>
-          <span aria-hidden>📁</span> {!compact && <span className="folder-label">Choose a project folder</span>}
+    <>
+      <button className={iconBtn} aria-label={dir ? `Project folder ${dir}. Change` : "Choose a project folder"} title={dir ? `${dir}\nClick to change` : "Choose a project folder"} onClick={() => { setValue(dir ?? ""); setErr(""); setEditing(true); }}>
+        <IconFolder className="size-3.5" aria-hidden="true" />
+      </button>
+      {dir && (
+        <button className={`${iconBtn} ${panelOpen ? "text-primary" : ""}`} aria-pressed={panelOpen} data-testid={TID.rightPanelToggle} aria-label={panelOpen ? "Hide the right panel" : "Show the right panel"} title={panelOpen ? "Hide the right panel" : "Show files and changes"} onClick={onTogglePanel}>
+          <IconLayoutSidebarRight className="size-3.5" aria-hidden="true" />
+          {!panelOpen && count > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-3 rounded-full bg-primary px-0.5 text-center text-[9px] leading-3 text-primary-foreground">{count}</span>}
         </button>
-        </>
       )}
       {editing && (
         <Dialog label="Project folder" onClose={() => setEditing(false)}>
@@ -75,6 +67,6 @@ export function ProjectBar({ dir, status, busy, panelOpen, onTogglePanel, onSetD
           </form>
         </Dialog>
       )}
-    </div>
+    </>
   );
 }

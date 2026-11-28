@@ -10,6 +10,7 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "pheme-e2e-"));
 
 export default defineConfig({
   testDir: "e2e",
+  testIgnore: "**/visual.spec.ts", // the visual harness has its own config: npm run visual
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false, // the tests share one server and one data folder
@@ -20,6 +21,8 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${PORT}`,
     // CI installs Playwright's own Chromium; on a machine it does not support, set PW_CHANNEL=chrome to use installed Chrome.
     channel: process.env.PW_CHANNEL || undefined,
+    // Optional: point at a specific Chromium binary (for example in a sandbox that cannot download browsers).
+    launchOptions: process.env.PW_EXECUTABLE_PATH ? { executablePath: process.env.PW_EXECUTABLE_PATH } : undefined,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

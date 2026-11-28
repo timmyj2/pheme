@@ -138,7 +138,10 @@ describe("applyTheme", () => {
     expect(root.style.getPropertyValue("--dt-primary-text")).toMatch(/^#[0-9a-f]{6}$/);
     expect(root.classList.contains("dark")).toBe(true);
     const boot = JSON.parse(localStorage.getItem("pheme-theme-boot")!);
-    expect(boot).toEqual({ bg: root.style.getPropertyValue("--dt-background"), fg: root.style.getPropertyValue("--dt-foreground"), dark: true });
+    expect(boot.dark).toBe(true);
+    expect(boot.bg).toMatch(/^#[0-9a-f]{6}$/);
+    expect(boot.vars["--theme-background-seed"]).toBe(root.style.getPropertyValue("--theme-background-seed"));
+    expect(boot.vars["--theme-primary"]).toBe(root.style.getPropertyValue("--theme-primary"));
     expect(JSON.stringify(THEMES)).toBe(before);
     vi.unstubAllGlobals();
   });

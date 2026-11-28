@@ -79,7 +79,7 @@ describe("ShipBox", () => {
     const link = await screen.findByRole("link", { name: /#7 Existing/ });
     expect(link).toHaveAttribute("href", "https://github.com/o/r/pull/7");
     expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
-    expect(screen.getByText(/Draft · ✗ Checks failing/)).toBeInTheDocument();
+    expect(screen.getByText(/Draft · Checks failing/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Open pull request/ })).toBeNull();
   });
 

@@ -2,9 +2,10 @@ import { ContextMeter } from "./ContextMeter.tsx";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./api.ts";
-import { ChangesPanel } from "./ChangesPanel.tsx";
-import { Dialog } from "./Dialog.tsx";
-import { ModelPicker } from "./ModelPicker.tsx";
+import { RightPanel } from "./RightPanel.tsx";
+import { ModelControls } from "./components/composer/model-controls.tsx";
+import { runningActivity } from "./components/composer/status-stack.tsx";
+import { latestTodos } from "./blocks.ts";
 import { ProjectBar } from "./ProjectBar.tsx";
 import { useGit } from "./useGit.ts";
 import { Composer, type ComposerHandle } from "./Composer.tsx";
@@ -20,6 +21,11 @@ interface Props {
   /** This chat's own model (undefined = follows the default) and the default from Settings. */
   model?: string;
   defaultModel: string;
+  /** The reasoning effort chosen in Settings or the composer ("" = the model's default). */
+  reasoningEffort?: string;
+  /** The "Collapse thinking by default" setting. */
+  collapseThinking?: boolean;
+  onReasoningEffort?: (effort: string) => void;
   offline: boolean;
   composerRef: RefObject<ComposerHandle | null>;
   /** Text to send as soon as the chat has loaded (the message that created it). */
@@ -35,7 +41,7 @@ interface Props {
   folderInTop?: boolean;
 }
 
-export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaultModel, offline, folderInTop, composerRef, autoSend, autoFiles, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
+export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaultModel, reasoningEffort = "", collapseThinking = false, onReasoningEffort, offline, folderInTop, composerRef, autoSend, autoFiles, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
   const toast = useToast();
   const chat = useChat(chatId, { onChange: onChanged, onError: (m) => toast.error(m), onRestore: (text, files) => { composerRef.current?.insert(text); composerRef.current?.addFiles(files); } });
   const sentAuto = useRef(false);
@@ -54,7 +60,7 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
   };
   const [panelOpen, setPanelOpen] = useState(() => { try { return localStorage.getItem("pheme-changes-open") === "1"; } catch { return false; } });
   const [folderSlot, setFolderSlot] = useState<HTMLElement | null>(null);
-  useEffect(() => { setFolderSlot(document.getElementById(folderInTop ? "top-folder" : "side-folder")); }, [chatId, folderInTop]);
+  useEffect(() => { setFolderSlot(document.getElementById("top-right")); }, [chatId, folderInTop]);
   const togglePanel = () => setPanelOpen((o) => { const next = !o; try { localStorage.setItem("pheme-changes-open", next ? "1" : "0"); } catch { /* private mode */ } return next; });
   const git = useGit(chatId, projectDir, panelOpen, chat.busy);
   const setDir = async (dir: string | null) => {
@@ -107,6 +113,8 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
         chatId={chatId}
         events={chat.events}
         streaming={chat.streaming}
+        thinking={chat.reasoning}
+        collapseThinking={collapseThinking}
         busy={chat.busy}
         loaded={chat.loaded}
         pending={chat.pending}
@@ -125,18 +133,19 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
         busy={chat.busy}
         offline={offline}
         queue={chat.queue}
+        activity={runningActivity(chat.events)}
+        todos={latestTodos(chat.events)}
+        git={git.status?.repo ? { branch: git.status.branch ?? "", behind: git.status.behind ?? 0, changed: git.status.files.length + (git.status.moreFiles ?? 0) } : null}
         hasMessages={chat.events.length > 0}
         projectDir={projectDir}
         onSend={send}
         onStop={() => void stop()}
         onRemoveQueued={chat.removeQueued}
-        extra={chatId ? <ModelPicker value={model} defaultModel={defaultModel} disabled={chat.busy || offline} onChange={setModel} /> : undefined}
+        extra={chatId ? <ModelControls model={model} defaultModel={defaultModel} reasoningEffort={reasoningEffort} disabled={chat.busy || offline} onModelChange={setModel} onEffortChange={(e) => onReasoningEffort?.(e)} /> : undefined}
       />
       </div>
       {chatId && projectDir && panelOpen && (
-        <Dialog label="Changes" className="changes-dialog" onClose={togglePanel}>
-          <ChangesPanel chatId={chatId} status={git.status} error={git.error} loading={git.loading} onRefresh={() => void git.refresh()} onClose={togglePanel} busy={chat.busy} />
-        </Dialog>
+        <RightPanel chatId={chatId} dir={projectDir} status={git.status} error={git.error} loading={git.loading} busy={chat.busy} onRefresh={() => void git.refresh()} />
       )}
       </div>
     </section>

@@ -44,7 +44,7 @@ describe("buildBlocks", () => {
     expect(blocks).toHaveLength(2);
     expect((blocks[0] as { decision?: string }).decision).toBe("chat");
     expect((blocks[1] as { decision?: string }).decision).toBeUndefined();
-    expect(APPROVAL_LABEL.deny).toBe("Denied");
+    expect(APPROVAL_LABEL.deny).toBe("Rejected");
   });
   it("shows one card per agent run, with its latest state", () => {
     n = 0;

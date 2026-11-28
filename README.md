@@ -38,7 +38,7 @@ chat with a session list, skills and memory that improve themselves, sub-agents,
 
 **On your Mac or any other machine**, the steps are the same except you start it with `node pheme.mjs` instead of `start-pheme.cmd`.
 
-Try it without Copilot: `node pheme.mjs --fake` (a scripted fake engine; type `steps 10`, `run ls`, `remember I like tea`, `parallel a|b|c`).
+Try it without Copilot: `node pheme.mjs --fake` (a scripted fake engine; type `steps 10`, `run ls`, `remember I like tea`, `parallel a|b|c`, `think about X` for a reasoning block, intent, todos, progress and a title).
 
 Options: `--port <n>`, `--no-open`, `--data-dir <path>`, `--fake`.
 

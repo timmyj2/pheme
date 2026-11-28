@@ -1,57 +1,66 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, type ReactNode } from "react";
+import { ConfirmDialog as UiConfirmDialog } from "./components/ui/confirm-dialog.tsx";
+import { Dialog as UiDialog, DialogContent, DialogTitle } from "./components/ui/dialog.tsx";
+import { TID } from "./testids.ts";
 
-const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-
-/** Accessible modal: traps Tab, closes on Esc and backdrop click, and returns focus to whatever opened it. */
-export function Dialog({ label, onClose, children, className = "" }: { label: string; onClose: () => void; children: ReactNode; className?: string }) {
-  const box = useRef<HTMLDivElement>(null);
+/**
+ * Focus goes back to whatever opened the dialog, synchronously when it unmounts. Radix returns focus on a timer,
+ * so Pheme does it here and cancels Radix's own return with onCloseAutoFocus.
+ */
+function useReturnFocus() {
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    const first = box.current?.querySelector<HTMLElement>("[data-autofocus]") ?? box.current?.querySelector<HTMLElement>(FOCUSABLE);
-    first?.focus();
     return () => {
       if (opener && document.contains(opener)) opener.focus();
     };
   }, []);
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      onClose();
-      return;
-    }
-    if (e.key !== "Tab" || !box.current) return;
-    const items = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest("[hidden]"));
-    if (!items.length) return;
-    const firstEl = items[0];
-    const lastEl = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === firstEl) {
-      e.preventDefault();
-      lastEl.focus();
-    } else if (!e.shiftKey && document.activeElement === lastEl) {
-      e.preventDefault();
-      firstEl.focus();
-    }
-  };
-  return createPortal(
-    <div className="overlay" onMouseDown={onClose}>
-      <div ref={box} className={`dialog ${className}`} role="dialog" aria-modal="true" aria-label={label} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
+}
+
+/** Accessible modal (Radix): traps Tab, closes on Esc and backdrop click, and returns focus to whatever opened it. */
+export function Dialog({ label, onClose, children, className = "" }: { label: string; onClose: () => void; children: ReactNode; className?: string }) {
+  useReturnFocus();
+  return (
+    <UiDialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        aria-describedby={undefined}
+        aria-label={label}
+        aria-modal="true"
+        className={`dialog ${className}`}
+        overlayProps={{ "data-testid": TID.dialogOverlay }}
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        showCloseButton={false}
+        onOpenAutoFocus={(event) => {
+          // Callers mark the control to focus first with data-autofocus; otherwise Radix picks the first focusable.
+          const target = (event.currentTarget as HTMLElement).querySelector<HTMLElement>("[data-autofocus]");
+          if (target) {
+            event.preventDefault();
+            target.focus();
+          }
+        }}
+      >
+        <DialogTitle className="sr-only">{label}</DialogTitle>
         {children}
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </UiDialog>
   );
 }
 
+/** Confirmation for destructive or leaving actions. Keeps the old props; the body is the description. */
 export function ConfirmDialog({ title, body, confirmLabel, danger, onConfirm, onClose }: { title: string; body: string; confirmLabel: string; danger?: boolean; onConfirm: () => void; onClose: () => void }) {
+  useReturnFocus();
   return (
-    <Dialog label={title} onClose={onClose}>
-      <h2 className="dialog-title">{title}</h2>
-      <p className="muted">{body}</p>
-      <div className="dialog-actions">
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button className={`btn ${danger ? "danger" : "primary"}`} data-autofocus onClick={() => { onConfirm(); onClose(); }}>{confirmLabel}</button>
-      </div>
-    </Dialog>
+    <UiConfirmDialog
+      cancelLabel="Cancel"
+      confirmLabel={confirmLabel}
+      description={body}
+      destructive={danger}
+      dismissOnConfirm
+      overlayProps={{ "data-testid": TID.dialogOverlay }}
+      onClose={onClose}
+      onCloseAutoFocus={(event) => event.preventDefault()}
+      onConfirm={onConfirm}
+      open
+      title={title}
+    />
   );
 }

@@ -1,8 +1,11 @@
+import { GlyphSpinner } from "./components/ui/glyph-spinner.tsx";
+import { IconRefresh } from "./lib/icons.ts";
 import { useEffect, useState } from "react";
 import { BranchBar } from "./BranchBar.tsx";
 import { CommitBox } from "./CommitBox.tsx";
 import { ShipBox } from "./ShipBox.tsx";
 import { api, type ChangedFile, type FileDiff, type GitStatus } from "./api.ts";
+import { TID } from "./testids.ts";
 
 const LABEL: Record<string, string> = { modified: "M", added: "A", deleted: "D", renamed: "R", copied: "C", untracked: "U", conflicted: "!", typechange: "T" };
 const WORD: Record<string, string> = { modified: "Modified", added: "Added", deleted: "Deleted", renamed: "Renamed", copied: "Copied", untracked: "Untracked", conflicted: "Conflict", typechange: "Type changed" };
@@ -16,10 +19,10 @@ export function DiffView({ diff }: { diff: string }) {
   const lines = diff.split("\n");
   if (lines.length && lines[lines.length - 1] === "") lines.pop(); // the text ends with a newline: no phantom blank line
   return (
-    <pre className="diff" aria-label="Diff">
+    <pre className="diff" data-testid={TID.diff} aria-label="Diff">
       {lines.map((l, i) => {
         const kind = l.startsWith("@@") ? "hunk" : l.startsWith("+++") || l.startsWith("---") || l.startsWith("diff ") || l.startsWith("index ") ? "meta" : l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : "ctx";
-        return <span key={i} className={`dl ${kind}`}>{l || " "}{"\n"}</span>;
+        return <span key={i} className={`dl ${kind}`} data-testid={TID.diffLine} data-kind={kind}>{l || " "}{"\n"}</span>;
       })}
     </pre>
   );
@@ -41,7 +44,7 @@ function FileRow({ chatId, f, stale }: { chatId: string; f: ChangedFile; stale: 
 
   return (
     <li className={`change-file st-${st}`}>
-      <button className="change-row" aria-expanded={open} onClick={() => setOpen((o) => !o)} title={f.from ? `${f.from} → ${f.path}` : f.path}>
+      <button className="change-row" data-testid={TID.changeRow} aria-expanded={open} onClick={() => setOpen((o) => !o)} title={f.from ? `${f.from} → ${f.path}` : f.path}>
         <span className={`st-badge st-${st}`} role="img" aria-label={WORD[st]}>{LABEL[st]}</span>
         <span className="change-path">{f.path}</span>
         {f.binary ? <span className="muted small">binary</span> : <span className="change-counts"><span className="plus">+{f.additions}</span> <span className="minus">−{f.deletions}</span></span>}
@@ -62,12 +65,11 @@ interface Props {
   error: string;
   loading: boolean;
   onRefresh: () => void;
-  onClose: () => void;
   /** A reply is running: committing is paused so files are not changed underneath it. */
   busy?: boolean;
 }
 
-export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClose, busy = false }: Props) {
+export function ChangesPanel({ chatId, status, error, loading, onRefresh, busy = false }: Props) {
   const staged = status?.files.filter((f) => f.staged && f.unstaged !== "conflicted") ?? [];
   const unstaged = status?.files.filter((f) => f.unstaged && f.unstaged !== "untracked" && f.unstaged !== "conflicted") ?? [];
   const untracked = status?.files.filter((f) => f.unstaged === "untracked") ?? [];
@@ -85,13 +87,10 @@ export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClos
     ) : null;
 
   return (
-    <aside className="changes-panel" aria-label="Changes">
-      <header className="changes-head">
-        <h2>Changes</h2>
-        <span className="spacer" />
-        <button className="icon-btn" aria-label="Refresh changes" title="Refresh" onClick={onRefresh} disabled={loading}>{loading ? "…" : "↻"}</button>
-        <button className="icon-btn" aria-label="Close changes" title="Close" onClick={onClose}>✕</button>
-      </header>
+    <div className="flex min-h-0 flex-1 flex-col" aria-label="Changes" data-testid="changes-panel">
+      <div className="flex h-6 flex-none items-center justify-end px-2">
+        <button className="icon-btn rounded p-0.5 text-muted-foreground hover:text-foreground" aria-label="Refresh changes" title="Refresh" onClick={onRefresh} disabled={loading}>{loading ? <GlyphSpinner /> : <IconRefresh className="size-3.5" aria-hidden="true" />}</button>
+      </div>
       {status?.repo && !status.problem && status.hasCommits && <BranchBar key={`branch-${chatId}`} chatId={chatId} status={status} busy={busy} onChanged={onRefresh} />}
       <div className="changes-body">
         {error && <p className="notice error" role="alert">{error}</p>}
@@ -107,6 +106,6 @@ export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClos
       </div>
       {status?.repo && !status.problem && <CommitBox key={chatId} chatId={chatId} status={status} busy={busy} onDone={onRefresh} />}
       {status?.repo && !status.problem && status.hasCommits && !status.protectedBranch && <ShipBox key={`ship-${chatId}`} chatId={chatId} status={status} busy={busy} suggestedTitle={status.lastSubject || status.branch || ""} onDone={onRefresh} />}
-    </aside>
+    </div>
   );
 }

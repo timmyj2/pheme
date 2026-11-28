@@ -1,4 +1,4 @@
-import type { ModelOption } from "./protocol.ts";
+import type { ActivityEvent, ModelOption } from "./protocol.ts";
 
 export interface ToolDef {
   name: string;
@@ -23,13 +23,16 @@ export type EngineEvent =
   | { type: "tool_end"; id: string; name: string; ok: boolean; result: string }
   | { type: "subagent"; phase: "start" | "end"; id: string; name: string; task?: string; ok?: boolean; result?: string }
   | { type: "usage"; used: number; limit: number }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | ActivityEvent;
 
 export interface SessionOptions {
   /** Pheme chat id; also the engine session id so it can be resumed. */
   id: string;
   resume: boolean;
   model: string;
+  /** Reasoning effort to ask for; ignored by models that do not report support. */
+  reasoningEffort?: string;
   /** Appended to the engine's own system prompt: persona, memory block, skills index. */
   systemMessage: string;
   tools: ToolDef[];

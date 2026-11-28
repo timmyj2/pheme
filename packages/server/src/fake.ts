@@ -1,16 +1,23 @@
 import type { Engine, EngineAttachment, EngineEvent, EngineSession, PermissionRequest, SessionOptions } from "./engine.ts";
-import type { ModelOption } from "./protocol.ts";
+import type { ActivityEvent, ModelOption } from "./protocol.ts";
 
 export type FakeStep =
   | { say: string }
   | { tool: string; args: Record<string, unknown> }
   /** Pretend the engine ran one of its own built-in tools (needs approval unless kind is "read"). */
-  | { builtin: "shell" | "write" | "read"; detail: string }
+  | { builtin: "shell" | "write" | "read"; detail: string; progress?: string[] }
   | { delayMs: number }
   /** Run several tool calls at the same time, like a model that calls a tool twice in one response. */
   | { parallel: { tool: string; args: Record<string, unknown> }[] }
   /** Pretend Copilot delegated to one of the custom agents in opts.agents. */
-  | { delegate: string; task: string };
+  | { delegate: string; task: string }
+  /** Stream a reasoning block word by word (reasoning_delta), then send the final reasoning event. */
+  | { think: string }
+  /** Send one activity event (intent, todos, title) as the Copilot engine would. */
+  | { emit: ActivityEvent };
+
+/** Per-word pause while the fake streams reasoning, so the live timer is visible. */
+const THINK_WORD_MS = 60;
 
 export interface FakeContext {
   prompt: string;
@@ -61,6 +68,18 @@ export const defaultScript: FakeScript = ({ prompt, opts }) => {
   if (par) return [{ parallel: par[1].split("|").map((t) => ({ tool: "agent", args: { task: t.trim() } })) }, { say: "All agents finished." }];
   const del = /^delegate (\S+) (.+)$/i.exec(prompt);
   if (del) return [{ delegate: del[1], task: del[2] }, { say: "Delegated." }];
+  // "think": every activity event the Copilot engine may send (reasoning, intent, todos, progress, title).
+  if (/^think\b/i.test(prompt)) {
+    return [
+      { think: "The user wants a quick check. I will list the folder first, then say what I found, and keep the answer short." },
+      { emit: { type: "intent", text: "Listing the project folder" } },
+      { emit: { type: "todos", items: [{ id: "1", title: "List the folder", status: "in_progress" }, { id: "2", title: "Summarise it", status: "pending" }] } },
+      { builtin: "read", detail: "project", progress: ["Reading directory", "3 entries found"] },
+      { emit: { type: "todos", items: [{ id: "1", title: "List the folder", status: "done" }, { id: "2", title: "Summarise it", status: "in_progress" }] } },
+      { emit: { type: "title", title: "Check the project folder" } },
+      { say: "The folder has three entries." },
+    ];
+  }
   const steps = /\bsteps (\d+)/i.exec(prompt);
   if (steps) {
     const out: FakeStep[] = [];
@@ -96,7 +115,8 @@ export class FakeEngine implements Engine {
     return [
       { id: "auto", name: "Auto" },
       { id: "fake-mini", name: "Fake Mini (cheap)" },
-      { id: "fake-large", name: "Fake Large" },
+      // Only this model reports reasoning effort, so the composer's effort pill can be tried in fake mode.
+      { id: "fake-large", name: "Fake Large", reasoningEfforts: ["low", "medium", "high"], defaultReasoningEffort: "medium" },
     ];
   }
 
@@ -136,6 +156,10 @@ export class FakeEngine implements Engine {
             const known = opts.agents?.some((x) => x.name === (step as { delegate: string }).delegate);
             onEvent({ type: "subagent", phase: "start", id, name: step.delegate, task: step.task });
             onEvent({ type: "subagent", phase: "end", id, name: step.delegate, ok: !!known, result: known ? "" : "unknown agent" });
+          } else if ("think" in step) {
+            await think(step.think, `r${++n}`, onEvent, signal);
+          } else if ("emit" in step) {
+            onEvent(step.emit);
           } else if ("builtin" in step) {
             const id = `b${++n}-${Math.random().toString(36).slice(2, 7)}`;
             const name = step.builtin === "shell" ? "bash" : step.builtin === "write" ? "edit" : "view";
@@ -148,6 +172,10 @@ export class FakeEngine implements Engine {
               }
             }
             onEvent({ type: "tool_start", id, name, args: { detail: step.detail } });
+            for (const text of step.progress ?? []) {
+              onEvent({ type: "progress", id, text });
+              await sleep(THINK_WORD_MS * 5, signal);
+            }
             onEvent({ type: "tool_end", id, name, ok: true, result: `(fake ${step.builtin}) ${step.detail}` });
           }
         }
@@ -173,6 +201,17 @@ const sleep = (ms: number, signal?: AbortSignal) =>
       resolve();
     });
   });
+
+/** Stream reasoning as deltas, then the final block with the measured duration. */
+async function think(text: string, id: string, onEvent: (e: EngineEvent) => void, signal?: AbortSignal) {
+  const started = Date.now();
+  for (const w of text.match(/\S+\s*/g) ?? []) {
+    if (signal?.aborted) return;
+    onEvent({ type: "reasoning_delta", id, text: w });
+    await sleep(THINK_WORD_MS, signal);
+  }
+  onEvent({ type: "reasoning", id, text, ms: Date.now() - started });
+}
 
 async function say(text: string, onEvent: (e: EngineEvent) => void, delay: number, signal?: AbortSignal) {
   for (const w of text.match(/\S+\s*/g) ?? []) {

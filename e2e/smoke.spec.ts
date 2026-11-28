@@ -7,7 +7,15 @@ import { expect, test, type Page } from "@playwright/test";
 const TOKEN = "e2e-token-0123456789abcdefghij";
 const open = (page: Page, hash = "#/") => page.goto(`/?token=${TOKEN}${hash}`);
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
-const composer = (page: Page) => page.getByRole("textbox", { name: /message/i }).or(page.locator("textarea")).first();
+// Stable test ids: keep in step with packages/ui/src/testids.ts (the single list). Never select app structure by CSS class.
+const TID = {
+  shell: "shell", sidebarWrap: "sidebar-wrap", menuButton: "menu-button", userMessage: "user-message", userBlock: "user-block",
+  assistantBlock: "assistant-block", composerWrap: "composer-wrap", composerInput: "composer-input", contextMeter: "context-meter",
+  settingsPanel: "settings-panel", changeRow: "change-row", diffLine: "diff-line", commitDone: "commit-done", branchPill: "branch-pill", stashItem: "stash-item",
+  rightPanelToggle: "right-panel-toggle", rightTabChanges: "right-tab-changes", thinking: "thinking", todoRow: "todo-row",
+} as const;
+const tid = (page: Page, id: string) => page.getByTestId(id);
+const composer = (page: Page) => tid(page, TID.composerInput);
 
 async function send(page: Page, text: string) {
   const box = composer(page);
@@ -23,27 +31,42 @@ test.describe("Pheme in a real browser", () => {
     await open(page);
     await expect(page.getByRole("button", { name: "New chat" })).toBeVisible();
     await send(page, "hello from the e2e test");
-    await expect(page.locator(".bubble.user", { hasText: "hello from the e2e test" })).toBeVisible();
-    await expect(page.locator(".assistant").first()).toBeVisible();
+    await expect(tid(page, TID.userBlock).filter({ hasText: "hello from the e2e test" })).toBeVisible();
+    await expect(tid(page, TID.assistantBlock).first()).toBeVisible();
     await expect(page).toHaveURL(/#\/chat\//);
     expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  test("thinking: a scripted reasoning run shows Thinking, then Thought for Ns, with todos, and the reasoning survives a reload", async ({ page }) => {
+    await open(page);
+    await send(page, "think about the folder");
+    await expect(tid(page, TID.thinking).first()).toBeVisible();
+    await expect(page.getByText("Thinking", { exact: true })).toBeVisible();
+    await expect(tid(page, TID.todoRow).first()).toBeVisible();
+    await expect(page.getByText(/^Thought for \d+s$/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Check the project folder").first()).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(/^Thought for \d+s$/)).toBeVisible();
+    await page.getByRole("button", { name: /^Thought for \d+s$/ }).click();
+    await expect(page.getByText("The user wants a quick check", { exact: false })).toBeVisible();
   });
 
   test("the lazy-loaded markdown chunk loads with no failed requests, also after a reload", async ({ page }) => {
     await open(page);
     await send(page, "Show me:\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```js\nconst x = 1;\n```");
-    await page.locator(".assistant").first().waitFor();
+    await tid(page, TID.assistantBlock).first().waitFor();
     // (The fake engine does not produce markdown; formatting itself is covered by unit tests and the real-Copilot runs.)
-    await expect(page.locator(".assistant").first()).toBeVisible();
+    await expect(tid(page, TID.assistantBlock).first()).toBeVisible();
     const failed: string[] = [];
     page.on("response", (r) => { if (r.status() >= 400) failed.push(r.url()); });
     await page.reload();
-    await expect(page.locator(".assistant").first()).toBeVisible();
+    await expect(tid(page, TID.assistantBlock).first()).toBeVisible();
     expect(failed).toEqual([]);
   });
 
   test("command palette opens with the shortcut, changes the theme, and Esc closes it", async ({ page }) => {
     await open(page);
+    await expect(page.getByRole("button", { name: "New chat" })).toBeVisible(); // wait until the app has started and bound its shortcuts
     await page.keyboard.press(`${MOD}+KeyK`);
     const input = page.getByRole("combobox");
     await expect(input).toBeFocused();
@@ -51,7 +74,7 @@ test.describe("Pheme in a real browser", () => {
     await expect(page.getByRole("option").first()).toContainText(/Solarized/i);
     await page.keyboard.press("Enter");
     await expect(page.getByRole("combobox")).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--dt-background").trim())).toMatch(/^#/);
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--theme-background-seed").trim())).toBe("#002b36"); // Solarized dark: the seed applyTheme wrote
     await page.keyboard.press(`${MOD}+KeyK`);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("combobox")).toHaveCount(0);
@@ -59,7 +82,7 @@ test.describe("Pheme in a real browser", () => {
 
   test("keyboard: first Tab stop is the skip link, then the sidebar; every stop shows focus", async ({ page }) => {
     await open(page);
-    await page.locator(".sidebar-wrap").waitFor(); // no click: keyboard focus then starts at the top of the page
+    await tid(page, TID.sidebarWrap).waitFor(); // no click: keyboard focus then starts at the top of the page
     const seen: string[] = [];
     for (let i = 0; i < 6; i++) {
       await page.keyboard.press("Tab");
@@ -78,11 +101,13 @@ test.describe("Pheme in a real browser", () => {
   test("narrow screen: the sidebar is a drawer that Esc closes and returns focus to the menu button", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     await open(page);
-    const menu = page.locator(".menu-btn");
+    const menu = tid(page, TID.menuButton);
     await menu.click();
-    await expect(page.locator(".shell")).toHaveClass(/drawer-open/);
+    await expect(tid(page, TID.shell)).toHaveAttribute("data-drawer-open", "true");
+    // At 390px the open drawer must not push the page into a horizontal scroll either.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
     await page.keyboard.press("Escape");
-    await expect(page.locator(".shell")).not.toHaveClass(/drawer-open/);
+    await expect(tid(page, TID.shell)).not.toHaveAttribute("data-drawer-open", "true");
     await expect(menu).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   });
@@ -94,17 +119,18 @@ test.describe("Pheme in a real browser", () => {
     // The app removes the access key from the address bar, so a second tab needs it again (a duplicated tab keeps it).
     const other = await context.newPage();
     await other.goto(`/?token=${TOKEN}${new URL(page.url()).hash}`);
-    await expect(other.locator(".bubble.user", { hasText: "sync check" })).toBeVisible();
+    await expect(tid(other, TID.userBlock).filter({ hasText: "sync check" })).toBeVisible();
     await send(other, "second tab message");
-    await expect(page.locator(".bubble.user", { hasText: "second tab message" })).toBeVisible();
+    await expect(tid(page, TID.userBlock).filter({ hasText: "second tab message" })).toBeVisible();
     await other.close();
   });
 
   test("settings: search narrows the panels and a rebound shortcut takes effect", async ({ page }) => {
     await open(page, "#/settings");
     await page.getByLabel("Search settings").fill("backup");
-    await expect(page.locator(".panel:not([hidden]) h3")).toHaveText(["Backup and restore"]);
+    await expect(tid(page, TID.settingsPanel).filter({ visible: true }).getByRole("heading", { level: 3 })).toHaveText(["Backup and restore"]);
     await page.getByLabel("Search settings").fill("");
+    await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
     await page.getByRole("button", { name: /New chat: .* Change/ }).click();
     await page.keyboard.press("Alt+KeyJ");
     await expect(page.getByRole("button", { name: /New chat: .*J\. Change/ })).toBeVisible();
@@ -112,6 +138,18 @@ test.describe("Pheme in a real browser", () => {
     await page.keyboard.press("Alt+KeyJ");
     await expect(page).toHaveURL(/#\/$|#\/chat\//);
     await page.evaluate(() => localStorage.removeItem("pheme-keys"));
+  });
+
+  test("settings overlay: opens over the app, Escape closes it, and the breadcrumb follows the page", async ({ page }) => {
+    await open(page, "#/settings");
+    const dialog = page.getByRole("dialog", { name: "Settings" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Main model");
+    await page.getByRole("button", { name: "Notifications" }).click();
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Notifications");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page).toHaveURL(/#\/$|#\/chat\//);
   });
 
   test("git: choosing a project folder shows its changes, a diff, and commits to a new branch", async ({ page }) => {
@@ -129,20 +167,20 @@ test.describe("Pheme in a real browser", () => {
     await page.getByRole("button", { name: /Choose a project folder/ }).click();
     await page.getByLabel("Folder path").fill(repo);
     await page.getByRole("button", { name: "Use this folder" }).click();
-    const changes = page.getByRole("button", { name: /^Changes/ });
-    await changes.click();
-    await expect(page.locator(".change-row")).toHaveCount(2);
-    await page.locator(".change-row", { hasText: "a.txt" }).click();
-    await expect(page.locator(".diff .dl.add", { hasText: "+TWO" })).toBeVisible();
+    await tid(page, TID.rightPanelToggle).click();
+    await tid(page, TID.rightTabChanges).click();
+    await expect(tid(page, TID.changeRow)).toHaveCount(2);
+    await tid(page, TID.changeRow).filter({ hasText: "a.txt" }).click();
+    await expect(page.locator(`[data-testid="${TID.diffLine}"][data-kind="add"]`, { hasText: "+TWO" })).toBeVisible();
 
     await page.getByLabel("Commit message").fill("E2E commit");
     await page.getByRole("button", { name: /^Commit 2 files/ }).click();
     await page.getByRole("group", { name: "Confirm commit" }).getByRole("button", { name: "Commit" }).click();
-    await expect(page.locator(".commit-done")).toContainText("E2E commit");
+    await expect(tid(page, TID.commitDone)).toContainText("E2E commit");
     expect(git("rev-parse", "--abbrev-ref", "HEAD")).toMatch(/^pheme\//); // never committed on main
     expect(git("rev-list", "--count", "main")).toBe("1");
     await page.getByRole("button", { name: "Undo" }).click();
-    await expect(page.locator(".commit-done")).toHaveCount(0);
+    await expect(tid(page, TID.commitDone)).toHaveCount(0);
     expect(git("rev-list", "--count", "HEAD")).toBe("1");
     // Windows keeps a folder locked while Pheme is still watching it; the temp folder is not important enough to fail the test.
     try { fs.rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* left for the OS temp cleanup */ }
@@ -164,8 +202,9 @@ test.describe("Pheme in a real browser", () => {
     await page.getByRole("button", { name: /Choose a project folder/ }).click();
     await page.getByLabel("Folder path").fill(repo);
     await page.getByRole("button", { name: "Use this folder" }).click();
-    await page.getByRole("button", { name: /^Changes/ }).click();
-    await page.locator(".branch-pill").click();
+    await tid(page, TID.rightPanelToggle).click();
+    await tid(page, TID.rightTabChanges).click();
+    await tid(page, TID.branchPill).click();
 
     // switching onto a branch that would overwrite the edit asks first and changes nothing
     await page.getByRole("button", { name: /other/ }).filter({ hasText: "other edits a.txt" }).click();
@@ -174,7 +213,7 @@ test.describe("Pheme in a real browser", () => {
     expect(git("rev-parse", "--abbrev-ref", "HEAD")).toBe("main");
     expect(read("a.txt")).toBe("my edit\n");
     await confirm.getByRole("button", { name: "Set aside and switch" }).click();
-    await expect(page.locator(".stash-list li")).toHaveCount(1);
+    await expect(tid(page, TID.stashItem)).toHaveCount(1);
     expect(git("rev-parse", "--abbrev-ref", "HEAD")).toBe("other");
     expect(read("a.txt")).toBe("other side\n");
 
@@ -182,7 +221,7 @@ test.describe("Pheme in a real browser", () => {
     await page.getByRole("button", { name: /main/ }).filter({ hasText: "init" }).click();
     await expect.poll(() => git("rev-parse", "--abbrev-ref", "HEAD")).toBe("main");
     await page.getByRole("button", { name: /^Restore stash/ }).click();
-    await expect(page.locator(".stash-list li")).toHaveCount(0);
+    await expect(tid(page, TID.stashItem)).toHaveCount(0);
     expect(read("a.txt")).toBe("my edit\n");
 
     // a new branch keeps the edit
@@ -210,14 +249,14 @@ test.describe("Pheme in a real browser", () => {
     await composer(page).fill("please check these [context:110000]");
     await composer(page).press("Enter");
     await expect(page).toHaveURL(/#\/chat\//);
-    const msg = page.locator(".user-msg").first();
-    await expect(msg.locator(".bubble")).toContainText("please check these");
+    const msg = tid(page, TID.userMessage).first();
+    await expect(msg.getByTestId(TID.userBlock)).toContainText("please check these");
     await expect(msg.getByRole("button", { name: /notes\.md/ })).toBeVisible();
     const thumb = msg.getByRole("img", { name: "shot.png" });
     await expect(thumb).toBeVisible();
     await expect.poll(() => thumb.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1); // really decoded, through the authorised download
     await expect(page.getByRole("meter", { name: "Context used" })).toHaveAttribute("aria-valuetext", /110k of 128k tokens, 8\d percent/);
-    await expect(page.locator(".ctx-meter")).toContainText("getting full");
+    await expect(tid(page, TID.contextMeter)).toContainText("getting full");
     await expect(page.getByRole("list", { name: "Files to send" })).toHaveCount(0); // the composer is empty again
     // open the text file the way a user would: it must show as text and never run
     const [popup] = await Promise.all([page.waitForEvent("popup"), msg.getByRole("button", { name: /notes\.md/ }).click()]);
@@ -227,8 +266,8 @@ test.describe("Pheme in a real browser", () => {
     expect(dialogs).toEqual([]);
     // drag and drop onto the composer also attaches
     const dt = await page.evaluateHandle(() => { const d = new DataTransfer(); d.items.add(new File(["a,b\n1,2\n"], "data.csv", { type: "text/csv" })); return d; });
-    await page.locator(".composer-wrap").dispatchEvent("dragover", { dataTransfer: dt });
-    await page.locator(".composer-wrap").dispatchEvent("drop", { dataTransfer: dt });
+    await tid(page, TID.composerWrap).dispatchEvent("dragover", { dataTransfer: dt });
+    await tid(page, TID.composerWrap).dispatchEvent("drop", { dataTransfer: dt });
     await expect(page.getByRole("list", { name: "Files to send" }).getByText("data.csv")).toBeVisible();
   });
 
@@ -297,6 +336,7 @@ test.describe("Pheme in a real browser", () => {
 
   test("backup downloads a file that previews as a valid backup", async ({ page }) => {
     await open(page, "#/settings");
+    await page.getByRole("button", { name: "Backup & transfer" }).click();
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download backup" }).click()]);
     expect(download.suggestedFilename()).toMatch(/^pheme-backup-\d{8}-\d{4}\.pheme-backup$/);
     const file = await download.path();
