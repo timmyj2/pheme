@@ -81,9 +81,11 @@
 .delegate-body { display: grid; gap: 6px; padding-top: 6px; color: var(--dt-muted-foreground); }
 .delegate-body pre { margin: 0; max-height: 10rem; overflow: auto; font-family: var(--dt-font-mono); font-size: 11.5px; white-space: pre-wrap; }
 
-/* Approval card stack, at the bottom of the thread. The next card peeks 7px behind at 0.96 scale per level. */
+/* Approval card stack: docked under the transcript, above the composer, at the transcript column's width. The next card peeks 7px behind at 0.96 scale per level. */
 .approval-activity { font-size: 12px; color: var(--dt-muted-foreground); padding: 0 2px 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.approval-stack { position: relative; width: 100%; max-width: 36rem; margin: 6px auto 0; }
+.approval-dock { width: 100%; max-width: 72rem; margin: 0 auto; padding: 0 16px 8px; box-sizing: border-box; }
+.approval-dock:empty { display: none; }
+.approval-stack { position: relative; width: 100%; margin: 0; }
 .card-stack { position: relative; }
 .card-stack-peek { position: absolute; top: 0; border-radius: 12px; background: var(--dt-popover); border: 1px solid var(--dt-border); pointer-events: none; }
 .card-stack-front { position: relative; }
@@ -99,7 +101,7 @@
   font-family: var(--dt-font-mono); font-size: 12px; line-height: 1.6; color: var(--dt-foreground);
 }
 .approval-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 4px 8px 8px; flex-wrap: wrap; }
-.approval-actions .approval-run kbd { margin-left: 6px; opacity: 0.6; font-family: inherit; }
+.approval-run kbd { margin-left: 6px; padding: 0 5px; border: 0; border-radius: 4px; background: color-mix(in srgb, currentColor 22%, transparent); color: inherit; font-family: inherit; font-size: 12px; line-height: 1.5; }
 .approval-done { padding: 2px 0; overflow-wrap: anywhere; font-size: 12px; }
 .approval-done code { font-family: var(--dt-font-mono); font-size: 11.5px; }
 

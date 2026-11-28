@@ -93,6 +93,7 @@ export const ToolRow = memo(function ToolRow({ item, defaultOpen = false }: { it
         </span>
         <DisclosureCaret open={open} className="tool-caret" size="0.7rem" />
       </button>
+      {running && item.progress ? <span className="tool-progress" data-testid={TID.toolProgress}>{item.progress}</span> : null}
       {body}
     </div>
   );

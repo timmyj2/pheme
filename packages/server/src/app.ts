@@ -221,7 +221,11 @@ export class App {
         (e: EngineEvent) => {
           if (e.type === "tool_start") toolSteps++;
           if (e.type === "subagent") this.recordCopilotAgent(chatId, e);
-          else store.append(chatId, e);
+          else if (e.type === "title") {
+            // The engine's title replaces Pheme's first-line title only while the chat still has an automatic one.
+            const cur = store.get(chatId)?.title;
+            if (cur === "New chat" || cur === titleFrom(text)) store.update(chatId, { title: e.title.slice(0, 80) });
+          } else store.append(chatId, e);
         },
         turn.abort.signal,
         attached.some((a) => a.ref.kind === "image") ? imagesForEngine(attached) : undefined,

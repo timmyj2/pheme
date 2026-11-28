@@ -1,5 +1,6 @@
 import type { AttachmentRef } from "./api.ts";
 import type { AgentRun, ApprovalDecision, SeqEvent } from "./api.ts";
+import type { TodoItem } from "../../server/src/protocol.ts";
 
 export interface ToolItem {
   id: string;
@@ -9,6 +10,8 @@ export interface ToolItem {
   result?: string;
   startTs: number;
   endTs?: number;
+  /** Last line of the tool's progress or partial output, shown while it runs. */
+  progress?: string;
 }
 
 export type Block =
@@ -17,6 +20,7 @@ export type Block =
   | { kind: "tools"; key: string; items: ToolItem[] }
   | { kind: "approval"; key: string; id: string; title: string; detail: string; approvalKind: string; decision?: ApprovalDecision }
   | { kind: "agent"; key: string; run: AgentRun }
+  | { kind: "thinking"; key: string; id: string; text: string; ms?: number }
   | { kind: "notice"; key: string; text: string; tone: "skill" | "memory" | "info" | "error" };
 
 /** Turn the raw event log into what the transcript shows: consecutive tool calls grouped, tool results merged into their call. */
@@ -60,6 +64,15 @@ export function buildBlocks(events: SeqEvent[]): Block[] {
           blocks.push({ kind: "agent", key: `g${e.run.id}`, run: latestRun.get(e.run.id)! });
         }
         break;
+      case "reasoning":
+        blocks.push({ kind: "thinking", key: `r${e.seq}`, id: e.id, text: e.text, ...(e.ms !== undefined ? { ms: e.ms } : {}) });
+        break;
+      case "progress": {
+        const item = tools.get(e.id);
+        const line = lastLine(e.text);
+        if (item && line) item.progress = line;
+        break;
+      }
       case "notice":
         blocks.push({ kind: "notice", key: `n${e.seq}`, text: e.text, tone: e.kind });
         break;
@@ -71,6 +84,35 @@ export function buildBlocks(events: SeqEvent[]): Block[] {
     }
   }
   return blocks;
+}
+
+function lastLine(text: string): string {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  return (lines[lines.length - 1] ?? "").slice(0, 160);
+}
+
+/** The model's latest intent line for the turn in progress (none once the turn has ended). */
+export function latestIntent(events: SeqEvent[]): string | undefined {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e.type === "turn_start" || e.type === "idle") return undefined;
+    if (e.type === "intent") return e.text;
+  }
+  return undefined;
+}
+
+/** The newest todo list, when it still has something unfinished. A list that is all done is hidden. */
+export function latestTodos(events: SeqEvent[]): TodoItem[] | undefined {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e.type !== "todos") continue;
+    return e.items.some((t) => !isDone(t.status)) ? e.items : undefined;
+  }
+  return undefined;
+}
+
+export function isDone(status: string): boolean {
+  return /^(done|completed|complete)$/i.test(status);
 }
 
 /** One short line describing a tool call's arguments. */

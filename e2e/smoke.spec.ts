@@ -12,7 +12,7 @@ const TID = {
   shell: "shell", sidebarWrap: "sidebar-wrap", menuButton: "menu-button", userMessage: "user-message", userBlock: "user-block",
   assistantBlock: "assistant-block", composerWrap: "composer-wrap", composerInput: "composer-input", contextMeter: "context-meter",
   settingsPanel: "settings-panel", changeRow: "change-row", diffLine: "diff-line", commitDone: "commit-done", branchPill: "branch-pill", stashItem: "stash-item",
-  rightPanelToggle: "right-panel-toggle", rightTabChanges: "right-tab-changes",
+  rightPanelToggle: "right-panel-toggle", rightTabChanges: "right-tab-changes", thinking: "thinking", todoRow: "todo-row",
 } as const;
 const tid = (page: Page, id: string) => page.getByTestId(id);
 const composer = (page: Page) => tid(page, TID.composerInput);
@@ -35,6 +35,20 @@ test.describe("Pheme in a real browser", () => {
     await expect(tid(page, TID.assistantBlock).first()).toBeVisible();
     await expect(page).toHaveURL(/#\/chat\//);
     expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  test("thinking: a scripted reasoning run shows Thinking, then Thought for Ns, with todos, and the reasoning survives a reload", async ({ page }) => {
+    await open(page);
+    await send(page, "think about the folder");
+    await expect(tid(page, TID.thinking).first()).toBeVisible();
+    await expect(page.getByText("Thinking", { exact: true })).toBeVisible();
+    await expect(tid(page, TID.todoRow).first()).toBeVisible();
+    await expect(page.getByText(/^Thought for \d+s$/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Check the project folder").first()).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(/^Thought for \d+s$/)).toBeVisible();
+    await page.getByRole("button", { name: /^Thought for \d+s$/ }).click();
+    await expect(page.getByText("The user wants a quick check", { exact: false })).toBeVisible();
   });
 
   test("the lazy-loaded markdown chunk loads with no failed requests, also after a reload", async ({ page }) => {

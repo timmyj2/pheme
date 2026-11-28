@@ -19,6 +19,9 @@ export const TID = {
   turn: "turn", // one user prompt and the replies after it
   scrollToBottom: "scroll-to-bottom", // the floating pill when the reader is scrolled up
   workingRow: "working-row", // the quiet working line while a turn runs
+ thinking: "thinking", // the reasoning disclosure: live "Thinking" or "Thought for Ns"
+ toolProgress: "tool-progress", // the last progress line under a running tool
+ todoRow: "todo-row", // one todo in the status stack
   replyActions: "reply-actions", // the hover bar under a reply
   userMessage: "user-message", // whole message (bubble + attachments + actions)
   userBlock: "user-block", // the bubble text

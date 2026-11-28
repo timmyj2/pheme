@@ -116,7 +116,7 @@ export class ChatStore {
     return out;
   }
 
-  /** Append an event. `delta` events are streamed but not persisted. */
+  /** Append an event. `delta`, `reasoning_delta` and `progress` are streamed but not persisted. */
   append(id: string, event: ChatEvent): SeqEvent {
     let seq = this.seqs.get(id);
     if (seq === undefined) {
@@ -127,7 +127,7 @@ export class ChatStore {
     this.seqs.set(id, seq);
     const full = { ...event, seq, ts: Date.now() } as SeqEvent;
     if (this.removed.has(id)) return full;
-    if (event.type !== "delta") {
+    if (event.type !== "delta" && event.type !== "reasoning_delta" && event.type !== "progress") {
       this.repairTail(id);
       fs.appendFileSync(this.logFile(id), JSON.stringify(full) + "\n");
     }

@@ -15,6 +15,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .row-actions button:hover { color: var(--dt-foreground); background: var(--dt-muted); }
 .spin { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--dt-primary); border-right-color: transparent; animation: spin 0.8s linear infinite; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Running session row (Hermes arc-border, adapted): a clipped gold arc travels round the row's edge. Transform only, so it is
+   compositor work; the static dot stands in the lead slot, and reduced motion stops the arc. */
+.running-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dt-primary); flex: none; }
+.arc-border { --arc-c0: transparent; --arc-c1: var(--dt-primary); --arc-c2: color-mix(in srgb, var(--dt-primary) 45%, transparent); --arc-angle: 160deg; --arc-width: 1px; --arc-duration: 2.23s; pointer-events: none; position: absolute; inset: 0; overflow: hidden; border-radius: 6px; padding: var(--arc-width); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.arc-border::before { content: ""; position: absolute; top: 0; left: 0; width: 240%; height: 240%; background: repeating-linear-gradient(var(--arc-angle), transparent 0%, var(--arc-c0) 18.75%, var(--arc-c1) 25%, var(--arc-c2) 31.25%, transparent 43.75%, transparent 50%); will-change: transform; animation: arc-border var(--arc-duration) linear infinite; }
+@keyframes arc-border { from { transform: translate(0, 0); } to { transform: translate(-50%, -50%); } }
+@media (prefers-reduced-motion: reduce) { .arc-border::before { animation: none; } }
 .link { background: none; border: 0; color: var(--dt-muted-foreground); cursor: pointer; text-align: left; padding: 2px 6px; }
 .top-folder { align-self: center; flex: 0 1 auto; max-width: 46%; min-width: 0; min-height: 0; max-height: 28px; height: 28px; overflow: hidden; display: flex; align-items: center; position: relative; z-index: 2; }
 .top-folder:empty { display: none; }
@@ -42,24 +49,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .page-head h1 { margin: 0; font-size: 18px; font-weight: 600; }
 .page-head p { margin: 2px 0 0; }
 .chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.thinking { color: var(--dt-muted-foreground); letter-spacing: 3px; animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 0.3; } }
 
-.tool-row { font-size: 12.5px; }
-.tool-head { width: 100%; display: flex; gap: 8px; align-items: center; background: none; border: 0; padding: 3px 0; cursor: pointer; text-align: left; color: var(--dt-muted-foreground); }
-.tool-head:hover { color: var(--dt-foreground); }
-.tool-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dt-muted-foreground); flex: none; }
-.tool-row[data-state="ok"] .tool-dot { background: #2da44e; }
-.tool-row[data-state="failed"] .tool-dot { background: var(--dt-destructive); }
-.tool-row[data-state="running"] .tool-dot { background: var(--dt-primary); animation: pulse 1s infinite; }
-.tool-name { font-family: var(--dt-font-mono); color: var(--dt-foreground); }
-.tool-sum { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tool-body { margin: 2px 0 6px 15px; padding: 8px 10px; background: var(--dt-muted); border-radius: var(--radius); font-family: var(--dt-font-mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
 
 .approval { background: var(--dt-popover); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow-float); outline: 1px solid var(--stroke-float); }
-.approval-title { font-weight: 600; margin-bottom: 6px; }
-.approval-detail { margin: 0 0 10px; padding: 8px 10px; background: var(--dt-muted); border-radius: 8px; font-family: var(--dt-font-mono); font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: auto; }
-.approval-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .notice { font-size: 12.5px; padding: 6px 10px; border-radius: var(--radius); background: var(--dt-accent); color: var(--dt-muted-foreground); }
 .notice.error { background: color-mix(in srgb, var(--dt-destructive) 14%, transparent); color: var(--dt-destructive-text); }
 .notice.banner { margin: 0 24px 8px; }
@@ -94,14 +87,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .job { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
 .job + .job { border-top: 1px solid var(--dt-border); }
 
-.agent-card { border-radius: var(--radius); background: var(--dt-accent); font-size: 12.5px; }
-.agent-head { width: 100%; display: flex; gap: 8px; align-items: center; background: none; border: 0; padding: 7px 10px; cursor: pointer; text-align: left; }
-.agent-task { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dt-muted-foreground); }
-.agent-card[data-status="done"] .tool-dot { background: #2da44e; }
-.agent-card[data-status="error"] .tool-dot, .agent-card[data-status="cancelled"] .tool-dot { background: var(--dt-destructive); }
-.agent-card[data-status="running"] .tool-dot { background: var(--dt-primary); animation: pulse 1s infinite; }
-.agent-body { padding: 0 10px 8px; }
-.agent-body pre { margin: 2px 0 8px; padding: 8px 10px; background: var(--dt-muted); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto; font-family: var(--dt-font-mono); }
 
 .load-earlier { align-self: center; }
 

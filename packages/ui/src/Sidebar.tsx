@@ -92,7 +92,7 @@ function NavIcon({ name }: { name: string }) {
   );
 }
 
-const ROW = "group flex w-full min-h-[26px] items-center gap-2 rounded-md border border-solid bg-transparent px-2 py-1 text-left text-[12.5px] transition-colors";
+const ROW = "group relative flex w-full min-h-[26px] items-center gap-2 rounded-md border border-solid bg-transparent px-2 py-1 text-left text-[12.5px] transition-colors";
 
 function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, onDelete, onExport }: {
   c: ChatRow; active: boolean; unread: boolean; tabStop: boolean;
@@ -168,8 +168,9 @@ function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, 
             else if (e.key === "Delete") { e.preventDefault(); onDelete(); }
           }}
         >
+          {c.busy && <span aria-hidden="true" className="arc-border arc-row" />}
           <span className="flex w-3.5 shrink-0 justify-center" aria-hidden="true">
-            {c.busy ? <span className="spin" role="img" aria-label="working" /> : unread ? <span className="dot" role="img" aria-label="new activity" /> : <span className="size-[7px] rounded-full border border-muted-foreground/70" />}
+            {c.busy ? <span className="running-dot" role="img" aria-label="working" /> : unread ? <span className="dot" role="img" aria-label="new activity" /> : <span className="size-[7px] rounded-full border border-muted-foreground/70" />}
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-px leading-tight">
             <span className="truncate">{c.title}</span>
@@ -376,7 +377,7 @@ export function Sidebar(props: {
             {pinned.length === 0 ? (
               <p className="flex items-center gap-2 px-2 py-1 text-[11.5px] text-muted-foreground"><IconPin className="size-3.5" aria-hidden="true" />Shift-click a chat to pin</p>
             ) : (
-              <ul className="flex flex-col gap-px">{pinned.map((c) => renderRow(c))}</ul>
+              <ul className="flex flex-col gap-px pl-1">{pinned.map((c) => renderRow(c))}</ul>
             )}
           </section>
         )}

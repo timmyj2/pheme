@@ -78,3 +78,13 @@ One line each: **decision** — why. The owner reviews these.
 - **Hybrid port: Tailwind v4 + Hermes token layer + ported `components/ui` primitives + ported chat and shell components rewired onto Pheme's `blocks.ts` and SSE** — no assistant-ui, nanostores or react-query. Also not used: `@nous-research/ui` (it ships the foundry fonts).
 - **Stub-or-skip policy** — build only UI the Copilot CLI backend can support. Hermes pages that need a backend Copilot does not have are skipped.
 - **Real-Copilot event probe (build-plan item 4) skipped by the owner** — Copilot-dependent UI (reasoning, intent, todos, progress, effort pill) is built from the pinned SDK's type definitions, feature-detected (hidden when the event never arrives), and tested in fake mode only. It has not been seen from a real CLI.
+- **Activity events mapped from the pinned SDK types, none confirmed on real Copilot (build-plan item 11)** — the real-run probe (item 4) was skipped, so these come from `@github/copilot-sdk` 1.0.34 `generated/session-events.d.ts` and `rpc.d.ts`. Status: type-defined, **not seen on a real CLI** for any event.
+  - `assistant.reasoning_delta` → `reasoning_delta` (streamed, not persisted; `deltaContent`, `reasoningId`)
+  - `assistant.reasoning` → `reasoning` (persisted; `content`, `reasoningId`; `ms` measured by Pheme from the first delta, absent when no delta came)
+  - `assistant.intent` → `intent` (persisted; `intent`; shown in the working row for the current turn only)
+  - `session.todos_changed` → `todos` (persisted; the event is signal-only, so Pheme reads `session.rpc.plan.readSqlTodosWithDependencies()`, an `@experimental` RPC, and keeps rows with a title; the list is shown while any item is unfinished)
+  - `tool.execution_progress` → `progress` and `tool.execution_partial_result` → `progress` with `partial: true` (streamed, not persisted; the last line shows under the running tool row)
+  - `session.title_changed` → `title` (not persisted; replaces the chat title only while it is still the automatic one)
+  - Not mapped: `tool.shell_output` (raw shell chunks; the progress line covers the need for now).
+  - Fake mode: `think <text>` emits all of the above; tests in `packages/server/test/activity.test.ts`, `packages/ui/test/thinking.test.tsx` and the fake-mode e2e test in `e2e/smoke.spec.ts`. A missing event hides its piece: no reasoning means no Thinking block, no intent means "Working", no todos means no Todos row, no progress means no line under a tool.
+  - Setting "Collapse thinking by default" (`collapseThinking`, default off) removes the live preview only.

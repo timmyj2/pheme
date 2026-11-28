@@ -1,4 +1,4 @@
-import type { ModelOption } from "./protocol.ts";
+import type { ActivityEvent, ModelOption } from "./protocol.ts";
 
 export interface ToolDef {
   name: string;
@@ -23,7 +23,8 @@ export type EngineEvent =
   | { type: "tool_end"; id: string; name: string; ok: boolean; result: string }
   | { type: "subagent"; phase: "start" | "end"; id: string; name: string; task?: string; ok?: boolean; result?: string }
   | { type: "usage"; used: number; limit: number }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | ActivityEvent;
 
 export interface SessionOptions {
   /** Pheme chat id; also the engine session id so it can be resumed. */

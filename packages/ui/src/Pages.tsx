@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { OverlayView } from "./components/overlay/overlay-view.tsx";
 import { OverlayBreadcrumb, OverlayMain, OverlayNav, OverlaySplitLayout, type NavGroup } from "./components/overlay/overlay-split-layout.tsx";
 import { SettingRow, SettingSelect, SettingsHeading, SettingsPanel, SwitchRow } from "./components/overlay/settings-rows.tsx";
@@ -14,6 +14,12 @@ import { THEMES, parseTheme, themeValue, type Mode } from "./themes/presets.ts";
 import { api, type BootstrapState, type CuratorState, type MemoryState, type ModelOption, type Settings, type SkillSummary } from "./api.ts";
 import { useToast } from "./toast.tsx";
 import { TID } from "./testids.ts";
+import { CapabilitiesTabs } from "./components/page/capabilities-tabs.tsx";
+import { PageHeader } from "./components/page/page-header.tsx";
+import { SkillCard } from "./components/page/skill-card.tsx";
+import { filterSkills, groupSkills, skillCategories } from "./components/page/skill-filter.ts";
+import { Input } from "./components/ui/input.tsx";
+import { Textarea } from "./components/ui/textarea.tsx";
 
 export function Head({ title, sub }: { title: string; sub?: string }) {
   return (
@@ -72,7 +78,7 @@ function MemoryList({ label, store, entries, limit, onSaved }: { label: string; 
     <section className="panel">
       <h3>{label}</h3>
       <p className="muted small">Separate entries with a line containing only §.</p>
-      <textarea className="area" rows={10} value={text} onChange={(e) => setText(e.target.value)} aria-label={label} />
+      <Textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} aria-label={label} />
       <div className="row">
         <span className={used > limit ? "over" : "muted"}>{used.toLocaleString()} / {limit.toLocaleString()} characters</span>
         <button className="btn primary" disabled={used > limit || !dirty} onClick={() => void save()}>Save</button>
@@ -91,7 +97,8 @@ export function MemoryPage() {
   }, [reload]);
   return (
     <section className="page">
-      <Head title="Memory" sub="Facts Pheme loads into every new chat. The agent can edit these too." />
+      <CapabilitiesTabs active="memory" />
+      <PageHeader title="Memory" subtitle="Facts Pheme loads into every new chat. The agent can edit these too." />
       {error && !m && <LoadError error={error} onRetry={() => void reload()} />}
       {m && (
         <>
@@ -115,7 +122,9 @@ export function SkillsPage({ name, onOpen }: { name: string | null; onOpen: (nam
   const [files, setFiles] = useState<string[]>([]);
   const [loadingSkill, setLoadingSkill] = useState(false);
   const [guard, setGuard] = useState<null | (() => void)>(null);
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<string>("All");
+  const [archiveName, setArchiveName] = useState<string | null>(null);
   const dirty = (isNew || !!name) && content !== saved;
   useUnsaved(dirty);
   const nameRef = useRef(name);
@@ -160,56 +169,91 @@ export function SkillsPage({ name, onOpen }: { name: string | null; onOpen: (nam
     }
   };
 
+  const all = list ?? [];
+  const categories = useMemo(() => skillCategories(list ?? []), [list]);
+  const shown = filterSkills(all, query, category);
+  const groups = groupSkills(shown, categories, category);
+  const editing = !!name || isNew;
+  const back = () => guarded(() => { setIsNew(false); onOpen(null); });
+
   return (
     <section className="page wide">
-      <Head title="Skills" sub="Reusable procedures. Pheme writes these after long tasks; you can edit them." />
-      <div className="panel">
-        <h3>Skill curator</h3>
-        <p className="muted small">Every few days Pheme merges overlapping skills and archives ones that have not been used for a long time. Nothing is ever deleted; archived skills stay in the skills/.archive folder.</p>
-        <div className="row">
-          <button className="btn" disabled={curator?.running} onClick={() => { void api.runCurator().then(() => setTimeout(() => { loadCurator(); void reloadList(); }, 1500)).catch((e: Error) => toast.error(e.message)); }}>{curator?.running ? "Running…" : "Run curator now"}</button>
-          <span className="muted small">{curator?.lastRunAt ? `Last run ${new Date(curator.lastRunAt).toLocaleString()}` : "Has not run yet"}</span>
-        </div>
-        {curator && curator.report.length > 0 && <ul className="small">{curator.report.map((l, i) => <li key={i}>{l}</li>)}</ul>}
-      </div>
-      {error && !list && <LoadError error={error} onRetry={() => void reloadList()} />}
-      <div className="split">
-        <div className="panel list">
-          <button className="btn" onClick={() => guarded(() => { setIsNew(true); setContent(NEW_SKILL); setSaved(""); setFiles([]); onOpen(null); })}>New skill</button>
-          <ul>
-            {(list ?? []).map((s) => (
-              <li key={s.name} className={name === s.name && !isNew ? "active" : ""}>
-                <button aria-current={name === s.name && !isNew ? "true" : undefined} onClick={() => guarded(() => { setIsNew(false); onOpen(s.name); })}><strong>{s.name}</strong><span className="muted small">{s.description}</span></button>
-              </li>
-            ))}
-          </ul>
-          {list && list.length === 0 && <p className="muted small">No skills yet.</p>}
-        </div>
-        <div className="panel grow">
-          {name || isNew ? (
-            <>
-              <textarea className="area tall" value={content} disabled={loadingSkill} onChange={(e) => setContent(e.target.value)} aria-label="Skill content" spellCheck={false} />
-              {files.length > 1 && <p className="muted small">Files: {files.join(", ")}</p>}
-              <div className="row">
-                <button className="btn primary" disabled={!dirty} onClick={() => void save()}>Save</button>
-                {!isNew && <button className="btn danger" onClick={() => setConfirmArchive(true)}>Archive</button>}
-                {dirty && <span className="muted small">Unsaved changes</span>}
-              </div>
-            </>
-          ) : (
-            <p className="muted">Pick a skill to read or edit it.</p>
+      <CapabilitiesTabs active="skills" counts={{ skills: list?.length }} />
+      {editing ? (
+        <>
+          <PageHeader
+            title={isNew ? "New skill" : name ?? ""}
+            subtitle="Reusable procedures. Pheme writes these after long tasks; you can edit them."
+            actions={<button className="btn" onClick={back}>All skills</button>}
+          />
+          <div className="panel grow">
+            <Textarea rows={18} className="font-mono" value={content} disabled={loadingSkill} onChange={(e) => setContent(e.target.value)} aria-label="Skill content" />
+            {files.length > 1 && <p className="muted small">Files: {files.join(", ")}</p>}
+            <div className="row">
+              <button className="btn primary" disabled={!dirty} onClick={() => void save()}>Save</button>
+              {!isNew && <button className="btn danger" onClick={() => setArchiveName(name)}>Archive</button>}
+              {dirty && <span className="muted small">Unsaved changes</span>}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="page-head flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="m-0 text-[22px] font-semibold">Skills</h2>
+              <p className="muted mt-1 text-[13px]">Reusable procedures. Pheme writes these after long tasks; you can edit them.</p>
+            </div>
+            <button className="btn" onClick={() => guarded(() => { setIsNew(true); setContent(NEW_SKILL); setSaved(""); setFiles([]); onOpen(null); })}>New skill</button>
+          </div>
+          <div className="mx-6 mb-3 flex h-10 items-center gap-2 rounded-[6px] border border-(--ui-stroke-secondary) bg-(--ui-bg-card) px-3">
+            <IconSearch className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="rounded-[3px] bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">Skills</span>
+            <Input className="h-full border-0 bg-transparent px-0 focus-visible:ring-0" aria-label="Search skills" placeholder="Search skills by name or description" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+          {categories.length > 0 && (
+            <div role="group" aria-label="Filter skills by category" className="mx-6 mb-6 flex flex-wrap gap-1.5">
+              {["All", ...categories].map((c) => (
+                <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)}
+                  className={`h-7 rounded-[4px] border px-3 text-[13px] ${category === c ? "border-primary bg-primary text-primary-foreground" : "border-(--ui-stroke-secondary) text-muted-foreground hover:text-foreground"}`}>
+                  {c === "All" ? "All" : c.charAt(0).toUpperCase() + c.slice(1)}
+                </button>
+              ))}
+            </div>
           )}
-        </div>
-      </div>
+          {error && !list && <div className="mx-6"><LoadError error={error} onRetry={() => void reloadList()} /></div>}
+          {list && list.length === 0 && <p className="muted mx-6 text-[13px]">No skills yet. Pheme writes one after a long task, or press New skill.</p>}
+          {list && list.length > 0 && shown.length === 0 && <p className="muted mx-6 text-[13px]">No skill matches “{query}”.</p>}
+          {groups.map((g) => (
+            <section key={g.title} className="mx-6 mb-8" aria-label={g.title}>
+              <h3 className="m-0 text-[20px] font-semibold">{g.title}</h3>
+              <p className="muted mt-1 mb-4 text-[13px]">{g.items.length} {g.items.length === 1 ? "skill" : "skills"}</p>
+              <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(14rem,1fr))]">
+                {g.items.map((s) => (
+                  <SkillCard key={s.name} skill={s} onOpen={() => guarded(() => { setIsNew(false); onOpen(s.name); })} onArchive={() => setArchiveName(s.name)} />
+                ))}
+              </div>
+            </section>
+          ))}
+          <div className="panel mx-6 mb-6">
+            <h3>Skill curator</h3>
+            <p className="muted small">Every few days Pheme merges overlapping skills and archives ones that have not been used for a long time. Nothing is ever deleted; archived skills stay in the skills/.archive folder.</p>
+            <div className="row">
+              <button className="btn" disabled={curator?.running} onClick={() => { void api.runCurator().then(() => setTimeout(() => { loadCurator(); void reloadList(); }, 1500)).catch((e: Error) => toast.error(e.message)); }}>{curator?.running ? "Running…" : "Run curator now"}</button>
+              <span className="muted small">{curator?.lastRunAt ? `Last run ${new Date(curator.lastRunAt).toLocaleString()}` : "Has not run yet"}</span>
+            </div>
+            {curator && curator.report.length > 0 && <ul className="small">{curator.report.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+          </div>
+        </>
+      )}
       {guard && <ConfirmDialog title="Discard unsaved changes?" body="You have edits to this skill that are not saved." confirmLabel="Discard" danger onConfirm={() => { const g = guard; setGuard(null); g(); setSaved(content); }} onClose={() => setGuard(null)} />}
-      {confirmArchive && name && (
+      {archiveName && (
         <ConfirmDialog
-          title={`Archive "${name}"?`}
+          title={`Archive "${archiveName}"?`}
           body="The skill moves to the archive folder and Pheme stops using it. Nothing is deleted."
           confirmLabel="Archive"
           danger
-          onConfirm={() => { api.archiveSkill(name).then(() => { toast.info(`Archived "${name}"`); onOpen(null); void reloadList(); }).catch((e: Error) => toast.error(e.message)); }}
-          onClose={() => setConfirmArchive(false)}
+          onConfirm={() => { const target = archiveName; api.archiveSkill(target).then(() => { toast.info(`Archived "${target}"`); if (target === nameRef.current) onOpen(null); void reloadList(); }).catch((e: Error) => toast.error(e.message)); }}
+          onClose={() => setArchiveName(null)}
         />
       )}
     </section>
@@ -404,6 +448,12 @@ export function SettingsPage({ state, onChange, onClose }: { state: BootstrapSta
                 description="Off unless you turn it on."
                 label="Soft background behind the chat"
                 onChange={(on) => { try { localStorage.setItem("pheme-wallpaper", on ? "1" : "0"); } catch { /* private mode: this tab still shows it */ } document.documentElement.classList.toggle("wallpaper", on); }}
+              />
+              <SwitchRow
+                checked={s.collapseThinking}
+                description="No live preview while the model reasons. The finished thinking stays collapsed."
+                label="Collapse thinking by default"
+                onChange={(on) => void set({ collapseThinking: on })}
               />
             </SettingsPanel>
             <SettingsPanel page="appearance">

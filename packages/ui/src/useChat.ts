@@ -23,6 +23,8 @@ const BACKOFF = [500, 1000, 2000, 4000, 8000];
 export function useChat(chatId: string | null, opts: { onChange: () => void; onError: (m: string) => void; /** An upload failed: give the text and files back to the composer. */ onRestore?: (text: string, files: File[]) => void }) {
   const [events, setEvents] = useState<SeqEvent[]>([]);
   const [streaming, setStreaming] = useState("");
+  // Reasoning being streamed right now (not persisted). Cleared when the final reasoning block arrives.
+  const [reasoning, setReasoning] = useState<{ text: string; since: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [live, setLive] = useState<Live>("connecting");
   const [loaded, setLoaded] = useState(false);
@@ -40,6 +42,7 @@ export function useChat(chatId: string | null, opts: { onChange: () => void; onE
   useEffect(() => {
     setEvents([]);
     setStreaming("");
+    setReasoning(null);
     setBusy(false);
     setPending([]);
     setQueue([]);
@@ -62,9 +65,14 @@ export function useChat(chatId: string | null, opts: { onChange: () => void; onE
         setStreaming((s) => s + e.text);
         return;
       }
+      if (e.type === "reasoning_delta") {
+        setReasoning((r) => ({ text: (r?.text ?? "") + e.text, since: r?.since ?? Date.now() }));
+        return;
+      }
       if (e.seq <= lastSeq.current) return;
       lastSeq.current = e.seq;
       if (e.type === "message") setStreaming("");
+      if (e.type === "reasoning" || e.type === "idle") setReasoning(null);
       if (e.type === "turn_start") setBusy(true);
       if (e.type === "user") setPending((p) => { const i = p.findIndex((x) => x.text === e.text && !x.failed); return i < 0 ? p : p.filter((_, j) => j !== i); });
       if (e.type === "idle") {
@@ -193,5 +201,5 @@ export function useChat(chatId: string | null, opts: { onChange: () => void; onE
     if (chatId) void api.approve(chatId, approvalId, d).catch((e: Error) => optsRef.current.onError(e.message));
   }, [chatId]);
 
-  return { events, streaming, busy, live, loaded, loadError, pending, queue, send, stop, dropPending, removeQueued, answer };
+  return { events, streaming, reasoning, busy, live, loaded, loadError, pending, queue, send, stop, dropPending, removeQueued, answer };
 }

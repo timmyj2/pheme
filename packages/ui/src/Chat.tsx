@@ -5,6 +5,7 @@ import { api } from "./api.ts";
 import { RightPanel } from "./RightPanel.tsx";
 import { ModelControls } from "./components/composer/model-controls.tsx";
 import { runningActivity } from "./components/composer/status-stack.tsx";
+import { latestTodos } from "./blocks.ts";
 import { ProjectBar } from "./ProjectBar.tsx";
 import { useGit } from "./useGit.ts";
 import { Composer, type ComposerHandle } from "./Composer.tsx";
@@ -22,6 +23,8 @@ interface Props {
   defaultModel: string;
   /** The reasoning effort chosen in Settings or the composer ("" = the model's default). */
   reasoningEffort?: string;
+  /** The "Collapse thinking by default" setting. */
+  collapseThinking?: boolean;
   onReasoningEffort?: (effort: string) => void;
   offline: boolean;
   composerRef: RefObject<ComposerHandle | null>;
@@ -38,7 +41,7 @@ interface Props {
   folderInTop?: boolean;
 }
 
-export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaultModel, reasoningEffort = "", onReasoningEffort, offline, folderInTop, composerRef, autoSend, autoFiles, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
+export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaultModel, reasoningEffort = "", collapseThinking = false, onReasoningEffort, offline, folderInTop, composerRef, autoSend, autoFiles, onAutoSent, onCreate, onChanged, onOpenChat, onBusy }: Props) {
   const toast = useToast();
   const chat = useChat(chatId, { onChange: onChanged, onError: (m) => toast.error(m), onRestore: (text, files) => { composerRef.current?.insert(text); composerRef.current?.addFiles(files); } });
   const sentAuto = useRef(false);
@@ -110,6 +113,8 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
         chatId={chatId}
         events={chat.events}
         streaming={chat.streaming}
+        thinking={chat.reasoning}
+        collapseThinking={collapseThinking}
         busy={chat.busy}
         loaded={chat.loaded}
         pending={chat.pending}
@@ -129,6 +134,7 @@ export function ChatView({ chatId, projectDir: dirProp, model: modelProp, defaul
         offline={offline}
         queue={chat.queue}
         activity={runningActivity(chat.events)}
+        todos={latestTodos(chat.events)}
         git={git.status?.repo ? { branch: git.status.branch ?? "", behind: git.status.behind ?? 0, changed: git.status.files.length + (git.status.moreFiles ?? 0) } : null}
         hasMessages={chat.events.length > 0}
         projectDir={projectDir}

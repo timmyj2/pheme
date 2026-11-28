@@ -102,6 +102,11 @@ describe("Sidebar", () => {
     expect(screen.getByLabelText("new activity")).toBeInTheDocument();
     expect(screen.getByText("Gamma").closest("button")).toHaveAttribute("aria-current", "page");
   });
+  it("marks only the running row with the travelling arc; the others get no arc", () => {
+    setup([chat("a", "Alpha", 1, { busy: true } as never), chat("b", "Beta", 2)]);
+    expect(screen.getByText("Alpha").closest("button")?.querySelector(".arc-border")).not.toBeNull();
+    expect(screen.getByText("Beta").closest("button")?.querySelector(".arc-border")).toBeNull();
+  });
   it("renders only the first page of a huge list, with a way to see more", async () => {
     const user = userEvent.setup();
     const many = Array.from({ length: ROW_LIMIT * 2 + 10 }, (_, i) => chat(`c${i}`, `Chat ${i}`, i));

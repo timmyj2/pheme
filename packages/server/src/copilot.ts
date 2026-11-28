@@ -155,6 +155,8 @@ export class CopilotEngine implements Engine {
     return {
       async send(prompt, onEvent, signal, attachments) {
         const names = new Map<string, string>();
+        const reasoningStart = new Map<string, number>(); // first delta time per reasoning block, for "Thought for Ns"
+        const todoReads: Promise<void>[] = [];
         await new Promise<void>((resolve, reject) => {
           let lastUsage: { used: number; limit: number } | undefined;
           const off = session.on(((raw: unknown) => {
@@ -163,6 +165,41 @@ export class CopilotEngine implements Engine {
             switch (ev.type) {
               case "assistant.message_delta":
                 onEvent({ type: "delta", text: String(d.deltaContent ?? "") });
+                break;
+              case "assistant.reasoning_delta": {
+                const id = String(d.reasoningId ?? "");
+                if (!reasoningStart.has(id)) reasoningStart.set(id, Date.now());
+                onEvent({ type: "reasoning_delta", id, text: String(d.deltaContent ?? "") });
+                break;
+              }
+              case "assistant.reasoning": {
+                const id = String(d.reasoningId ?? "");
+                const started = reasoningStart.get(id);
+                if (d.content) onEvent({ type: "reasoning", id, text: String(d.content), ...(started !== undefined ? { ms: Date.now() - started } : {}) });
+                break;
+              }
+              case "assistant.intent":
+                if (d.intent) onEvent({ type: "intent", text: String(d.intent) });
+                break;
+              case "session.todos_changed":
+                // Signal only: the rows are read back over RPC. Idle waits for these reads so the list lands inside the turn.
+                todoReads.push(
+                  session.rpc.plan.readSqlTodosWithDependencies().then((r) => {
+                    const items = r.rows
+                      .map((row) => ({ id: String(row.id ?? ""), title: String(row.title ?? ""), status: String(row.status ?? "pending") }))
+                      .filter((t) => t.title);
+                    onEvent({ type: "todos", items });
+                  }).catch(() => {}),
+                );
+                break;
+              case "tool.execution_progress":
+                if (d.progressMessage) onEvent({ type: "progress", id: String(d.toolCallId), text: String(d.progressMessage) });
+                break;
+              case "tool.execution_partial_result":
+                if (d.partialOutput) onEvent({ type: "progress", id: String(d.toolCallId), text: String(d.partialOutput), partial: true });
+                break;
+              case "session.title_changed":
+                if (typeof d.title === "string" && d.title.trim()) onEvent({ type: "title", title: d.title.trim() });
                 break;
               case "assistant.message":
                 if (d.content) onEvent({ type: "message", text: String(d.content) });
@@ -196,8 +233,10 @@ export class CopilotEngine implements Engine {
               }
               case "session.idle":
                 if (lastUsage) onEvent({ type: "usage", ...lastUsage }); // once per turn: the log stays small
-                off();
-                resolve();
+                void Promise.allSettled(todoReads).then(() => {
+                  off();
+                  resolve();
+                });
                 break;
             }
           }) as never);

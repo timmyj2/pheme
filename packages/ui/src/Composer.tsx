@@ -6,6 +6,7 @@ import { loadDraft, loadHistory, pushHistory, saveDraft } from "./drafts.ts";
 import { TID } from "./testids.ts";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./components/ui/dropdown-menu.tsx";
 import { StatusStack, type ActivityRun } from "./components/composer/status-stack.tsx";
+import type { TodoItem } from "../../server/src/protocol.ts";
 
 /** The server rejects bodies over 1,000,000 bytes; stay safely under that. */
 export const MAX_CHARS = 250_000;
@@ -45,9 +46,11 @@ interface Props {
   git?: GitStrip | null;
   /** Agent runs still going in this chat (shown in the status stack). */
   activity?: ActivityRun[];
+  /** The unfinished todo list from the engine, if any. */
+  todos?: TodoItem[];
 }
 
-export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, projectDir, onSend, onStop, onRemoveQueued, extra, git, activity = [] }, ref) {
+export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ chatId, busy, offline, queue, hasMessages, projectDir, onSend, onStop, onRemoveQueued, extra, git, activity = [], todos }, ref) {
   const [text, setText] = useState(() => loadDraft(chatId));
   const latest = useRef(text); // the current text, readable from cleanup code after the textarea is gone
   latest.current = text;
@@ -216,7 +219,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
       onDrop={(e) => { if (e.dataTransfer?.files.length) { e.preventDefault(); setDragging(false); addFiles([...e.dataTransfer.files]); } }}
     >
-      <StatusStack chatId={chatId} activity={activity} queue={queue} onRemoveQueued={onRemoveQueued} />
+      <StatusStack chatId={chatId} activity={activity} todos={todos} queue={queue} onRemoveQueued={onRemoveQueued} />
       {pickerVisible && (
         <div className="prompt-picker composer-panel-card" role="group" aria-label="Insert a saved prompt">
           {promptsOpen && (

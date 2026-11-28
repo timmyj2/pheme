@@ -93,20 +93,13 @@ describe("scroll-to-bottom pill", () => {
     expect(screen.queryByTestId(TID.scrollToBottom)).toBeNull();
   });
 
-  it("says Approval needed when a pending approval card is below the view", () => {
+  it("docks a pending approval outside the scroll area, so it stays in view above the composer", () => {
     n = 0;
-    const m = { scrollHeight: 2000, clientHeight: 500, scrollTop: 1500 };
     const req = ev({ type: "approval_request", id: "p1", kind: "shell", title: "Run shell command", detail: "ls" });
     render(<Transcript {...props({ events: [req], busy: true })} />);
     const scroller = screen.getByTestId(TID.transcript);
-    metrics(scroller, m);
-    const box = { top: 0, bottom: 400, height: 400, left: 0, right: 0, width: 0, x: 0, y: 0, toJSON: () => ({}) };
-    vi.spyOn(scroller, "getBoundingClientRect").mockReturnValue(box as DOMRect);
-    vi.spyOn(screen.getByTestId(TID.approval), "getBoundingClientRect").mockReturnValue({ ...box, top: 500, bottom: 580, height: 80 } as DOMRect);
-    m.scrollTop = 300;
-    fireEvent.scroll(scroller);
-    expect(screen.getByTestId(TID.scrollToBottom)).toHaveTextContent("Approval needed");
-    expect(screen.getByTestId(TID.scrollToBottom)).toHaveAttribute("data-attention", "approval");
+    expect(screen.getByTestId(TID.approvalStack).closest(`[data-testid="${TID.transcript}"]`)).toBeNull();
+    expect(scroller.contains(screen.getByTestId(TID.approval))).toBe(false);
   });
 });
 

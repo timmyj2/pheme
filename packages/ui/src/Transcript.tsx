@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AgentCard } from "./AgentCard.tsx";
 import { LazyMarkdown as Markdown } from "./LazyMarkdown.tsx";
 import type { ApprovalDecision, SeqEvent } from "./api.ts";
-import { buildBlocks, type Block } from "./blocks.ts";
+import { buildBlocks, latestIntent, type Block } from "./blocks.ts";
 import { ApprovalDone, ApprovalStack, type ApprovalBlock } from "./components/tool/approval.tsx";
 import { ToolGroup } from "./components/tool/tool-group.tsx";
 import type { Pending } from "./useChat.ts";
@@ -13,6 +13,7 @@ import { Enter } from "./components/thread/Enter.tsx";
 import { PromptBlock } from "./components/thread/PromptBlock.tsx";
 import { ReplyActions } from "./components/thread/ReplyActions.tsx";
 import { ScrollToBottom } from "./components/thread/ScrollToBottom.tsx";
+import { Thinking } from "./components/thread/Thinking.tsx";
 import { WorkingRow } from "./components/thread/WorkingRow.tsx";
 import { formatDuration, groupTurns, turnMs, type Turn } from "./components/thread/turns.ts";
 import "./components/thread/thread.css";
@@ -46,6 +47,10 @@ interface Props {
   chatId?: string | null;
   events: SeqEvent[];
   streaming: string;
+  /** Reasoning still streaming (not yet a block in the log). */
+  thinking?: { text: string; since: number } | null;
+  /** The "Collapse thinking by default" setting. */
+  collapseThinking?: boolean;
   busy: boolean;
   loaded: boolean;
   pending: Pending[];
@@ -61,7 +66,7 @@ interface Props {
 const SUGGESTIONS = ["What can you do?", "Remember that I prefer short answers", "List the files in my home folder", "Help me write a reusable skill"];
 
 export function Transcript(props: Props) {
-  const { events, streaming, busy, loaded, pending } = props;
+  const { events, streaming, busy, loaded, pending, thinking, collapseThinking = false } = props;
   const scroller = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -83,6 +88,7 @@ export function Transcript(props: Props) {
   const latestReply = lastAssistant >= 0 ? blocks[lastAssistant].key : "";
   const lastUser = useMemo(() => { for (let i = blocks.length - 1; i >= 0; i--) { const b = blocks[i]; if (b.kind === "user") return b.text; } return ""; }, [blocks]);
   const runningTool = useMemo(() => { for (let i = blocks.length - 1; i >= 0; i--) { const b = blocks[i]; if (b.kind === "tools") { const t = b.items.find((x) => x.ok === undefined); if (t) return t.name; } } return undefined; }, [blocks]);
+  const intent = useMemo(() => latestIntent(events), [events]);
   const approvalOpen = useMemo(() => busy && blocks.some((b) => b.kind === "approval" && !b.decision), [blocks, busy]);
   // Live approvals are answered from the stack at the bottom; the transcript keeps only their settled lines.
   const pendingApprovals = useMemo(() => (busy ? blocks.filter((b): b is ApprovalBlock => b.kind === "approval" && !b.decision) : []), [blocks, busy]);
@@ -181,6 +187,9 @@ export function Transcript(props: Props) {
         return <Enter key={b.key} id={b.key} enabled={enabled} className="block"><ApprovalDone b={b} /></Enter>;
       case "agent":
         return <Enter key={b.key} id={b.key} enabled={enabled} className="scaffold"><AgentCard run={b.run} onOpenChat={props.onOpenChat} /></Enter>;
+      case "thinking":
+        // Arrived while the turn was running: keep the preview open after it finishes, as the live view did.
+        return <Enter key={b.key} id={b.key} enabled={enabled} className="scaffold"><Thinking text={b.text} ms={b.ms} collapseThinking={collapseThinking} keepOpen={enabled} /></Enter>;
       case "notice":
         return <Enter key={b.key} id={b.key} enabled={enabled} className={`notice ${b.tone}`}><div role={b.tone === "error" ? "alert" : undefined}>{b.text}</div></Enter>;
       default:
@@ -237,15 +246,20 @@ export function Transcript(props: Props) {
               </PromptBlock>
             </div>
           ))}
+          {thinking && (
+            <div className="turn">
+              <div className="scaffold"><Thinking text={thinking.text} live since={thinking.since} collapseThinking={collapseThinking} /></div>
+            </div>
+          )}
           {streaming && (
             <div className="turn">
               <div className="reply streaming" data-testid={TID.assistantBlock} aria-busy="true"><Markdown text={streaming} /></div>
             </div>
           )}
-          <ApprovalStack items={pendingApprovals} onAnswer={props.onAnswer} />
-          {busy && <WorkingRow hint={approvalOpen ? "Waiting for your approval" : runningTool ? `Running ${runningTool}` : "Working"} />}
+          {busy && <WorkingRow hint={approvalOpen ? "Waiting for your approval" : intent ?? (runningTool ? `Running ${runningTool}` : "Working")} />}
         </div>
       </div>
+      <div className="approval-dock"><ApprovalStack items={pendingApprovals} onAnswer={props.onAnswer} /></div>
       {!atBottom && <ScrollToBottom approvalBelow={approvalBelow} unseen={missed} onClick={() => toBottom(true)} />}
     </div>
   );

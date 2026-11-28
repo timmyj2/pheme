@@ -33,7 +33,35 @@ export type ChatEvent =
   | { type: "turn_start" }
   | { type: "idle" }
   | { type: "usage"; used: number; limit: number }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | ActivityEvent;
+
+/**
+ * Events the Copilot SDK defines (pinned 1.0.34 types) but that no real run has confirmed yet. Mapped from:
+ * assistant.reasoning_delta / assistant.reasoning (reasoningId), assistant.intent, session.todos_changed (signal only:
+ * the rows come from session.rpc.plan.readSqlTodosWithDependencies), tool.execution_progress and
+ * tool.execution_partial_result (toolCallId), session.title_changed. The UI shows each piece only when its event arrives.
+ */
+export type ActivityEvent =
+  /** Live reasoning text. Streamed, not persisted. */
+  | { type: "reasoning_delta"; id: string; text: string }
+  /** The final reasoning block. `ms` is measured from its first delta (absent when no delta was seen). */
+  | { type: "reasoning"; id: string; text: string; ms?: number }
+  /** What the model is doing right now, one short line. */
+  | { type: "intent"; text: string }
+  /** The full todo list as of now (replaces the previous list). */
+  | { type: "todos"; items: TodoItem[] }
+  /** Progress or partial output of a running tool. Streamed, not persisted. `partial` means output, not a status line. */
+  | { type: "progress"; id: string; text: string; partial?: boolean }
+  /** The title the engine gave the session. */
+  | { type: "title"; title: string };
+
+export interface TodoItem {
+  id: string;
+  title: string;
+  /** As the engine reports it, e.g. "pending", "in_progress", "done". */
+  status: string;
+}
 
 /** An event as stored/streamed, numbered per chat. */
 export type SeqEvent = ChatEvent & { seq: number; ts: number };
@@ -56,6 +84,8 @@ export interface Settings {
   memoryReviewEveryUserMessages: number;
   memoryLimit: number;
   userLimit: number;
+  /** Hide the live reasoning preview; the finished thinking block stays collapsed. */
+  collapseThinking: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -72,6 +102,7 @@ export const DEFAULT_SETTINGS: Settings = {
   memoryReviewEveryUserMessages: 10,
   memoryLimit: 2200,
   userLimit: 1375,
+  collapseThinking: false,
 };
 
 export interface Usage {

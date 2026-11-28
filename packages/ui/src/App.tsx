@@ -402,6 +402,7 @@ export function App() {
               model={chats.find((c) => c.id === activeId)?.model}
               defaultModel={state.settings.model}
               reasoningEffort={state.settings.reasoningEffort}
+              collapseThinking={state.settings.collapseThinking}
               onReasoningEffort={(e) => void setSetting({ reasoningEffort: e })}
               offline={offline}
               folderInTop={!sidebarOpen}
