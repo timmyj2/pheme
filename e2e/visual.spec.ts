@@ -174,7 +174,7 @@ test("capabilities", async ({ page }) => {
   const skills: [string, string][] = [["computer-use", "Drive the desktop background-first; escalate on signal."], ["apple-notes", "Manage Apple Notes via memo CLI: create, search, edit."], ["apple-reminders", "Apple Reminders via remindctl: add, list, complete."], ["findmy", "Track Apple devices and AirTags via FindMy.app."], ["imessage", "Send and receive iMessage and SMS via the imsg CLI."], ["write-tests", "Add a regression test before fixing a bug."]];
   for (const [name, d] of skills) await api(page, "PUT", `/api/skills/${name}`, { content: `---\nname: ${name}\ndescription: ${d}\n---\n\n## Procedure\n1. Read the relevant files.\n2. Make the change.\n` });
   await visit(page, "#/skills");
-  await expect(page.getByText("apple-notes").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open apple-notes" })).toBeVisible();
   files.capabilities = await shoot(page, "capabilities");
 });
 

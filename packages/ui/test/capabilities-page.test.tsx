@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SkillsPage } from "../src/Pages.tsx";
 import { filterSkills, groupSkills, skillCategories } from "../src/components/page/skill-filter.ts";
+import { skillDisplayName } from "../src/components/page/skill-card.tsx";
 import { api, type SkillSummary } from "../src/api.ts";
 import { ToastProvider } from "../src/toast.tsx";
 import { clearUnsaved } from "../src/unsaved.ts";
@@ -23,6 +24,13 @@ beforeEach(() => {
   vi.clearAllMocks(); clearUnsaved();
   m("skills").mockResolvedValue(SKILLS);
   m("curator").mockResolvedValue({ running: false, lastRunAt: null, report: [] });
+});
+
+describe("skill card display", () => {
+  it("title-cases the name for display only", () => {
+    expect(skillDisplayName("apple-notes")).toBe("Apple Notes");
+    expect(skillDisplayName("write_tests")).toBe("Write Tests");
+  });
 });
 
 describe("skill filters", () => {
@@ -50,7 +58,8 @@ describe("Capabilities page", () => {
     expect(screen.getByRole("link", { name: "Memory" })).toHaveAttribute("href", "#/memory");
     expect(screen.getByRole("link", { name: "Agents" })).toHaveAttribute("href", "#/agents");
     expect(screen.getByRole("link", { name: /Skills/ })).toHaveTextContent("3");
-    expect(screen.getAllByText("Yours")).toHaveLength(3);
+    expect(screen.getAllByText("Yours")).toHaveLength(6);
+    expect(screen.getByRole("heading", { name: "Apple Notes" })).toBeInTheDocument();
     expect(screen.queryByRole("switch")).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByRole("button", { name: "Archive apple-notes" })).toBeInTheDocument();
@@ -58,16 +67,16 @@ describe("Capabilities page", () => {
   it("filters the cards with search and the category chips", async () => {
     const user = userEvent.setup();
     render(ui());
-    await screen.findByText("write-tests");
+    await screen.findByText("Write Tests");
     await user.type(screen.getByLabelText("Search skills"), "apple");
-    expect(screen.queryByText("write-tests")).toBeNull();
+    expect(screen.queryByText("Write Tests")).toBeNull();
     await user.clear(screen.getByLabelText("Search skills"));
     await user.click(screen.getByRole("button", { name: "Apple" }));
     expect(screen.getByRole("button", { name: "Apple" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByText("write-tests")).toBeNull();
+    expect(screen.queryByText("Write Tests")).toBeNull();
     await user.click(screen.getByRole("button", { name: "All" }));
-    expect(screen.getByText("write-tests")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Apple" })).toBeInTheDocument();
+    expect(screen.getByText("Write Tests")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Apple" })).toHaveTextContent("Skills for apple.");
   });
   it("archives a skill from its card after confirming, and keeps the curator button", async () => {
     const user = userEvent.setup();

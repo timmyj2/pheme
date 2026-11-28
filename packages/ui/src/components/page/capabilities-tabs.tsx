@@ -19,11 +19,11 @@ export function CapabilitiesTabs({ active, counts = {} }: { active: CapabilityTa
             key={t.id}
             href={`#/${t.id}`}
             aria-current={on ? "page" : undefined}
-            className={`relative pb-2 text-[15px] no-underline outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${on ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            className={`relative pb-2 text-[15px] no-underline outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${on ? "font-semibold text-white" : "text-muted-foreground hover:text-foreground"}`}
           >
             {t.label}
             {count != null && <sup className="ml-1 text-[10px] text-muted-foreground tabular-nums">{count}</sup>}
-            {on && <span aria-hidden="true" className="absolute inset-x-0 -bottom-px h-0.5 bg-primary" />}
+            {on && <span aria-hidden="true" className="absolute inset-x-0 -bottom-px h-0.5 bg-[#ffbf00]" />}
           </a>
         );
       })}

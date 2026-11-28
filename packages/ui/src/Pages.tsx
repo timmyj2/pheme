@@ -205,16 +205,17 @@ export function SkillsPage({ name, onOpen }: { name: string | null; onOpen: (nam
             </div>
             <button className="btn" onClick={() => guarded(() => { setIsNew(true); setContent(NEW_SKILL); setSaved(""); setFiles([]); onOpen(null); })}>New skill</button>
           </div>
-          <div className="mx-6 mb-3 flex h-10 items-center gap-2 rounded-[6px] border border-(--ui-stroke-secondary) bg-(--ui-bg-card) px-3">
+          <div className="mx-6 mb-3 flex h-9 items-center gap-2 rounded-[6px] border border-[#33323a] bg-[#1a1b24] px-3">
             <IconSearch className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="rounded-[3px] bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">Skills</span>
+            <span className="rounded-[3px] bg-[#2c293a] px-1.5 py-0.5 text-[11px] text-muted-foreground">Skills</span>
             <Input className="h-full border-0 bg-transparent px-0 focus-visible:ring-0" aria-label="Search skills" placeholder="Search skills by name or description" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           {categories.length > 0 && (
             <div role="group" aria-label="Filter skills by category" className="mx-6 mb-6 flex flex-wrap gap-1.5">
               {["All", ...categories].map((c) => (
                 <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)}
-                  className={`h-7 rounded-[4px] border px-3 text-[13px] ${category === c ? "border-primary bg-primary text-primary-foreground" : "border-(--ui-stroke-secondary) text-muted-foreground hover:text-foreground"}`}>
+                  style={category === c ? { background: "#ffbf00", borderColor: "#ffbf00", color: "#16130a", boxShadow: "none" } : { background: "transparent", borderColor: "rgba(255, 255, 255, 0.14)", boxShadow: "none" }}
+                  className={`h-7 rounded-[4px] border px-3 text-[13px] ${category === c ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>
                   {c === "All" ? "All" : c.charAt(0).toUpperCase() + c.slice(1)}
                 </button>
               ))}
@@ -225,8 +226,8 @@ export function SkillsPage({ name, onOpen }: { name: string | null; onOpen: (nam
           {list && list.length > 0 && shown.length === 0 && <p className="muted mx-6 text-[13px]">No skill matches “{query}”.</p>}
           {groups.map((g) => (
             <section key={g.title} className="mx-6 mb-8" aria-label={g.title}>
-              <h3 className="m-0 text-[20px] font-semibold">{g.title}</h3>
-              <p className="muted mt-1 mb-4 text-[13px]">{g.items.length} {g.items.length === 1 ? "skill" : "skills"}</p>
+              <h3 className="m-0 text-[24px] font-semibold leading-tight">{g.title}</h3>
+              <p className="muted mt-1 mb-4 text-[13px]">{g.title === "Other" ? "Skills without a category." : g.title === "Your skills" ? `${g.items.length} ${g.items.length === 1 ? "skill" : "skills"}.` : `Skills for ${g.title.toLowerCase()}.`}</p>
               <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(14rem,1fr))]">
                 {g.items.map((s) => (
                   <SkillCard key={s.name} skill={s} onOpen={() => guarded(() => { setIsNew(false); onOpen(s.name); })} onArchive={() => setArchiveName(s.name)} />
