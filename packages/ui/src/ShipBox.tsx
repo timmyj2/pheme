@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { IconCheck, IconCircleFilled, IconX } from "./lib/icons.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type GitStatus, type RemoteInfo } from "./api.ts";
 import { PrDetails } from "./PrDetails.tsx";
@@ -12,7 +14,12 @@ interface Props {
   onDone: () => void;
 }
 
-const CHECKS: Record<string, string> = { passing: "✓ Checks passing", failing: "✗ Checks failing", pending: "● Checks running", none: "No checks" };
+const CHECKS: Record<string, string> = { passing: "Checks passing", failing: "Checks failing", pending: "Checks running", none: "No checks" };
+const CHECK_ICON: Record<string, ReactNode> = {
+  passing: <IconCheck className="mr-1 inline size-3 align-[-2px]" aria-hidden="true" />,
+  failing: <IconX className="mr-1 inline size-3 align-[-2px]" aria-hidden="true" />,
+  pending: <IconCircleFilled className="mr-1 inline size-2 align-[-1px]" aria-hidden="true" />,
+};
 
 /** Push the branch and open a pull request. Every step asks first; nothing is forced. */
 export function ShipBox({ chatId, status, busy, suggestedTitle, onDone }: Props) {
@@ -119,7 +126,7 @@ export function ShipBox({ chatId, status, busy, suggestedTitle, onDone }: Props)
       {info.pr ? (
         <div className="pr-card">
           <a href={info.pr.url} target="_blank" rel="noreferrer noopener">#{info.pr.number} {info.pr.title}</a>
-          <span className={`checks ${info.pr.checks}`}>{info.pr.draft ? "Draft · " : ""}{CHECKS[info.pr.checks]}</span>
+          <span className={`checks ${info.pr.checks}`}>{info.pr.draft ? "Draft · " : ""}{CHECK_ICON[info.pr.checks]}{CHECKS[info.pr.checks]}</span>
           <PrDetails chatId={chatId} number={info.pr.number} />
         </div>
       ) : canPr ? (

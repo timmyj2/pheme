@@ -1,3 +1,4 @@
+import { IconFolder, IconGitBranch } from "./lib/icons.ts";
 import { useState } from "react";
 import { Dialog } from "./Dialog.tsx";
 import type { GitStatus } from "./api.ts";
@@ -41,9 +42,9 @@ export function ProjectBar({ dir, status, busy, panelOpen, onTogglePanel, onSetD
       {dir ? (
         <>
           <button className="project-folder" style={box} title={`${dir}\nClick to change`} onClick={() => { setValue(dir); setErr(""); setEditing(true); }} aria-label={`Project folder ${dir}. Change`}>
-            <span aria-hidden>📁</span> {!compact && <span className="project-name">{folderName}</span>}
+            <IconFolder className="size-3.5" aria-hidden="true" /> {!compact && <span className="project-name">{folderName}</span>}
           </button>
-          {!compact && status?.repo && status.branch && <span className="project-branch" title={status.upstream ? `Tracking ${status.upstream}` : "No upstream branch"}>⎇ {status.branch}{status.ahead ? ` ↑${status.ahead}` : ""}{status.behind ? ` ↓${status.behind}` : ""}</span>}
+          {!compact && status?.repo && status.branch && <span className="project-branch" title={status.upstream ? `Tracking ${status.upstream}` : "No upstream branch"}><IconGitBranch className="inline size-3.5 align-[-2px]" aria-hidden="true" /> {status.branch}{status.ahead ? ` ↑${status.ahead}` : ""}{status.behind ? ` ↓${status.behind}` : ""}</span>}
           {!compact && status?.repo && status.detached && <span className="project-branch warn">detached HEAD</span>}
           {!compact && <span className="spacer" />}
           {!compact && (
@@ -55,7 +56,7 @@ export function ProjectBar({ dir, status, busy, panelOpen, onTogglePanel, onSetD
       ) : (
         <>
         <button className="project-folder empty" style={box} aria-label="Choose a project folder" onClick={() => { setValue(""); setErr(""); setEditing(true); }}>
-          <span aria-hidden>📁</span> {!compact && <span className="folder-label">Choose a project folder</span>}
+          <IconFolder className="size-3.5" aria-hidden="true" /> {!compact && <span className="folder-label">Choose a project folder</span>}
         </button>
         </>
       )}

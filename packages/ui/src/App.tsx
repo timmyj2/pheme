@@ -1,3 +1,5 @@
+import { Badge } from "./components/ui/badge.tsx";
+import { IconKeyboard, IconMenu2 } from "./lib/icons.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentsPage } from "./Agents.tsx";
 import { ChatView } from "./Chat.tsx";
@@ -132,7 +134,7 @@ export function App() {
   useEffect(() => {
     const names: Record<string, string> = { skills: "Skills", memory: "Memory", agents: "Agents", prompts: "Prompts", jobs: "Scheduled jobs", settings: "Settings" };
     const name = route.view === "chat" ? (activeChat?.title ?? "New chat") : names[route.view];
-    document.title = `${activeBusy && route.view === "chat" ? "● " : ""}${name} · Pheme`;
+    document.title = `${activeBusy && route.view === "chat" ? "• " : ""}${name} · Pheme`;
   }, [route, activeChat?.title, activeBusy]);
 
   useEffect(() => { try { localStorage.setItem(HIDE_KEY, hidden ? "1" : "0"); } catch { /* ignore */ } }, [hidden]);
@@ -358,7 +360,7 @@ export function App() {
       {drawer && <div className="backdrop" onClick={closeDrawer} aria-hidden />}
       <main className="main" id="main" tabIndex={-1}>
         <header className="topbar">
-          <button className="icon-btn menu-btn" data-testid={TID.menuButton} aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarOpen} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (narrow) setDrawer((d) => !d); else setHidden((h) => !h); }}>☰</button>
+          <button className="icon-btn menu-btn" data-testid={TID.menuButton} aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarOpen} title={`Toggle sidebar (${formatCombo(keys.sidebar)})`} onClick={() => { if (narrow) setDrawer((d) => !d); else setHidden((h) => !h); }}><IconMenu2 className="size-4" aria-hidden="true" /></button>
           <div id="top-folder" className="top-folder" />
           <h1 className="sr-only">{pageTitle}</h1>
           <div className="tab-strip" data-testid={TID.tabStrip} role="tablist" aria-label="Open chats">
@@ -369,8 +371,8 @@ export function App() {
               </button>
             )) : <span className="tab active" data-testid={TID.tab} data-active="true" role="tab" aria-selected="true">{pageTitle}</span>}
           </div>
-          {state.fake && <span className="pill" title="Using the built-in fake engine">fake</span>}
-          <button className="icon-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={() => setHelp(true)}>⌨</button>
+          {state.fake && <Badge className="self-center" size="xs" title="Using the built-in fake engine" variant="muted">fake</Badge>}
+          <button className="icon-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={() => setHelp(true)}><IconKeyboard className="size-4" aria-hidden="true" /></button>
         </header>
         {offline && (
           <div className="banner warn" role="alert">

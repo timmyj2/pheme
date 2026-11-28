@@ -1,3 +1,4 @@
+import { IconClipboardList, IconPaperclip, IconPhoto } from "./lib/icons.ts";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { ACCEPT, checkFiles, DEFAULT_TEXT, isImage, nameForPasted, sizeLabel } from "./attach.ts";
 import { firstPlaceholder, PromptList, promptsFor, SaveAsPrompt, usePrompts } from "./PromptPicker.tsx";
@@ -229,7 +230,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           <ul className="att-draft" aria-label="Files to send">
             {files.map((f, i) => (
               <li key={`${f.name}-${f.size}-${i}`}>
-                {isImage(f) ? <Thumb file={f} /> : <span aria-hidden="true">📎</span>}
+                {isImage(f) ? <Thumb file={f} /> : <IconPaperclip className="size-4" aria-hidden="true" />}
                 <span className="att-meta">
                   <span className="att-name">{f.name}</span>
                   <span className="muted small">{sizeLabel(f.size)}</span>
@@ -240,7 +241,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ ch
           </ul>
         )}
         <div className="composer-row">
-          <button className="icon-btn attach-btn" aria-label="Insert a saved prompt" aria-expanded={promptsOpen} title="Saved prompts (or type /)" onClick={() => { setPromptsOpen((o) => !o); setSavingPrompt(false); setPromptFilter(""); }}>📋</button>
+          <button className="icon-btn attach-btn" aria-label="Insert a saved prompt" aria-expanded={promptsOpen} title="Saved prompts (or type /)" onClick={() => { setPromptsOpen((o) => !o); setSavingPrompt(false); setPromptFilter(""); }}><IconClipboardList className="size-4" aria-hidden="true" /></button>
           <button className="icon-btn attach-btn" aria-label="Attach files" title="Attach images or text files (or drop or paste them)" disabled={offline} onClick={() => picker.current?.click()}>+</button>
           <textarea
             ref={ta}
@@ -284,5 +285,5 @@ function Thumb({ file }: { file: File }) {
     setUrl(u);
     return () => URL.revokeObjectURL(u);
   }, [file]);
-  return url ? <img className="att-mini" src={url} alt="" /> : <span aria-hidden="true">🖼</span>;
+  return url ? <img className="att-mini" src={url} alt="" /> : <IconPhoto className="size-4" aria-hidden="true" />;
 }

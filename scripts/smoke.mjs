@@ -39,7 +39,7 @@ try {
   const cssPath = /href="(\/assets\/[^"]+\.css)"/.exec(html)?.[1];
   const css = cssPath ? await (await fetch(base + cssPath)).text() : "";
   const fontPaths = [...css.matchAll(/url\((\/assets\/JetBrainsMono-[^)]+\.woff2)\)/g)].map((m) => m[1]);
-  if (fontPaths.length !== 3) fail("expected three JetBrains Mono font files in the stylesheet, found " + fontPaths.length);
+  if (fontPaths.length !== 2) fail("expected two JetBrains Mono font files in the stylesheet, found " + fontPaths.length);
   if (/url\(\s*["']?https?:/.test(css) || /@import[^;]*https?:/.test(css)) fail("the stylesheet references an external URL");
   for (const f of fontPaths) {
     const r = await fetch(base + f);

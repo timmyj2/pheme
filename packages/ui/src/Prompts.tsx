@@ -19,7 +19,7 @@ export function folderLabel(dir: string): string {
   return parts[parts.length - 1] ?? dir;
 }
 
-/** Saved prompts: create, edit, delete. They are inserted from the message box (the 📋 button, or type "/"). */
+/** Saved prompts: create, edit, delete. They are inserted from the message box (the saved prompts button, or type "/"). */
 export function PromptsPage() {
   const toast = useToast();
   const [items, setItems] = useState<Prompt[] | null>(null);
@@ -63,7 +63,7 @@ export function PromptsPage() {
     <section className="page wide">
       <header className="page-head">
         <h2 className="page-title">Prompts</h2>
-        <p className="muted">Saved messages you use again and again. In a chat, press the 📋 button next to the message box, or type <kbd>/</kbd>, to insert one. Put <code>{"{{like this}}"}</code> where you want to fill something in.</p>
+        <p className="muted">Saved messages you use again and again. In a chat, press the saved prompts button next to the message box, or type <kbd>/</kbd>, to insert one. Put <code>{"{{like this}}"}</code> where you want to fill something in.</p>
       </header>
       {loadError && !items && <LoadError error={loadError} onRetry={() => void load()} />}
       <div className="panel">

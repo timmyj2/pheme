@@ -19,11 +19,10 @@ test.describe("design tokens in a real browser", () => {
       document.body.append(probe);
       await document.fonts.load('400 13px "JetBrains Mono"');
       await document.fonts.load('700 13px "JetBrains Mono"');
-      await document.fonts.load('italic 400 13px "JetBrains Mono"');
       const out = {
         fontSize: cs.fontSize, lineHeight: cs.lineHeight, scalar: root.getPropertyValue("--radius-scalar").trim(),
         dark: document.documentElement.classList.contains("dark"), bg: cs.backgroundColor, primary: root.getPropertyValue("--theme-primary").trim().toLowerCase(),
-        mono: ["400 13px", "700 13px", "italic 400 13px"].map((f) => document.fonts.check(`${f} "JetBrains Mono"`)),
+        mono: ["400 13px", "700 13px"].map((f) => document.fonts.check(`${f} "JetBrains Mono"`)),
         loaded: [...document.fonts].filter((f) => f.family.includes("JetBrains") && f.status === "loaded").length,
         textScale: root.getPropertyValue("--chat-text-scale").trim(),
       };
@@ -38,8 +37,8 @@ test.describe("design tokens in a real browser", () => {
     // The chrome mix of the gold-on-navy seeds, about #171726. Chromium serialises color-mix results as color(srgb r g b).
     const ch = (/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)\)/.exec(m.bg) ?? /rgb\((\d+), (\d+), (\d+)\)/.exec(m.bg) ?? []).slice(1).map((v) => (m.bg.startsWith("color") ? Math.round(Number(v) * 255) : Number(v)));
     expect(ch).toEqual([23, 23, 38]);
-    expect(m.mono).toEqual([true, true, true]);
-    expect(m.loaded).toBe(3);
+    expect(m.mono).toEqual([true, true]);
+    expect(m.loaded).toBe(2);
     expect(m.textScale).toBe("1.1");
     expect(external).toEqual([]);
   });

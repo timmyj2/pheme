@@ -1,3 +1,5 @@
+import { DisclosureCaret } from "./components/ui/disclosure-caret.tsx";
+import { IconArrowDown, IconPaperclip, IconRefresh } from "./lib/icons.ts";
 import { Attachments } from "./AttachmentView.tsx";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentCard } from "./AgentCard.tsx";
@@ -60,7 +62,7 @@ const ToolGroup = memo(function ToolGroup({ items }: { items: ToolItem[] }) {
   return (
     <div className="tool-group" data-testid={TID.toolGroup}>
       <button className="tool-summary" onClick={() => setOpen(!open)} aria-expanded={expanded}>
-        <span className="chev" aria-hidden>{expanded ? "▾" : "▸"}</span>
+        <span className="chev" aria-hidden><DisclosureCaret open={expanded} /></span>
         {items.length} tool calls
         {running ? " · running" : ""}
         {failed ? ` · ${failed} failed` : ""}
@@ -91,7 +93,7 @@ function Actions({ ts, onCopy, onRetry }: { ts?: number; onCopy: () => void; onR
   return (
     <div className="msg-actions">
       <button className="icon-btn" onClick={onCopy} aria-label="Copy message" title="Copy">⧉ Copy</button>
-      {onRetry && <button className="icon-btn" onClick={onRetry} aria-label="Try again" title="Send the last message again">↻ Try again</button>}
+      {onRetry && <button className="icon-btn" onClick={onRetry} aria-label="Try again" title="Send the last message again"><IconRefresh className="inline size-3.5 align-[-2px]" aria-hidden="true" /> Try again</button>}
       {ts ? <time className="muted small" dateTime={new Date(ts).toISOString()} title={new Date(ts).toLocaleString()}>{clock(ts)}</time> : null}
     </div>
   );
@@ -229,7 +231,7 @@ export function Transcript(props: Props) {
           {pending.map((p) => (
             <div key={`p${p.id}`} className={`msg user-msg pending${p.failed ? " failed" : ""}`} data-testid={TID.userMessage}>
               <div className="bubble user" data-testid={TID.userBlock}>{p.text}</div>
-              {p.files?.length ? <ul className="att-list" aria-label="Attachments being sent">{p.files.map((n, i) => <li key={i}><span className="att-chip">📎 {n}</span></li>)}</ul> : null}
+              {p.files?.length ? <ul className="att-list" aria-label="Attachments being sent">{p.files.map((n, i) => <li key={i}><span className="att-chip"><IconPaperclip className="inline size-3.5 align-[-2px]" aria-hidden="true" /> {n}</span></li>)}</ul> : null}
               {p.failed ? (
                 <div className="msg-actions show">
                   <span className="over small">Not sent: {p.failed}</span>
@@ -245,7 +247,7 @@ export function Transcript(props: Props) {
       </div>
       {!atBottom && (
         <button className={`jump${missed ? " new" : ""}`} onClick={() => toBottom(true)} aria-label="Jump to the latest message">
-          ↓ {missed ? "New messages" : "Latest"}
+          <IconArrowDown className="inline size-3.5 align-[-2px]" aria-hidden="true" /> {missed ? "New messages" : "Latest"}
         </button>
       )}
     </div>

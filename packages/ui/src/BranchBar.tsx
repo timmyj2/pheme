@@ -1,3 +1,4 @@
+import { IconChevronDown, IconChevronUp, IconCircleFilled, IconGitBranch } from "./lib/icons.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type BranchList, type GitStatus, type StashEntry } from "./api.ts";
 import { useToast } from "./toast.tsx";
@@ -79,8 +80,8 @@ export function BranchBar({ chatId, status, busy, onChanged }: Props) {
   return (
     <div className="branch-bar">
       <button className="branch-pill" data-testid={TID.branchPill} aria-expanded={open} aria-controls="branch-panel" onClick={() => setOpen((o) => !o)}>
-        <span aria-hidden="true">⎇</span> {status.detached ? "detached HEAD" : status.branch ?? "no branch"}
-        <span className="muted small"> · branches and stash {open ? "▴" : "▾"}</span>
+        <IconGitBranch className="inline size-3.5 align-[-2px]" aria-hidden="true" /> {status.detached ? "detached HEAD" : status.branch ?? "no branch"}
+        <span className="muted small"> · branches and stash {open ? <IconChevronUp className="inline size-3" aria-hidden="true" /> : <IconChevronDown className="inline size-3" aria-hidden="true" />}</span>
       </button>
       {open && (
         <div id="branch-panel" className="branch-panel">
@@ -102,7 +103,7 @@ export function BranchBar({ chatId, status, busy, onChanged }: Props) {
               {shown.map((b) => (
                 <li key={b.name}>
                   <button className="branch-item" aria-current={b.current ? "true" : undefined} disabled={b.current || working || !!wait} title={wait || b.subject} onClick={() => void switchTo(b.name)}>
-                    <span className="branch-name">{b.current ? "● " : ""}{b.name}</span>
+                    <span className="branch-name">{b.current ? <IconCircleFilled className="mr-1 inline size-2 align-[-1px]" aria-hidden="true" /> : null}{b.name}</span>
                     <span className="muted small">{b.subject} · {ago(b.date)}</span>
                   </button>
                 </li>

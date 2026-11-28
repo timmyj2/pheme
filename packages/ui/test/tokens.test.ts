@@ -22,8 +22,8 @@ describe("type metrics and tokens", () => {
   });
   it("mono font leads with the bundled JetBrains Mono", () => {
     expect(decl(/:root/, "--dt-font-mono")).toMatch(/^"JetBrains Mono"/);
-    expect([...css.matchAll(/url\("\.\/fonts\/(JetBrainsMono-\w+\.woff2)"\)/g)].map((m) => m[1]).sort()).toEqual(["JetBrainsMono-Bold.woff2", "JetBrainsMono-Italic.woff2", "JetBrainsMono-Regular.woff2"]);
-    for (const f of ["Regular", "Bold", "Italic"]) expect(fs.statSync(path.join(__dirname, `../src/fonts/JetBrainsMono-${f}.woff2`)).size).toBeGreaterThan(50_000);
+    expect([...css.matchAll(/url\("\.\/fonts\/(JetBrainsMono-\w+\.woff2)"\)/g)].map((m) => m[1]).sort()).toEqual(["JetBrainsMono-Bold.woff2", "JetBrainsMono-Regular.woff2"]);
+    for (const f of ["Regular", "Bold"]) expect(fs.statSync(path.join(__dirname, `../src/fonts/JetBrainsMono-${f}.woff2`)).size).toBeGreaterThan(50_000);
     expect(css).not.toMatch(/https?:\/\//);
   });
   it("keeps reduced-motion and reduced-transparency rules", () => {

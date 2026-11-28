@@ -14,6 +14,7 @@ const TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
   ".json": "application/json",
   ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
 };
 
 export function readAssetDir(dir: string): Assets {

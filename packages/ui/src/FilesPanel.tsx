@@ -1,3 +1,6 @@
+import { DisclosureCaret } from "./components/ui/disclosure-caret.tsx";
+import { GlyphSpinner } from "./components/ui/glyph-spinner.tsx";
+import { IconArrowUp, IconRefresh, IconX } from "./lib/icons.ts";
 import { useCallback, useEffect, useState } from "react";
 import { api, type DirList } from "./api.ts";
 
@@ -28,14 +31,14 @@ export function FilesPanel({ chatId, onClose }: { chatId: string; onClose: () =>
       <header className="changes-head">
         <h2>{list?.label ?? "Files"}</h2>
         <span className="spacer" />
-        <button className="icon-btn" aria-label="Refresh files" title="Refresh" onClick={() => void load(path)} disabled={loading}>{loading ? "…" : "↻"}</button>
-        <button className="icon-btn" aria-label="Close files" title="Close" onClick={onClose}>✕</button>
+        <button className="icon-btn" aria-label="Refresh files" title="Refresh" onClick={() => void load(path)} disabled={loading}>{loading ? <GlyphSpinner /> : <IconRefresh className="size-3.5" aria-hidden="true" />}</button>
+        <button className="icon-btn" aria-label="Close files" title="Close" onClick={onClose}><IconX className="size-3.5" aria-hidden="true" /></button>
       </header>
       <div className="changes-body">
         {error && <p className="notice error" role="alert">{error}</p>}
         {list && list.parent !== null && (
           <button className="file-row" onClick={() => void load(list.parent ?? "")}>
-            <span aria-hidden="true">↑</span>
+            <IconArrowUp className="size-3.5" aria-hidden="true" />
             <span className="change-path">..</span>
           </button>
         )}
@@ -44,7 +47,7 @@ export function FilesPanel({ chatId, onClose }: { chatId: string; onClose: () =>
             <li key={e.name}>
               {e.dir ? (
                 <button className="file-row" onClick={() => void load(path ? `${path}/${e.name}` : e.name)}>
-                  <span aria-hidden="true">▸</span>
+                  <DisclosureCaret open={false} />
                   <span className="change-path">{e.name}</span>
                 </button>
               ) : (

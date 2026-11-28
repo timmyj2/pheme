@@ -1,3 +1,5 @@
+import { GlyphSpinner } from "./components/ui/glyph-spinner.tsx";
+import { IconRefresh, IconX } from "./lib/icons.ts";
 import { useEffect, useState } from "react";
 import { BranchBar } from "./BranchBar.tsx";
 import { CommitBox } from "./CommitBox.tsx";
@@ -90,8 +92,8 @@ export function ChangesPanel({ chatId, status, error, loading, onRefresh, onClos
       <header className="changes-head">
         <h2>Changes</h2>
         <span className="spacer" />
-        <button className="icon-btn" aria-label="Refresh changes" title="Refresh" onClick={onRefresh} disabled={loading}>{loading ? "…" : "↻"}</button>
-        <button className="icon-btn" aria-label="Close changes" title="Close" onClick={onClose}>✕</button>
+        <button className="icon-btn" aria-label="Refresh changes" title="Refresh" onClick={onRefresh} disabled={loading}>{loading ? <GlyphSpinner /> : <IconRefresh className="size-3.5" aria-hidden="true" />}</button>
+        <button className="icon-btn" aria-label="Close changes" title="Close" onClick={onClose}><IconX className="size-3.5" aria-hidden="true" /></button>
       </header>
       {status?.repo && !status.problem && status.hasCommits && <BranchBar key={`branch-${chatId}`} chatId={chatId} status={status} busy={busy} onChanged={onRefresh} />}
       <div className="changes-body">

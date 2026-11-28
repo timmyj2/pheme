@@ -5,6 +5,8 @@ from hermes-agent (https://github.com/NousResearch/hermes-agent), used under the
 Upstream commit: `5688461d66fadd3ce3d6ed6bccccd958c7370eae`. Each adapted file carries a header comment
 naming its upstream path. Hermes and Nous names, logos, artwork and fonts are not used.
 
+The Codicon icon font (`@vscode/codicons` 0.0.45, `packages/ui/src/components/ui/codicon.tsx`) is licensed under CC-BY-4.0 (Creative Commons Attribution 4.0 International); its licence file is `node_modules/@vscode/codicons/LICENSE`. The font is bundled into `dist/pheme.mjs` and served by Pheme.
+
 ```
 MIT License
 
