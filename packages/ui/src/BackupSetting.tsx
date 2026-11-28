@@ -71,7 +71,7 @@ export function BackupSetting() {
   };
 
   const p = picked?.preview;
-  const link = "inline-flex h-7 items-center rounded-md border border-(--ui-stroke-secondary) px-3 text-xs text-(--ui-text-secondary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
+  const link = "inline-flex h-7 items-center rounded-md border border-(--ui-stroke-secondary) px-3 text-xs text-(--ui-text-secondary) transition-colors duration-100 hover:transition-none hover:bg-(--ui-control-hover-background) hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
   return (
     <>
       <SettingsHeading>Backup and restore</SettingsHeading>
@@ -96,7 +96,7 @@ export function BackupSetting() {
           <label className="flex items-center gap-2 text-(--ui-text-secondary)"><input type="radio" name="restore-mode" checked={overwrite} onChange={() => setOverwrite(true)} /> Replace what is already here with the backup's version</label>
           <p className="text-(--ui-text-tertiary)">Pheme saves your current data in a “backups” folder inside its data folder first, so you can undo a mistake.</p>
           <div className="flex items-center gap-2 pt-1">
-            <button className="inline-flex h-7 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50" disabled={busy !== ""} onClick={() => (overwrite ? setConfirm(true) : void restore())} type="button">{busy === "restore" ? "Restoring…" : "Restore"}</button>
+            <button className="inline-flex h-7 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors duration-100 hover:transition-none hover:bg-primary/90 disabled:opacity-50" disabled={busy !== ""} onClick={() => (overwrite ? setConfirm(true) : void restore())} type="button">{busy === "restore" ? "Restoring…" : "Restore"}</button>
             <button className={link} disabled={busy !== ""} onClick={() => setPicked(null)} type="button">Cancel</button>
           </div>
         </div>

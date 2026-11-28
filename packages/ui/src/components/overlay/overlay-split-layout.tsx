@@ -37,7 +37,7 @@ function NavRow({ active, current, icon: Glyph, label, nested, onClick, trailing
     <button
       aria-current={current ? "page" : undefined}
       className={cn(
-        "row-hover flex h-7 w-full shrink-0 items-center justify-start gap-2 rounded-md border px-2 text-left text-[13px] font-normal transition-colors focus-visible:outline-hidden focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50",
+        "row-hover flex h-7 w-full shrink-0 items-center justify-start gap-2 rounded-md border px-2 text-left text-[13px] font-normal transition-colors duration-100 hover:transition-none focus-visible:outline-hidden focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50",
         nested
           ? active
             ? "border-transparent bg-(--ui-control-hover-background) font-medium text-foreground"

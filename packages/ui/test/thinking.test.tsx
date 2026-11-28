@@ -87,6 +87,8 @@ describe("Transcript reasoning, intent and progress", () => {
     const { container } = render(<Transcript {...props({ events, busy: true })} />);
     expect(container.querySelector(`[data-testid="${TID.workingRow}"]`)?.textContent).toContain("Reading the config");
     expect(screen.getByTestId(TID.toolProgress).textContent).toBe("Scanning 12 files");
+    // The working line is a polite live region, so screen readers hear the hint change.
+    expect(container.querySelector(`[data-testid="${TID.workingRow}"] [role="status"]`)).toHaveAttribute("aria-live", "polite");
   });
 
   it("drops the intent once the turn has ended", () => {

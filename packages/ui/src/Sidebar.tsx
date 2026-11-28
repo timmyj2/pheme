@@ -92,7 +92,7 @@ function NavIcon({ name }: { name: string }) {
   );
 }
 
-const ROW = "group relative flex w-full min-h-[26px] items-center gap-2 rounded-md border border-solid bg-transparent px-2 py-1 text-left text-[12.5px] transition-colors";
+const ROW = "group relative flex w-full min-h-[26px] items-center gap-2 rounded-md border border-solid bg-transparent px-2 py-1 text-left text-[12.5px] transition-colors duration-100 hover:transition-none";
 
 function Item({ c, active, unread, tabStop, onOpen, onRename, onPin, onArchive, onDelete, onExport }: {
   c: ChatRow; active: boolean; unread: boolean; tabStop: boolean;

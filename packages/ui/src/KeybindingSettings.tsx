@@ -43,7 +43,7 @@ export function KeybindingSettings() {
               control={
                 <div className="flex items-center gap-1.5">
                   <button
-                    className={`flex h-7 min-w-[5.5rem] items-center justify-center rounded-md border px-2 text-xs transition-colors ${capturing === id ? "border-(--dt-primary) text-foreground" : "border-(--ui-stroke-secondary) text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-foreground"}`}
+                    className={`flex h-7 min-w-[5.5rem] items-center justify-center rounded-md border px-2 text-xs transition-colors duration-100 hover:transition-none ${capturing === id ? "border-(--dt-primary) text-foreground" : "border-(--ui-stroke-secondary) text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-foreground"}`}
                     aria-label={`${BINDING_LABELS[id]}: ${formatCombo(keys[id])}. Change`}
                     onClick={() => { setMessage(null); setCapturing(capturing === id ? null : id); }}
                     type="button"
@@ -51,7 +51,7 @@ export function KeybindingSettings() {
                     {capturing === id ? "Press keys…" : <kbd className="font-mono text-[0.6875rem]">{formatCombo(keys[id])}</kbd>}
                   </button>
                   <button
-                    className="h-7 rounded-md px-2 text-xs text-(--ui-text-tertiary) transition-colors hover:text-foreground disabled:opacity-40 disabled:hover:text-(--ui-text-tertiary)"
+                    className="h-7 rounded-md px-2 text-xs text-(--ui-text-tertiary) transition-colors duration-100 hover:transition-none hover:text-foreground disabled:opacity-40 disabled:hover:text-(--ui-text-tertiary)"
                     disabled={keys[id] === DEFAULT_BINDINGS[id]}
                     aria-label={`Reset ${BINDING_LABELS[id]}`}
                     onClick={() => { saveBindings({ ...keys, [id]: DEFAULT_BINDINGS[id] }); setMessage(null); }}
@@ -68,7 +68,7 @@ export function KeybindingSettings() {
       </ul>
       {changed && (
         <div className="pt-3">
-          <button className="h-7 rounded-md border border-(--ui-stroke-secondary) px-3 text-xs text-(--ui-text-secondary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-foreground" onClick={() => { saveBindings({ ...DEFAULT_BINDINGS }); setCapturing(null); setMessage(null); }} type="button">Reset all to defaults</button>
+          <button className="h-7 rounded-md border border-(--ui-stroke-secondary) px-3 text-xs text-(--ui-text-secondary) transition-colors duration-100 hover:transition-none hover:bg-(--ui-control-hover-background) hover:text-foreground" onClick={() => { saveBindings({ ...DEFAULT_BINDINGS }); setCapturing(null); setMessage(null); }} type="button">Reset all to defaults</button>
         </div>
       )}
     </>

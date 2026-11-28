@@ -88,3 +88,5 @@ One line each: **decision** — why. The owner reviews these.
   - Not mapped: `tool.shell_output` (raw shell chunks; the progress line covers the need for now).
   - Fake mode: `think <text>` emits all of the above; tests in `packages/server/test/activity.test.ts`, `packages/ui/test/thinking.test.tsx` and the fake-mode e2e test in `e2e/smoke.spec.ts`. A missing event hides its piece: no reasoning means no Thinking block, no intent means "Working", no todos means no Todos row, no progress means no line under a tool.
   - Setting "Collapse thinking by default" (`collapseThinking`, default off) removes the live preview only.
+
+- 2026-11-28 (item 15): one reduced-motion kill switch lives in `tokens.css`; component-level reduced-motion rules remain only where they set a static fallback. Looping animations pause on `visibilitychange` through the `data-renderer-animations-paused` attribute. Scaffold text is 0.7 opacity (Hermes README floor).

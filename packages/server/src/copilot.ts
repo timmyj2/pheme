@@ -4,6 +4,27 @@ import { spawnSync } from "node:child_process";
 import type { Engine, EngineSession, SessionOptions } from "./engine.ts";
 import type { ModelOption } from "./protocol.ts";
 
+// Reads the todo rows over RPC. Never throws and never hangs the turn: a CLI without rpc.plan, a synchronous throw
+// or a read that does not settle within the timeout resolves to undefined, so idle is not held for long.
+const TODO_READ_TIMEOUT_MS = 3000;
+type TodoRow = Record<string, unknown>;
+async function readTodoRows(session: unknown, timeoutMs = TODO_READ_TIMEOUT_MS): Promise<TodoRow[] | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const plan = (session as { rpc?: { plan?: { readSqlTodosWithDependencies?: () => Promise<{ rows?: TodoRow[] }> } } } | undefined)?.rpc?.plan;
+    if (typeof plan?.readSqlTodosWithDependencies !== "function") return undefined;
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), timeoutMs);
+    });
+    const result = await Promise.race([plan.readSqlTodosWithDependencies(), timeout]);
+    return Array.isArray(result?.rows) ? result.rows : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Find the user's installed Copilot CLI. Returns a path the SDK can launch (a binary or npm-loader.js). */
 export function findCopilotCli(env: NodeJS.ProcessEnv = process.env): string | undefined {
   if (env.COPILOT_CLI_PATH && fs.existsSync(env.COPILOT_CLI_PATH)) return env.COPILOT_CLI_PATH;
@@ -184,12 +205,13 @@ export class CopilotEngine implements Engine {
               case "session.todos_changed":
                 // Signal only: the rows are read back over RPC. Idle waits for these reads so the list lands inside the turn.
                 todoReads.push(
-                  session.rpc.plan.readSqlTodosWithDependencies().then((r) => {
-                    const items = r.rows
+                  readTodoRows(session).then((rows) => {
+                    if (!rows) return;
+                    const items = rows
                       .map((row) => ({ id: String(row.id ?? ""), title: String(row.title ?? ""), status: String(row.status ?? "pending") }))
                       .filter((t) => t.title);
                     onEvent({ type: "todos", items });
-                  }).catch(() => {}),
+                  }),
                 );
                 break;
               case "tool.execution_progress":

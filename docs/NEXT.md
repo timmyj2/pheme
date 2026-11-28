@@ -15,7 +15,7 @@ Goal: an exact match of the Hermes webapp. Reference shots: `docs/visual/hermes-
 12. Port the composer and status stack, model pill, effort pill (only where the model reports it).
 13. Port markdown and code cards (keep react-markdown and highlight.js).
 14. Restyle the remaining pages onto the page shell; no "Hermes" or "Nous" strings anywhere in `packages/ui/src`.
-15. Motion audit, accessibility pass, exact-match gate, final `PARITY.md`.
+15. Motion audit, accessibility pass, exact-match gate, final `PARITY.md`. DONE (2026-11-28): motion timings aligned, hidden-window pause, one kill switch, scaffold 0.7, live working line, unused CSS pruned, final `PARITY.md`. Bundle 3019 KB.
 
 Not planned, on purpose: assistant-ui, nanostores, react-query, the contentEditable editor, voice, branching, Shiki and Streamdown, the plugin registry, the pane-tree layout, glass effects, and Hermes pages Copilot cannot back.
 

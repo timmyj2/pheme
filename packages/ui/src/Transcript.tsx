@@ -72,7 +72,6 @@ export function Transcript(props: Props) {
   const stick = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
   const [missed, setMissed] = useState(false);
-  const [approvalBelow, setApprovalBelow] = useState(false);
   const [shown, setShown] = useState(WINDOW);
   const grewBy = useRef<number | null>(null);
   // The blocks that were on screen when the chat loaded do not slide in again; only blocks that arrive later do.
@@ -103,18 +102,6 @@ export function Transcript(props: Props) {
     setMissed(false);
   }, []);
 
-  // Whether a pending approval card sits below the viewport, so the pill can say so.
-  const refreshApproval = useCallback(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const box = el.getBoundingClientRect();
-    const below = [...el.querySelectorAll<HTMLElement>('[data-approval-pending="true"]')].some((n) => {
-      const r = n.getBoundingClientRect();
-      return r.height > 0 && r.top >= box.bottom;
-    });
-    setApprovalBelow(below);
-  }, []);
-
   // New chat or first load: start at the bottom.
   useLayoutEffect(() => { if (loaded) toBottom(); }, [loaded, toBottom]);
 
@@ -131,8 +118,7 @@ export function Transcript(props: Props) {
     }
     if (ownSend || stick.current) toBottom();
     else setMissed(true);
-    refreshApproval();
-  }, [events.length, streaming, pending.length, toBottom, refreshApproval, approvalOpen]);
+  }, [events.length, streaming, pending.length, toBottom, approvalOpen]);
 
   // Markdown, images and expanding rows change the height without changing the event count.
   useEffect(() => {
@@ -151,7 +137,6 @@ export function Transcript(props: Props) {
     stick.current = near;
     setAtBottom(near);
     if (near) setMissed(false);
-    refreshApproval();
   };
 
   const hidden = events.length - visible.length;
@@ -260,7 +245,7 @@ export function Transcript(props: Props) {
         </div>
       </div>
       <div className="approval-dock"><ApprovalStack items={pendingApprovals} onAnswer={props.onAnswer} /></div>
-      {!atBottom && <ScrollToBottom approvalBelow={approvalBelow} unseen={missed} onClick={() => toBottom(true)} />}
+      {!atBottom && <ScrollToBottom unseen={missed} onClick={() => toBottom(true)} />}
     </div>
   );
 }

@@ -13,7 +13,7 @@ const TEXT_ACTION_ICON = '[&_.codicon]:no-underline [&_svg]:no-underline'
 // fixed heights — so they stay snug and scale with content. Only icon buttons
 // (inherently square) carry the shared 4px radius.
 const buttonVariants = cva(
-  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[2.5px] text-xs leading-4 font-medium whitespace-nowrap shadow-none transition-all duration-100 focus-visible:outline-hidden focus-visible:border-ring focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-default disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[2.5px] text-xs leading-4 font-medium whitespace-nowrap shadow-none transition-colors duration-100 hover:transition-none focus-visible:outline-hidden focus-visible:border-ring focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-default disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
   {
     variants: {
       variant: {
@@ -30,7 +30,7 @@ const buttonVariants = cva(
         // hover (shadow, not border, so nothing reflows).
         chip: 'bg-(--ui-bg-quaternary) text-(--ui-text-primary) hover:bg-(--ui-control-hover-background) hover:shadow-[inset_0_0_0_0.5px_var(--ui-stroke-secondary)]',
         ghost: 'text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)',
-        grip: 'bg-transparent text-(--ui-text-tertiary) transition-colors hover:text-(--ui-text-secondary) focus-visible:text-(--ui-text-primary)',
+        grip: 'bg-transparent text-(--ui-text-tertiary) transition-colors duration-100 hover:transition-none hover:text-(--ui-text-secondary) focus-visible:text-(--ui-text-primary)',
         // A control floating free of any surface (fan-menu discs, detached
         // chips): the menu/popover treatment — opaque popover fill + the
         // shared `shadow-md` ring-and-drop. Hover only lifts the glyph; a fill

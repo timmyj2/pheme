@@ -251,7 +251,12 @@
   }
 }
 
-/* Reduced motion: stop every animation and transition. */
+/* Loops (working square, shimmers, glyph spinners) pause while the window is hidden. main.tsx sets the attribute. */
+:root[data-renderer-animations-paused] *, :root[data-renderer-animations-paused] *::before, :root[data-renderer-animations-paused] *::after {
+  animation-play-state: paused !important;
+}
+
+/* Reduced motion: the one kill switch for every animation and transition. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -13,7 +13,7 @@ export function WorkingRow({ hint = "Working" }: { hint?: string }) {
   return (
     <div className="working-row" data-testid={TID.workingRow}>
       <span className="working-square" aria-hidden="true" />
-      <span className="working-hint" role="status">{hint}</span>
+      <span className="working-hint" role="status" aria-live="polite">{hint}</span>
       <span className="working-timer" aria-hidden="true">{formatDuration(now - since)}</span>
     </div>
   );

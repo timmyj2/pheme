@@ -104,6 +104,8 @@ test.describe("Pheme in a real browser", () => {
     const menu = tid(page, TID.menuButton);
     await menu.click();
     await expect(tid(page, TID.shell)).toHaveAttribute("data-drawer-open", "true");
+    // At 390px the open drawer must not push the page into a horizontal scroll either.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
     await page.keyboard.press("Escape");
     await expect(tid(page, TID.shell)).not.toHaveAttribute("data-drawer-open", "true");
     await expect(menu).toBeFocused();

@@ -17,7 +17,7 @@
 .tool-meta { margin-left: auto; flex-shrink: 0; font-size: 10.5px; font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }
 .tool-meta .add { color: #2da44e; }
 .tool-meta .del { color: var(--dt-destructive); }
-.tool-caret { opacity: 0; transition: opacity 150ms; flex-shrink: 0; }
+.tool-caret { opacity: 0; transition: opacity 100ms; flex-shrink: 0; }
 .tool-line-head:hover .tool-caret, .tool-line-head[aria-expanded="true"] .tool-caret { opacity: 0.8; }
 .tool-line[data-state="failed"] .tool-title { color: var(--dt-destructive); }
 .tool-line[data-state="failed"] .tool-glyph { color: var(--dt-destructive); }

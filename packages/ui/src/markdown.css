@@ -81,12 +81,12 @@ html.dark {
 
 /* Capped at 7.5rem; the fade and chevron appear only when the code overflows. */
 .md .expandable { position: relative; }
-.md .expandable-scroll { max-height: 7.5rem; overflow-x: auto; overflow-y: auto; transition: max-height 0.2s ease; }
+.md .expandable-scroll { max-height: 7.5rem; overflow-x: auto; overflow-y: auto; transition: max-height 0.22s ease; }
 .md .expandable-scroll[data-expanded] { max-height: 40vh; max-height: 40dvh; }
 .md .expandable-fade { position: absolute; inset: auto 0 0 0; height: 1.75rem; display: flex; justify-content: flex-end; align-items: flex-end; background: linear-gradient(to top, var(--md-code-bg), transparent); pointer-events: none; }
 .md .expandable-toggle { pointer-events: auto; width: 2.25rem; height: 1.75rem; display: flex; align-items: flex-end; justify-content: center; padding: 0 0 4px; border: 0; background: none; color: color-mix(in srgb, var(--dt-muted-foreground) 70%, transparent); cursor: pointer; }
 .md .expandable-toggle:hover { color: var(--dt-foreground); }
-.md .expandable-toggle svg { transition: transform 0.2s ease; }
+.md .expandable-toggle svg { transition: transform 100ms ease; }
 .md .expandable-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 
 /* Copy: 16px inset, invisible until the card is hovered or the button is focused. */

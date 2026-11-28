@@ -376,7 +376,7 @@ export function SettingsPage({ state, onChange, onClose }: { state: BootstrapSta
   }, [keys]);
 
   const searchPill = (
-    <label className="settings-overlay flex h-7 items-center gap-1.5 rounded-full border border-(--ui-stroke-secondary) bg-(--ui-chat-surface-background) px-2.5 text-(--ui-text-tertiary) shadow-sm transition-colors focus-within:text-foreground">
+    <label className="settings-overlay flex h-7 items-center gap-1.5 rounded-full border border-(--ui-stroke-secondary) bg-(--ui-chat-surface-background) px-2.5 text-(--ui-text-tertiary) shadow-sm transition-colors duration-100 hover:transition-none focus-within:text-foreground">
       <IconSearch aria-hidden="true" className="size-3" />
       <input
         aria-label="Search settings"

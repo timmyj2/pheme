@@ -76,7 +76,7 @@ export function OverlayView({ children, onClose, label, closeLabel = "Close", ed
         >
           <button
             aria-label={closeLabel}
-            className="overlay-close absolute right-3 top-3 z-10 flex size-7 items-center justify-center rounded-md text-(--ui-text-tertiary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-foreground focus-visible:outline-hidden focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50"
+            className="overlay-close absolute right-3 top-3 z-10 flex size-7 items-center justify-center rounded-md text-(--ui-text-tertiary) transition-colors duration-100 hover:transition-none hover:bg-(--ui-control-hover-background) hover:text-foreground focus-visible:outline-hidden focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50"
             onClick={() => onCloseRef.current()}
             type="button"
           >

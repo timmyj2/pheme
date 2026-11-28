@@ -87,7 +87,6 @@ describe("scroll-to-bottom pill", () => {
     fireEvent.scroll(scroller);
     const pill = screen.getByTestId(TID.scrollToBottom);
     expect(pill).toHaveTextContent("Scroll to bottom");
-    expect(pill).not.toHaveAttribute("data-attention");
     act(() => pill.click());
     expect(m.scrollTop).toBe(2000);
     expect(screen.queryByTestId(TID.scrollToBottom)).toBeNull();

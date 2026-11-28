@@ -95,7 +95,6 @@ function ApprovalCard({ b, total, onAnswer }: { b: ApprovalBlock; total: number;
     <div
       className="approval-card"
       data-testid={TID.approval}
-      data-approval-pending="true"
       data-swiping={swiping ? "true" : undefined}
       role="group"
       aria-label={label}

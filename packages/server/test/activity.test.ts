@@ -112,3 +112,48 @@ describe("Copilot mapping: activity events", () => {
     expect(events.map((e) => e.type)).toEqual(["message"]);
   });
 });
+
+describe("Copilot mapping: todo reads are guarded", () => {
+  const sessionWith = (rpc: unknown, idle: () => Promise<void> | void = () => {}) => {
+    const handlers: ((ev: { type: string; data?: Record<string, unknown> }) => void)[] = [];
+    return {
+      rpc,
+      on(h: (ev: { type: string; data?: Record<string, unknown> }) => void) { handlers.push(h); return () => {}; },
+      async send() {
+        queueMicrotask(async () => {
+          handlers.forEach((h) => h({ type: "session.todos_changed", data: {} }));
+          await idle();
+          handlers.forEach((h) => h({ type: "session.idle", data: {} }));
+        });
+      },
+      async abort() {}, async disconnect() {},
+    };
+  };
+  const runWith = async (session: unknown) => {
+    const engine = new CopilotEngine("/nonexistent");
+    const priv = engine as unknown as { client: unknown; sdk: unknown };
+    priv.sdk = { defineTool: (_n: string, cfg: unknown) => cfg };
+    priv.client = { createSession: async () => session, resumeSession: async () => session, stop: async () => {} };
+    const s = await engine.createSession(opts());
+    const events: EngineEvent[] = [];
+    await s.send("hi", (e) => events.push(e));
+    return events;
+  };
+
+  it("ends the turn normally when the CLI has no rpc.plan", async () => {
+    const events = await runWith(sessionWith({}));
+    expect(events.map((e) => e.type)).toEqual([]);
+  });
+
+  it("ends the turn normally when rpc.plan.readSqlTodosWithDependencies throws synchronously", async () => {
+    const events = await runWith(sessionWith({ plan: { readSqlTodosWithDependencies() { throw new Error("no rpc"); } } }));
+    expect(events.map((e) => e.type)).toEqual([]);
+  });
+
+  it("stops waiting for a read that never resolves", async () => {
+    const started = Date.now();
+    const events = await runWith(sessionWith({ plan: { readSqlTodosWithDependencies: () => new Promise(() => {}) } }));
+    expect(events.map((e) => e.type)).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(6000);
+  }, 10_000);
+});
