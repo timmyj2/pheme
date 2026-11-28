@@ -12,7 +12,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p packages/server && tsc -p packages/ui",
-    "lint": "eslint packages scripts e2e playwright.config.ts",
+    "lint": "eslint packages scripts e2e playwright.config.ts playwright.visual.config.ts",
     "test": "vitest run",
     "build:ui": "npm run build -w @pheme/ui",
     "build": "node scripts/build.mjs",
@@ -20,6 +20,7 @@
     "stress": "node scripts/stress.mjs",
     "dev:fake": "node --experimental-strip-types packages/server/src/main.ts --fake",
     "e2e": "playwright test",
+    "visual": "playwright test -c playwright.visual.config.ts",
     "verify": "node scripts/verify.mjs"
   },
   "devDependencies": {

@@ -95,3 +95,6 @@ Open, in priority order:
 
 ## Hermes UI match, item 1 (2026-11-28)
 Docs only. Owner decisions recorded: goal is an exact match of the Hermes webapp, porting Hermes code under MIT is allowed (upstream `5688461d`), identity, brand fonts and artwork are not. Hybrid port approach, stub-or-skip policy, and the real-Copilot probe skipped (Copilot-dependent UI is feature-detected, fake mode only). New queue is at the top of `docs/NEXT.md`. `THIRD_PARTY_NOTICES.md` now names the SHA and carries the JetBrains Mono OFL text and a Codicons line. No code changed.
+
+## Hermes UI match, item 3 (2026-11-28)
+Visual harness: `npm run visual` seeds fake-mode data and captures chat, capabilities, settings, right-panel, approval and composer at 1000x560 @2x, plus side-by-side composites against `docs/visual/hermes-reference/` in `e2e/visual-out/` (git-ignored). Separate Playwright config; default `npx playwright test` ignores it. Never fails on pixel differences.

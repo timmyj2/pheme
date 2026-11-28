@@ -4,7 +4,7 @@ Goal: an exact match of the Hermes webapp. Reference shots: `docs/visual/hermes-
 
 1. Docs: drop the "do not copy" rules, record the porting and provenance rules, notices. (This pass.)
 2. Stable test selectors (`data-testid`, roles); move e2e and unit tests off CSS classes.
-3. Visual reference set and a Playwright side-by-side harness against the five reference shots.
+3. Visual reference set and a Playwright side-by-side harness against the five reference shots. DONE: `npm run visual` (e2e/visual.spec.ts, playwright.visual.config.ts), output in `e2e/visual-out/`.
 5. Tailwind v4, the Hermes token layer, type metrics, JetBrains Mono served by Pheme.
 6. Port the `components/ui` primitives; replace every emoji with real icons.
 7. Port the shell: 28px tab strip, 237px left rail, 20px status bar, settings overlay.
