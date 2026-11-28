@@ -31,13 +31,29 @@ export const TID = {
   approvalAllowOnce: "approval-allow-once",
   approvalAllowChat: "approval-allow-chat",
   approvalDeny: "approval-deny",
+  approvalStack: "approval-stack", // the bottom-of-thread stack of pending cards
+  approvalCounter: "approval-counter", // "1 / 3" on the front card
+  approvalActivity: "approval-activity", // one line above the stack
+  toolRun: "tool-run", // consecutive calls folded into one summary line
+  runSummary: "run-summary", // that summary line (its button)
+  toolTicker: "tool-ticker", // the live reel under a run
+  delegateRow: "delegate-row", // one sub-agent in the delegate card
   composerWrap: "composer-wrap",
   composerInput: "composer-input",
+  composerBox: "composer-box", // the gold-edged box holding the strip, attachments and the input row
+  attachFiles: "attach-files", // the "Attach files or images" item in the "+" menu
   sendButton: "send-button",
   stopButton: "stop-button",
   contextMeter: "context-meter",
+  statusStack: "status-stack", // the card above the composer with subagents, background runs and the queue
+  effortPill: "effort-pill", // the reasoning-effort pill (only for models that report levels)
+  effortOption: "effort-option", // prefix; each menu item is effort-option-<level>
   settingsPanel: "settings-panel",
   dialogOverlay: "dialog-overlay",
+  rightPanelToggle: "right-panel-toggle", // the project bar button that shows or hides the docked right panel
+  rightPanel: "right-panel",
+  rightTabFiles: "right-tab-files",
+  rightTabChanges: "right-tab-changes",
   changeRow: "change-row",
   diff: "diff",
   diffLine: "diff-line",

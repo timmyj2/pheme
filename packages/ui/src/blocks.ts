@@ -89,4 +89,4 @@ export function toolDuration(t: ToolItem): string {
   return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
-export const APPROVAL_LABEL: Record<ApprovalDecision, string> = { once: "Allowed once", chat: "Allowed for this chat", deny: "Denied" };
+export const APPROVAL_LABEL: Record<ApprovalDecision, string> = { once: "Allowed once", chat: "Allowed this session", deny: "Rejected" };

@@ -1,0 +1,109 @@
+/* Tool rows, run summaries, the live ticker, diffs, delegate rows and the approval card stack. Classes here are new; the
+   older global .tool-row / .approval / .agent-card rules in styles.css are no longer used by the transcript. */
+
+.tool-group { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--dt-muted-foreground); }
+
+/* One line per call. Dim until hovered or open. */
+.tool-line { min-width: 0; }
+.tool-line-head {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; max-width: 100%; min-height: 20px;
+  cursor: pointer; border-radius: 4px; padding: 0 2px;
+}
+.tool-line-head:focus-visible { outline: 2px solid var(--dt-primary); outline-offset: 1px; }
+.tool-line-head:hover { color: var(--dt-foreground); }
+.tool-glyph { width: 14px; display: inline-flex; justify-content: center; flex-shrink: 0; color: var(--dt-muted-foreground); }
+.tool-title { white-space: nowrap; flex-shrink: 0; }
+.tool-target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--dt-font-mono); font-size: 11.5px; opacity: 0.85; }
+.tool-meta { margin-left: auto; flex-shrink: 0; font-size: 10.5px; font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }
+.tool-meta .add { color: #2da44e; }
+.tool-meta .del { color: var(--dt-destructive); }
+.tool-caret { opacity: 0; transition: opacity 150ms; flex-shrink: 0; }
+.tool-line-head:hover .tool-caret, .tool-line-head[aria-expanded="true"] .tool-caret { opacity: 0.8; }
+.tool-line[data-state="failed"] .tool-title { color: var(--dt-destructive); }
+.tool-line[data-state="failed"] .tool-glyph { color: var(--dt-destructive); }
+
+/* Pending verbs shimmer; the rest of the line stays still. */
+.tool-shimmer {
+  background: linear-gradient(90deg, currentColor 0%, currentColor 35%, color-mix(in srgb, currentColor 35%, transparent) 50%, currentColor 65%, currentColor 100%) 0 0 / 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: tool-shimmer 1.6s linear infinite;
+}
+@keyframes tool-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Expanded body: a hairline frame, the command strip, output and diff. */
+.tool-detail { position: relative; display: grid; gap: 6px; margin: 4px 0 6px; padding: 6px; border: 1px solid var(--dt-border); border-radius: 5px; }
+.tool-cmd {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 4px; background: var(--dt-muted);
+  font-family: var(--dt-font-mono); font-size: 11.5px; color: var(--dt-foreground);
+}
+.tool-prompt { color: var(--dt-primary); }
+.tool-cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: pre; font: inherit; }
+.tool-chip { flex-shrink: 0; padding: 0 6px; border-radius: 999px; font-size: 10.5px; border: 1px solid currentColor; }
+.tool-chip[data-ok="true"] { color: #2da44e; }
+.tool-chip[data-ok="false"] { color: #bf8700; }
+.tool-output, .tool-error-body { margin: 0; max-height: 5rem; overflow: auto; padding: 5px 8px; font-family: var(--dt-font-mono); font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; color: var(--dt-muted-foreground); }
+.tool-error-body { max-height: 14rem; }
+.tool-error-summary { margin: 0; font-weight: 600; color: var(--dt-destructive); white-space: pre-wrap; }
+.tool-copy { position: absolute; top: 4px; right: 4px; font-size: 10.5px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--dt-border); background: var(--dt-popover); color: var(--dt-muted-foreground); cursor: pointer; opacity: 0.6; }
+.tool-detail:hover .tool-copy, .tool-copy:focus-visible { opacity: 1; }
+
+/* Diff: capped at 12rem and scrolls inside the frame. */
+.tool-diff { max-height: 12rem; overflow: auto; margin: 0 -6px -6px; font-family: var(--dt-font-mono); font-size: 11.5px; line-height: 1.5; }
+.tool-diff-line { display: block; white-space: pre; padding: 0 10px; border-left: 2px solid transparent; }
+.tool-diff-line.add { background: var(--ui-diff-add-background); border-left-color: var(--ui-diff-add-border); color: var(--ui-diff-add-foreground); }
+.tool-diff-line.del { background: var(--ui-diff-remove-background); border-left-color: var(--ui-diff-remove-border); color: var(--ui-diff-remove-foreground); }
+.tool-diff-line.hunk { color: var(--dt-muted-foreground); opacity: 0.7; }
+
+/* A run of calls: summary line, live ticker, and the expanded list. */
+.tool-run { display: grid; gap: 2px; min-width: 0; }
+.tool-run-head { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-height: 20px; cursor: pointer; border-radius: 4px; padding: 0 2px; max-width: 100%; }
+.tool-run-head:hover { color: var(--dt-foreground); }
+.tool-run-head:focus-visible { outline: 2px solid var(--dt-primary); outline-offset: 1px; }
+.tool-run-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-run-failed { color: var(--dt-destructive); flex-shrink: 0; }
+.tool-run-body { display: grid; gap: 2px; padding-left: 14px; }
+
+/* Ticker: one fixed-height line; the reel slides up 240ms when a call is added. */
+.tool-ticker { height: 20px; overflow: hidden; position: relative; }
+.tool-ticker-reel { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
+.tool-ticker-line { height: 20px; line-height: 20px; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
+.tool-ticker-line .tool-title { font-size: 12.5px; }
+
+/* Delegate card: one bordered row per sub-agent. */
+.delegate-row { border: 1px solid var(--dt-border); border-radius: 12px; padding: 8px 12px; display: grid; gap: 2px; max-width: 75%; font-size: 12.5px; background: var(--dt-accent); }
+.delegate-head { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+.delegate-head:focus-visible { outline: 2px solid var(--dt-primary); outline-offset: 2px; border-radius: 4px; }
+.delegate-goal { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dt-foreground); }
+.delegate-meta { flex-shrink: 0; font-size: 10.5px; color: var(--dt-muted-foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.delegate-row[data-status="error"] .delegate-glyph, .delegate-row[data-status="cancelled"] .delegate-glyph { color: var(--dt-destructive); }
+.delegate-row[data-status="done"] .delegate-glyph { color: #2da44e; }
+.delegate-glyph { width: 14px; display: inline-flex; justify-content: center; flex-shrink: 0; color: var(--dt-muted-foreground); }
+.delegate-body { display: grid; gap: 6px; padding-top: 6px; color: var(--dt-muted-foreground); }
+.delegate-body pre { margin: 0; max-height: 10rem; overflow: auto; font-family: var(--dt-font-mono); font-size: 11.5px; white-space: pre-wrap; }
+
+/* Approval card stack, at the bottom of the thread. The next card peeks 7px behind at 0.96 scale per level. */
+.approval-activity { font-size: 12px; color: var(--dt-muted-foreground); padding: 0 2px 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.approval-stack { position: relative; width: 100%; max-width: 36rem; margin: 6px auto 0; }
+.card-stack { position: relative; }
+.card-stack-peek { position: absolute; top: 0; border-radius: 12px; background: var(--dt-popover); border: 1px solid var(--dt-border); pointer-events: none; }
+.card-stack-front { position: relative; }
+.approval-card {
+  border-radius: 12px; border: 1px solid var(--dt-border); background: var(--dt-popover); box-shadow: var(--shadow-float);
+  touch-action: pan-y; transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.approval-card[data-swiping="true"] { transition: none; }
+.approval-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 0; font-size: 12px; color: var(--dt-muted-foreground); }
+.approval-count { margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; }
+.approval-command {
+  margin: 0; padding: 8px 10px; max-height: 10rem; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  font-family: var(--dt-font-mono); font-size: 12px; line-height: 1.6; color: var(--dt-foreground);
+}
+.approval-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 4px 8px 8px; flex-wrap: wrap; }
+.approval-actions .approval-run kbd { margin-left: 6px; opacity: 0.6; font-family: inherit; }
+.approval-done { padding: 2px 0; overflow-wrap: anywhere; font-size: 12px; }
+.approval-done code { font-family: var(--dt-font-mono); font-size: 11.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-ticker-reel, .approval-card, .tool-caret { transition: none; }
+  .tool-shimmer { animation: none; background: none; color: inherit; -webkit-background-clip: border-box; background-clip: border-box; }
+}

@@ -1,11 +1,12 @@
-import { DisclosureCaret } from "./components/ui/disclosure-caret.tsx";
 import { IconPaperclip } from "./lib/icons.ts";
 import { Attachments } from "./AttachmentView.tsx";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentCard } from "./AgentCard.tsx";
 import { LazyMarkdown as Markdown } from "./LazyMarkdown.tsx";
 import type { ApprovalDecision, SeqEvent } from "./api.ts";
-import { APPROVAL_LABEL, buildBlocks, toolDuration, toolSummary, type Block, type ToolItem } from "./blocks.ts";
+import { buildBlocks, type Block } from "./blocks.ts";
+import { ApprovalDone, ApprovalStack, type ApprovalBlock } from "./components/tool/approval.tsx";
+import { ToolGroup } from "./components/tool/tool-group.tsx";
 import type { Pending } from "./useChat.ts";
 import { TID } from "./testids.ts";
 import { Enter } from "./components/thread/Enter.tsx";
@@ -39,58 +40,6 @@ export async function copyText(text: string): Promise<boolean> {
       return false;
     }
   }
-}
-
-const Row = memo(function ToolRow({ t }: { t: ToolItem }) {
-  const [open, setOpen] = useState(false);
-  const state = t.ok === undefined ? "running" : t.ok ? "ok" : "failed";
-  return (
-    <div className="tool-row" data-testid={TID.toolRow} data-state={state}>
-      <button className="tool-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="tool-dot" aria-hidden />
-        <span className="tool-name">{t.name}</span>
-        <span className="tool-sum">{toolSummary(t.name, t.args)}</span>
-        <span className="tool-state">{state}{toolDuration(t) ? ` · ${toolDuration(t)}` : ""}</span>
-      </button>
-      {open && <pre className="tool-body">{JSON.stringify(t.args, null, 2)}{t.result !== undefined ? `\n\n→ ${t.result}` : ""}</pre>}
-    </div>
-  );
-});
-
-const ToolGroup = memo(function ToolGroup({ items }: { items: ToolItem[] }) {
-  const running = items.some((i) => i.ok === undefined);
-  const failed = items.filter((i) => i.ok === false).length;
-  const [open, setOpen] = useState(false);
-  if (items.length <= 3) return <div className="tool-group" data-testid={TID.toolGroup}>{items.map((t) => <Row key={t.id} t={t} />)}</div>;
-  const expanded = open;
-  return (
-    <div className="tool-group" data-testid={TID.toolGroup}>
-      <button className="tool-summary" onClick={() => setOpen(!open)} aria-expanded={expanded}>
-        <span className="chev" aria-hidden><DisclosureCaret open={expanded} /></span>
-        {items.length} tool calls
-        {running ? " · running" : ""}
-        {failed ? ` · ${failed} failed` : ""}
-      </button>
-      {expanded && items.map((t) => <Row key={t.id} t={t} />)}
-    </div>
-  );
-});
-
-function Approval({ b, live, onAnswer }: { b: Extract<Block, { kind: "approval" }>; live: boolean; onAnswer: (id: string, d: ApprovalDecision) => void }) {
-  if (b.decision || !live) {
-    return <div className="approval-done muted small" data-testid={TID.approvalDone}>{b.decision ? APPROVAL_LABEL[b.decision] : "Approval expired"} · {b.title}: <code>{b.detail.slice(0, 140)}</code></div>;
-  }
-  return (
-    <div className="approval" data-testid={TID.approval} data-approval-pending="true" role="alertdialog" aria-label={b.title}>
-      <div className="approval-title">{b.title}</div>
-      <pre className="approval-detail">{b.detail}</pre>
-      <div className="approval-actions">
-        <button className="btn primary" data-testid={TID.approvalAllowOnce} onClick={() => onAnswer(b.id, "once")}>Allow once</button>
-        <button className="btn" data-testid={TID.approvalAllowChat} onClick={() => onAnswer(b.id, "chat")}>Allow for this chat</button>
-        <button className="btn danger" data-testid={TID.approvalDeny} onClick={() => onAnswer(b.id, "deny")}>Deny</button>
-      </div>
-    </div>
-  );
 }
 
 interface Props {
@@ -135,6 +84,8 @@ export function Transcript(props: Props) {
   const lastUser = useMemo(() => { for (let i = blocks.length - 1; i >= 0; i--) { const b = blocks[i]; if (b.kind === "user") return b.text; } return ""; }, [blocks]);
   const runningTool = useMemo(() => { for (let i = blocks.length - 1; i >= 0; i--) { const b = blocks[i]; if (b.kind === "tools") { const t = b.items.find((x) => x.ok === undefined); if (t) return t.name; } } return undefined; }, [blocks]);
   const approvalOpen = useMemo(() => busy && blocks.some((b) => b.kind === "approval" && !b.decision), [blocks, busy]);
+  // Live approvals are answered from the stack at the bottom; the transcript keeps only their settled lines.
+  const pendingApprovals = useMemo(() => (busy ? blocks.filter((b): b is ApprovalBlock => b.kind === "approval" && !b.decision) : []), [blocks, busy]);
 
   const toBottom = useCallback((smooth = false) => {
     const el = scroller.current;
@@ -226,7 +177,8 @@ export function Transcript(props: Props) {
       case "tools":
         return <Enter key={b.key} id={b.key} enabled={enabled} className="scaffold"><ToolGroup items={b.items} /></Enter>;
       case "approval":
-        return <Enter key={b.key} id={b.key} enabled={enabled} className="block"><Approval b={b} live={busy} onAnswer={props.onAnswer} /></Enter>;
+        if (busy && !b.decision) return null;
+        return <Enter key={b.key} id={b.key} enabled={enabled} className="block"><ApprovalDone b={b} /></Enter>;
       case "agent":
         return <Enter key={b.key} id={b.key} enabled={enabled} className="scaffold"><AgentCard run={b.run} onOpenChat={props.onOpenChat} /></Enter>;
       case "notice":
@@ -290,6 +242,7 @@ export function Transcript(props: Props) {
               <div className="reply streaming" data-testid={TID.assistantBlock} aria-busy="true"><Markdown text={streaming} /></div>
             </div>
           )}
+          <ApprovalStack items={pendingApprovals} onAnswer={props.onAnswer} />
           {busy && <WorkingRow hint={approvalOpen ? "Waiting for your approval" : runningTool ? `Running ${runningTool}` : "Working"} />}
         </div>
       </div>
